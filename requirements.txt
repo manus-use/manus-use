@@ -1,0 +1,35 @@
+# Core dependencies
+strands-agents>=0.1.4
+strands-agents-tools>=0.1.0
+
+# File and async operations
+aiofiles>=24.1.0
+
+# Docker for sandbox
+docker>=7.1.0
+
+# Browser automation
+playwright>=1.49.1
+browser-use>=0.2.1
+
+# Configuration and utilities
+pydantic>=2.0.0
+toml>=0.10.2
+rich>=13.9.4
+nest-asyncio>=1.5.8
+
+# HTTP client
+httpx>=0.28.1
+
+# Web scraping
+beautifulsoup4>=4.12.3
+
+# Search engines
+duckduckgo-search>=6.3.7
+
+# Data analysis and visualization
+pandas>=2.2.3
+matplotlib>=3.7.2
+seaborn>=0.13.2
+plotly>=5.24.1
+kaleido>=0.2.1
