@@ -2,17 +2,26 @@
 
 import asyncio
 from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
 
-from ..agents import ManusAgent, BrowserAgent, DataAnalysisAgent, MCPAgent
+from ..agents import ManusAgent, BrowserAgent, BrowserUseAgent, DataAnalysisAgent, MCPAgent
 from ..config import Config
-from .task_planner import PlanningAgent, TaskPlan
+from .planning_agent import PlanningAgent, TaskPlan
 
 
-class FlowOrchestrator:
+@dataclass
+class FlowResult:
+    """Result from flow execution."""
+    success: bool
+    output: str = ""
+    error: Optional[str] = None
+
+
+class Orchestrator:
     """Orchestrates multi-agent workflows."""
     
     def __init__(self, config: Optional[Config] = None):
-        """Initialize flow orchestrator.
+        """Initialize orchestrator.
         
         Args:
             config: Configuration object
@@ -50,7 +59,8 @@ class FlowOrchestrator:
         if agent_type == "manus":
             agent = ManusAgent(config=self.config)
         elif agent_type == "browser":
-            agent = BrowserAgent(config=self.config)
+            # Use BrowserUseAgent as the default browser agent
+            agent = BrowserUseAgent(config=self.config)
         elif agent_type == "data_analysis":
             agent = DataAnalysisAgent(config=self.config)
         elif agent_type == "mcp":
@@ -92,7 +102,10 @@ class FlowOrchestrator:
                 prompt += f"\n- {key}: {value}"
                 
         # Execute task
+        # Check if the agent returns a coroutine (async agents like BrowserUseAgent)
         result = agent(prompt)
+        if asyncio.iscoroutine(result):
+            result = await result
         
         # Store result
         self.results[task.task_id] = result
@@ -118,45 +131,75 @@ class FlowOrchestrator:
         
         return self.results
         
-    def run(self, request: str) -> Any:
+    def run(self, request: str) -> FlowResult:
         """Run a complete flow from user request.
         
         Args:
             request: User's request
             
         Returns:
-            Final result
+            FlowResult with success status and output
         """
-        # Get planning agent
-        planner = self.agents.get("planner")
-        if not planner:
-            raise ValueError("No planning agent configured")
-            
-        # Create plan
-        plan = planner.create_plan(request)
-        
-        # Execute plan
-        loop = asyncio.new_event_loop()
         try:
-            results = loop.run_until_complete(self.execute_plan(plan))
+            # Get planning agent
+            planner = self.agents.get("planner")
+            if not planner:
+                return FlowResult(success=False, error="No planning agent configured")
+                
+            # Create plan
+            plan = planner.create_plan(request)
             
-            # Return the final result (last task's output)
-            if plan:
-                return results.get(plan[-1].task_id, "No result")
-            return "No tasks in plan"
+            # Execute plan
+            loop = asyncio.new_event_loop()
+            try:
+                results = loop.run_until_complete(self.execute_plan(plan))
+                
+                # Return the final result (last task's output)
+                if plan:
+                    output = results.get(plan[-1].task_id, "No result")
+                    return FlowResult(success=True, output=str(output))
+                return FlowResult(success=True, output="No tasks in plan")
+                
+            finally:
+                loop.close()
+                
+        except Exception as e:
+            return FlowResult(success=False, error=str(e))
+    
+    async def cleanup(self):
+        """Cleanup resources for all agents."""
+        for agent_name, agent in self.agents.items():
+            if hasattr(agent, 'cleanup'):
+                try:
+                    await agent.cleanup()
+                except Exception as e:
+                    # Log but don't fail cleanup
+                    print(f"Warning: Failed to cleanup {agent_name}: {e}")
             
-        finally:
-            loop.close()
-            
-    async def run_async(self, request: str) -> Any:
+    async def run_async(self, request: str) -> FlowResult:
         """Async version of run."""
-        planner = self.agents.get("planner")
-        if not planner:
-            raise ValueError("No planning agent configured")
+        try:
+            planner = self.agents.get("planner")
+            if not planner:
+                return FlowResult(success=False, error="No planning agent configured")
+                
+            plan = planner.create_plan(request)
+            results = await self.execute_plan(plan)
             
-        plan = planner.create_plan(request)
-        results = await self.execute_plan(plan)
-        
-        if plan:
-            return results.get(plan[-1].task_id, "No result")
-        return "No tasks in plan"
+            if plan:
+                output = results.get(plan[-1].task_id, "No result")
+                return FlowResult(success=True, output=str(output))
+            return FlowResult(success=True, output="No tasks in plan")
+            
+        except Exception as e:
+            return FlowResult(success=False, error=str(e))
+    
+    async def cleanup(self):
+        """Cleanup resources for all agents."""
+        for agent_name, agent in self.agents.items():
+            if hasattr(agent, 'cleanup'):
+                try:
+                    await agent.cleanup()
+                except Exception as e:
+                    # Log but don't fail cleanup
+                    print(f"Warning: Failed to cleanup {agent_name}: {e}")

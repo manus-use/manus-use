@@ -26,7 +26,7 @@ browser = Browser(
 )
 
 agent = Agent(
-    task=task, llm=llm, controller=Controller(), browser=browser, validate_output=False,
+    task=task, llm=llm, controller=Controller(), browser=browser, validate_output=False, enable_memory=False
 )
 
 async def main():

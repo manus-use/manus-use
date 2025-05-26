@@ -42,6 +42,12 @@ class ManusAgent(BaseManusAgent):
             **kwargs
         )
         
+    def __del__(self):
+        """Ensure proper cleanup."""
+        # Properly handle cleanup by checking if parent class has __del__
+        if hasattr(super(), '__del__'):
+            super().__del__()
+        
     def _get_default_system_prompt(self) -> str:
         """Get Manus-style system prompt."""
         return """You are Manus, an advanced AI assistant capable of:

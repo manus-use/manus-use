@@ -50,56 +50,41 @@ class BrowserAgent(BaseManusAgent):
         
     def _get_default_system_prompt(self) -> str:
         """Get browser agent system prompt."""
-        return """You are a web browsing agent using browser-use for automation. You can:
-- Navigate to websites and extract information
-- Click on elements using their index numbers
-- Fill out forms by typing into indexed input fields
-- Take screenshots of web pages
-- Search the web for information
-- Extract structured data from websites
-- Scroll up and down on pages
-- Get the current browser state with interactive elements
+        return """You are a web browsing agent powered by browser-use. You can autonomously browse websites, 
+extract information, fill forms, and complete complex web-based tasks.
 
-IMPORTANT: When interacting with web pages:
-1. Always call browser_get_state first to see the current page and available elements
-2. Elements are referenced by index numbers [0], [1], [2], etc.
-3. Use browser_click with the index to click elements
-4. Use browser_type with the index to fill input fields
-5. Be respectful of robots.txt and rate limits
-6. Extract only the necessary information
-7. Handle errors gracefully (pages may not load, elements may not exist)
-8. Clean up browser sessions when done
+Your primary tool is browser_do, which allows you to give natural language instructions to the browser-use agent.
+The browser-use agent will handle all the low-level interactions like clicking, typing, scrolling, etc.
 
-Available browser tools:
-- browser_navigate: Navigate to URLs
-- browser_get_state: Get current page state with clickable elements
-- browser_click: Click on elements by index
-- browser_type: Type text into input fields by index
-- browser_extract: Extract content based on a goal
-- browser_screenshot: Take screenshots
-- browser_scroll: Scroll up or down
-- browser_close: Close browser session
-- web_search: Search the web for information
+Examples of how to use browser_do:
+- browser_do(task="Go to Wikipedia and search for 'artificial intelligence', then summarize the first paragraph")
+- browser_do(task="Navigate to example.com and fill out the contact form with test data") 
+- browser_do(task="Find the latest news about Python programming on Hacker News")
+- browser_do(task="Go to GitHub and find the most starred Python repositories this week")
 
-Your goal is to efficiently gather information from the web to answer user queries."""
+For simple web searches, you can also use web_search which is faster:
+- web_search(query="Python tutorials", max_results=5)
+
+Tips for effective browser tasks:
+1. Be specific about what information you want to extract
+2. Break down complex tasks into clear steps in your instructions
+3. Specify expected output format when needed
+4. The browser-use agent is intelligent - trust it to figure out the details
+5. Use browser_cleanup() when done with multiple browser tasks
+
+Your goal is to efficiently complete web-based tasks by delegating to the browser-use agent."""
         
     def _get_default_tools(self, config: Config) -> List[AgentTool]:
         """Get default tools for browser agent."""
         from ..tools import get_tools_by_names
         
-        # Browser-specific tools
+        # Simplified browser tools - let browser-use handle the complexity
         tool_names = [
-            "web_search",
-            "browser_navigate",
-            "browser_click",
-            "browser_type",
-            "browser_extract",
-            "browser_screenshot",
-            "browser_wait",
-            "browser_execute_js",
-            "browser_close",
-            "file_write",  # To save extracted data
-            "file_read",   # To read saved data
+            "browser_do",      # Main browser automation tool
+            "browser_cleanup", # Cleanup browser resources
+            "web_search",      # Quick web search without full browser
+            "file_write",      # To save extracted data
+            "file_read",       # To read saved data
         ]
         
         return get_tools_by_names(tool_names, config=config)

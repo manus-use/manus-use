@@ -8,7 +8,7 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.manus_use.multi_agents.task_planner import PlanningAgent
+from src.manus_use.multi_agents.task_planning_agent import PlanningAgent
 from src.manus_use.config import Config
 
 

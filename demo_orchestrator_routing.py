@@ -7,7 +7,7 @@ import json
 
 from manus_use import FlowOrchestrator, ManusAgent, BrowserAgent, DataAnalysisAgent
 from manus_use.config import Config
-from manus_use.multi_agents.task_planner import PlanningAgent
+from manus_use.multi_agents.task_planning_agent import PlanningAgent
 from manus_use.tools import file_write, file_read, web_search, code_execute
 
 

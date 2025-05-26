@@ -1,15 +1,15 @@
 """Multi-agent flow example."""
 
 from manus_use import ManusAgent, BrowserAgent, DataAnalysisAgent
-from manus_use.multi_agents import FlowOrchestrator
+from manus_use.multi_agents import Orchestrator
 
 
 def example_multi_agent_flow():
     """Example of multi-agent workflow."""
     print("=== Multi-Agent Flow Example ===")
     
-    # Create flow orchestrator
-    flow = FlowOrchestrator()
+    # Create orchestrator
+    flow = Orchestrator()
     
     # Add specialized agents
     flow.add_agent("researcher", BrowserAgent())
@@ -33,7 +33,7 @@ def example_custom_flow():
     from manus_use.multi_agents import TaskPlan
     
     # Create orchestrator
-    flow = FlowOrchestrator()
+    flow = Orchestrator()
     
     # Define custom task plan
     plan = [

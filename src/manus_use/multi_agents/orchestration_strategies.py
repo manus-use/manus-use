@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 from enum import Enum
 from pydantic import BaseModel
 
-from .task_planner import TaskPlan
+from .planning_agent import TaskPlan
 
 
 class ExecutionStrategy(Enum):
