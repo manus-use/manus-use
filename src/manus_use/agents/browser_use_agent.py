@@ -1,11 +1,17 @@
-"""Browser-use as a Strands Agent."""
+"""Browser-use as a Strands Agent.
+
+This module provides a Strands Agent wrapper around the `browser_use` library.
+It allows the main application to delegate browser-based tasks to an autonomous
+`browser_use.Agent` instance.
+"""
 
 import asyncio
+import logging
 import os
 from typing import Any, Optional, List, Union, Coroutine
 
 from strands import Agent
-from strands.types.tools import AgentTool
+# from strands.types.tools import AgentTool # Not used directly by BrowserUseAgent
 
 from ..config import Config
 
@@ -14,6 +20,7 @@ try:
     from browser_use.browser.profile import BrowserProfile
     from browser_use.controller.service import Controller
     from langchain_aws import ChatBedrock
+    from langchain_openai import ChatOpenAI
     BROWSER_USE_AVAILABLE = True
 except ImportError:
     BROWSER_USE_AVAILABLE = False
@@ -21,155 +28,324 @@ except ImportError:
     BrowserProfile = None
     Controller = None
     ChatBedrock = None
+    ChatOpenAI = None
 
 
 class BrowserUseAgent(Agent):
-    """Strands Agent wrapper for browser-use.
-    
-    This agent delegates all browser tasks to the browser-use agent,
-    treating it as the underlying execution engine rather than a tool.
+    """A Strands Agent that wraps the `browser_use` library's agent.
+
+    This agent acts as a bridge between a Strands-based application and the
+    `browser_use` library. It is designed to receive a task (typically a natural
+    language instruction for web interaction), pass it to a fresh instance of
+    `browser_use.Agent`, and return the result.
+
+    It does not use Strands tools in the traditional sense; instead, its primary
+    function is to manage and invoke the `browser_use.Agent`. The underlying
+    `browser_use.Agent` handles its own LLM interactions (configured via this
+    wrapper) and browser control.
     """
     
     def __init__(
         self,
         config: Optional[Config] = None,
         headless: Optional[bool] = None,
+        enable_memory: Optional[bool] = None,
         **kwargs
     ):
-        """Initialize BrowserUseAgent.
-        
+        """Initialize the BrowserUseAgent.
+
         Args:
-            config: Configuration object
-            headless: Whether to run browser in headless mode
-            **kwargs: Additional arguments for Agent
+            config: A `Config` object containing application settings, including
+                LLM provider (used by `_get_browser_llm`) and tool configurations. 
+                If None, it loads from the default configuration file.
+            headless: Specifies whether the browser controlled by `browser-use`
+                should run in headless mode. If None, defaults to the value in
+                `config.tools.browser_headless`.
+            enable_memory: If True, enables the memory feature of the underlying
+                `browser_use.Agent`. Defaults to False.
+            **kwargs: Additional keyword arguments passed to the base `strands.Agent`
+                constructor.
         """
+        # Ensure config is loaded to check llm.provider for ImportError message
+        loaded_config = config or Config.from_file()
+
         if not BROWSER_USE_AVAILABLE:
+            missing_packages = ["browser-use"]
+            # Check if specific langchain libraries are missing based on config
+            if loaded_config and loaded_config.llm.provider == 'bedrock' and not ChatBedrock:
+                missing_packages.append("langchain-aws")
+            if loaded_config and loaded_config.llm.provider == 'openai' and not ChatOpenAI:
+                missing_packages.append("langchain-openai")
+            
+            # If a provider is configured but its library is missing, the list will be more specific.
+            # If no provider is configured or a generic import failed, it might list both.
+            # A more targeted check could be done in _get_browser_llm if provider is known.
+            if "langchain-aws" not in missing_packages and "langchain-openai" not in missing_packages:
+                 if not ChatBedrock: missing_packages.append("langchain-aws")
+                 if not ChatOpenAI: missing_packages.append("langchain-openai")
+
             raise ImportError(
-                "browser-use and langchain-aws packages are required. "
-                "Install with: pip install browser-use langchain-aws"
+                f"Required package(s) for BrowserUseAgent missing or failed to import: {', '.join(missing_packages)}. "
+                f"Please install them (e.g., pip install {' '.join(missing_packages)})."
             )
             
-        self.config = config or Config.from_file()
+        self.config = loaded_config # Use the loaded_config
         self.headless = headless if headless is not None else self.config.tools.browser_headless
+        self.enable_memory = enable_memory if enable_memory is not None else False
         
-        
-        # Initialize Strands Agent with minimal setup
-        # We don't need tools since we delegate everything to browser-use
+        # Initialize base Strands Agent.
+        # A dummy model is provided as browser-use uses its own internal LLM (configured via _get_browser_llm).
+        # No tools are registered as this agent's role is to delegate tasks to browser_use.Agent.
         super().__init__(
-            model=self._get_dummy_model(),  # browser-use has its own LLM
-            tools=[],  # No tools needed
-            system_prompt="",  # browser-use handles prompting
+            model=self._get_dummy_model(),
+            tools=[], 
+            system_prompt="", # System prompt is handled by the browser_use.Agent internally.
             **kwargs
         )
     
-    def _get_dummy_model(self):
-        """Get a dummy model for Strands Agent initialization.
-        
-        Since browser-use has its own LLM, we just need something
-        to satisfy Strands Agent requirements.
+    def _get_dummy_model(self) -> Any:
+        """Provides a dummy model instance for base `strands.Agent` initialization.
+
+        The `BrowserUseAgent` itself doesn't use this model directly for its core
+        logic. The actual LLM used for browser tasks is configured and returned by
+        `_get_browser_llm` for the `browser_use.Agent`. This dummy model, however,
+        is obtained from the main application's configuration and fulfills the
+        `strands.Agent` base class requirement for a model instance.
         """
         return self.config.get_model()
     
     
-    def _get_browser_llm(self):
-        """Get LLM for browser-use."""
-        if self.config.llm.provider == 'bedrock':
-            model_id = self.config.llm.model
-            region = os.getenv('AWS_DEFAULT_REGION', 'us-east-1')
-            temperature = self.config.llm.temperature
-            max_tokens = self.config.llm.max_tokens
+    def _get_browser_llm(self) -> Any:
+        """Dynamically selects and configures the LLM for the `browser_use.Agent`.
+
+        Based on the `llm.provider` setting in `self.config` (which is the main
+        application's configuration), this method instantiates and returns the
+        appropriate Langchain LLM client (e.g., `ChatBedrock` or `ChatOpenAI`).
+        The specific model name, temperature, and max tokens are also sourced from
+        `self.config.llm`.
+
+        This LLM instance is then passed to the `browser_use.Agent` when it's
+        created for each task.
+
+        Raises:
+            ImportError: If the required Langchain package for the configured
+                         LLM provider (e.g., `langchain-aws` for Bedrock)
+                         is not installed.
+            ValueError: If the configured `llm.provider` in `self.config` is not
+                        supported (currently 'bedrock' or 'openai').
+
+        Returns:
+            An instance of a Langchain LLM client.
+        """
+        provider = self.config.llm.provider
+        model_name = self.config.llm.model
+        temperature = self.config.llm.temperature
+        max_tokens = self.config.llm.max_tokens
+
+        if provider == 'bedrock':
+            if not ChatBedrock:
+                raise ImportError("langchain-aws package is missing. Install with: pip install langchain-aws")
+            region = os.getenv('AWS_DEFAULT_REGION', self.config.llm.aws_region or 'us-east-1')
+            return ChatBedrock(
+                model_id=model_name,
+                model_kwargs={"temperature": temperature, "max_tokens": max_tokens},
+                region_name=region,
+            )
+        elif provider == 'openai':
+            if not ChatOpenAI:
+                raise ImportError("langchain-openai package is missing. Install with: pip install langchain-openai")
+            # ChatOpenAI typically picks up OPENAI_API_KEY from environment variables.
+            # It can also be passed explicitly:
+            # openai_api_key=self.config.llm.openai_api_key or os.getenv("OPENAI_API_KEY")
+            return ChatOpenAI(
+                model_name=model_name,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
         else:
-            # Default settings
-            model_id = 'us.anthropic.claude-3-7-sonnet-20250219-v1:0'
-            region = 'us-east-1'
-            temperature = 0.0
-            max_tokens = 4096
-            
-        return ChatBedrock(
-            model_id=model_id,
-            model_kwargs={
-                "temperature": temperature,
-                "max_tokens": max_tokens
-            },
-            region_name=region
-        )
+            raise ValueError(
+                f"Unsupported LLM provider for BrowserUseAgent: {provider}. "
+                "Supported providers are 'bedrock' and 'openai'."
+            )
     
     def __call__(self, task: Union[str, List[dict]]) -> Union[str, Coroutine[Any, Any, str]]:
-        """Execute a browser task.
-        
-        This overrides the Strands Agent __call__ to delegate
-        directly to browser-use instead of using the normal
-        Strands agent loop.
-        
+        """Executes a browser-based task using a new `browser_use.Agent` instance.
+
+        This method overrides the default `strands.Agent.__call__`. It receives a
+        task, typically a natural language instruction. It then determines if it's
+        running in an asynchronous context to decide whether to run `_run_browser_task`
+        directly (if async) or wrap it with `asyncio.run` (if sync).
+
+        A fresh `browser_use.Agent` is instantiated for each call to ensure that
+        each task is handled in isolation, with its own browser session and memory state
+        (if enabled).
+
         Args:
-            task: Task description (string) or message list
-            
+            task: The task description. This can be a plain string (e.g., "Search
+                  for AI on Wikipedia") or a list of Strands-compatible message
+                  dictionaries. If a list, the content of the last user message
+                  is extracted as the task string.
+
         Returns:
-            Result from browser-use (string) or coroutine if in async context
+            The result from the `browser_use.Agent` as a string. If called in an
+            asynchronous context, it returns a coroutine that will yield the
+            string result.
         """
-        # Convert to string if needed
         if isinstance(task, list):
-            # Extract user message from message list
+            # Extract the task string from the last message if a list is provided
             task_str = task[-1].get("content", "") if task else ""
         else:
             task_str = task
             
-        # Check if we're already in an event loop
+        # Determine if currently in an async event loop
         try:
             asyncio.get_running_loop()
-            # We're in an async context, return a coroutine
+            # If yes, return the coroutine directly
             return self._run_browser_task(task_str)
         except RuntimeError:
-            # No event loop, we can use asyncio.run
+            # If no, run the async task using asyncio.run
             return asyncio.run(self._run_browser_task(task_str))
     
     async def _run_browser_task(self, task: str) -> str:
-        """Run browser task asynchronously."""
-        # Create browser profile with headless setting
+        """Performs the browser task asynchronously by instantiating and running `browser_use.Agent`.
+
+        This method sets up and runs a single instance of `browser_use.Agent` for the
+        given task. It configures the agent with the appropriate LLM (from
+        `_get_browser_llm`), browser profile (including headless mode settings from
+        `self.headless`), and memory settings (from `self.enable_memory`).
+
+        After the `browser_use.Agent` completes its run, this method attempts to
+        extract meaningful content from the result. If specific content attributes
+        are not found, it logs a warning and falls back to a string representation
+        of the entire result object.
+
+        Args:
+            task: The task string to be executed by the `browser_use.Agent`.
+
+        Returns:
+            A string representing the outcome or extracted content from the
+            browser task.
+        """
         browser_profile = BrowserProfile(
             headless=self.headless
         )
         
-        # Create a new browser-use agent for this task
-        browser_use_agent = BrowserUse(
+        # Each task gets a fresh browser_use.Agent instance.
+        # This ensures task isolation and clean state for browser operations.
+        browser_use_agent_instance = BrowserUse( # Renamed to avoid confusion with self
             task=task,
             llm=self._get_browser_llm(),
             browser_profile=browser_profile,
             controller=Controller(),
-            enable_memory=False,  # Disable memory to avoid warning
+            enable_memory=self.enable_memory, # Uses the configured value for memory
             validate_output=False
         )
         
-        # Run the agent
-        result = await browser_use_agent.run()
+        result = await browser_use_agent_instance.run()
         
-        # Extract the result text
+        # Attempt to extract specific content from the result object.
         if hasattr(result, 'extracted_content'):
-            # Check if it's a method and call it
             extracted = result.extracted_content
-            if callable(extracted):
-                return extracted()
-            return extracted
+            # If extracted_content is a method (e.g., a callable that processes data), call it.
+            return extracted() if callable(extracted) else extracted
         elif hasattr(result, 'all_results') and result.all_results:
-            # Get the last "done" result text
-            for res in reversed(result.all_results):
-                if res.is_done and res.extracted_content:
-                    return res.extracted_content
+            # Fallback: check if 'all_results' list exists and has content.
+            # Iterate in reverse to find the last "done" result with content.
+            for res_item in reversed(result.all_results): # Renamed to avoid conflict
+                if hasattr(res_item, 'is_done') and res_item.is_done and \
+                   hasattr(res_item, 'extracted_content') and res_item.extracted_content:
+                    return res_item.extracted_content
         
-        return str(result)
+        logging.warning(
+            "BrowserUseAgent: Could not extract specific content from browser-use result. "
+            f"Falling back to str(result). Result object type: {type(result)}"
+        )
+        return str(result) # Fallback to string representation of the whole result
     
     async def cleanup(self):
-        """Clean up browser resources."""
-        # browser-use handles its own cleanup per instance
+        """Cleans up browser resources.
+        
+        Note: `browser_use.Agent` instances are created per-task within `_run_browser_task`.
+        The `browser_use` library is expected to handle the cleanup of its own
+        resources (e.g., browser instances) when the `BrowserUse` object is
+        garbage collected after each task. This method is provided for API
+        consistency with the `strands.Agent` base class but may not require
+        specific actions if `browser_use` manages its resources effectively
+        per instance.
+        """
+        # `browser_use.Agent` instances are created per-task and are expected
+        # to manage their own cleanup. No explicit agent-wide cleanup needed here.
         pass
     
     def __del__(self):
-        """Ensure cleanup on deletion."""
-        # No cleanup needed since we create/destroy agents per task
+        """Ensures cleanup on deletion of the BrowserUseAgent instance.
+        
+        Note: Similar to `cleanup`, actual resource release for browsers is primarily
+        the responsibility of the per-task `browser_use.Agent` instances.
+        """
+        # No specific cleanup needed here, as browser_use.Agent instances are per-task.
         pass
                 
-    # Override stream methods if needed
     async def stream_async(self, *args, **kwargs):
-        """browser-use doesn't support streaming, so we return the full result."""
-        result = self.__call__(*args, **kwargs)
-        yield {"type": "text", "text": result}
+        """Provides results from the `browser_use.Agent` execution.
+
+        This method is part of the `strands.Agent` interface. However, the
+        underlying `browser_use` library, as currently integrated, executes a
+        task to completion and returns the full result rather than streaming
+        partial outputs.
+
+        Therefore, this method first executes the task by calling `self.__call__`
+        (which internally handles both synchronous and asynchronous invocation of
+        `_run_browser_task`). Once the complete result is obtained (and awaited if
+        necessary), it is yielded as a single event dictionary conforming to
+        Strands' streaming format.
+
+        Args:
+            *args: Positional arguments to be passed to `self.__call__`.
+            **kwargs: Keyword arguments to be passed to `self.__call__`.
+
+        Yields:
+            A dictionary of the form `{"type": "text", "text": final_result}`,
+            containing the complete result from the browser task.
+        """
+        # Get the full result from the __call__ method (which handles sync/async execution)
+        result_value = self.__call__(*args, **kwargs)
+
+        # If __call__ returned a coroutine (meaning it was called in an async context), await it.
+        if asyncio.iscoroutine(result_value):
+            final_result = await result_value
+        else:
+            # If __call__ returned a direct result (sync context), use it.
+            final_result = result_value
+            
+        yield {"type": "text", "text": final_result}
+
+# Example usage (illustrative, not for direct execution without proper setup)
+# if __name__ == '__main__':
+#     # This requires a ManusUse Config setup and relevant environment variables.
+#     # Example for OpenAI:
+#     # Ensure OPENAI_API_KEY is set in your environment.
+#     # Create or load a manus_use.config.Config object where llm.provider = "openai"
+#     # config = Config() # Or Config.from_file('path/to/your/config.yaml')
+#     # config.llm.provider = "openai"
+#     # config.llm.model = "gpt-3.5-turbo" # Or your preferred model
+#     #
+#     # agent = BrowserUseAgent(config=config, headless=True, enable_memory=False)
+#     # try:
+#     #     result = agent(task="Go to example.com and find the title of the page.")
+#     #     print(f"Result: {result}")
+#     # except Exception as e:
+#     #     print(f"An error occurred: {e}")
+
+#     # Example for Bedrock (requires AWS credentials and Bedrock model access configured):
+#     # config_bedrock = Config() # Ensure this config points to Bedrock provider & model
+#     # config_bedrock.llm.provider = "bedrock"
+#     # config_bedrock.llm.model = "anthropic.claude-v2" # Or your preferred Bedrock model
+#     #
+#     # agent_bedrock = BrowserUseAgent(config=config_bedrock, headless=True)
+#     # try:
+#     #     bedrock_result = agent_bedrock(task="Search Wikipedia for 'Artificial Intelligence'")
+#     #     print(f"Bedrock Result: {bedrock_result}")
+#     # except Exception as e:
+#     #     print(f"An error occurred with Bedrock: {e}")
+#     pass
