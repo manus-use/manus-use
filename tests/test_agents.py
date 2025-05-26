@@ -252,24 +252,26 @@ def test_browser_use_agent_get_llm_openai_import_error(mock_config_fixture):
 
 # Task Execution Tests
 @patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
-@patch('manus_use.agents.browser_use_agent.Controller', Mock()) # Mock at source
-@patch('manus_use.agents.browser_use_agent.BrowserProfile', Mock()) # Mock at source
-@patch('manus_use.agents.browser_use_agent.BrowserUse') # Mock at source (aliased as BrowserUse in module)
-@patch('manus_use.agents.browser_use_agent.ChatOpenAI', create=True) # For LLM creation
-@patch('manus_use.agents.browser_use_agent.logging.warning') # To check warnings
-@pytest.mark.asyncio # Mark test as async
+@patch('manus_use.agents.browser_use_agent.Controller', Mock())
+@patch('manus_use.agents.browser_use_agent.BrowserProfile', Mock())
+@patch('manus_use.agents.browser_use_agent.BrowserUse')
+@patch('manus_use.agents.browser_use_agent.ChatOpenAI', create=True)
+@patch('manus_use.agents.browser_use_agent.logging') # Patch the whole logging module
+@pytest.mark.asyncio
 async def test_browser_use_agent_run_task_various_results(
-    mock_logging_warning, MockChatOpenAI, MockBrowserUse, MockBrowserProfile, MockController, mock_config_fixture
+    mock_logging, MockChatOpenAI, MockBrowserUse, MockBrowserProfile, MockController, mock_config_fixture
 ):
     agent = BrowserUseAgent(config=mock_config_fixture, headless=True, enable_memory=True)
     mock_llm_instance = MockChatOpenAI.return_value 
     
-    # Setup MockBrowserUse (the class) to return a mock instance
     mock_browser_use_instance = Mock()
     MockBrowserUse.return_value = mock_browser_use_instance
     
-    # --- Test 1: extracted_content as callable ---
-    mock_browser_use_instance.run = AsyncMock(return_value=Mock(extracted_content=Mock(return_value="callable_content")))
+    # --- Test 1: extracted_content() returns a list of strings ---
+    mock_run_result_1 = Mock()
+    mock_run_result_1.extracted_content = Mock(return_value=['Page Title: Example', 'Body text...'])
+    mock_browser_use_instance.run = AsyncMock(return_value=mock_run_result_1)
+    
     result = await agent._run_browser_task("test task 1")
     MockBrowserUse.assert_called_with(
         task="test task 1",
@@ -280,36 +282,66 @@ async def test_browser_use_agent_run_task_various_results(
         validate_output=False
     )
     MockBrowserProfile.assert_called_with(headless=True)
-    assert result == "callable_content"
-    mock_logging_warning.assert_not_called()
+    assert result == "Page Title: Example\nBody text..."
+    mock_logging.warning.assert_not_called()
+    mock_logging.info.assert_not_called()
 
-    # --- Test 2: extracted_content as attribute ---
-    mock_browser_use_instance.run = AsyncMock(return_value=Mock(extracted_content="direct_content", all_results=None)) # all_results=None to avoid that path
-    # Reset warning mock for this specific test case
-    mock_logging_warning.reset_mock()
+    # --- Test 2: extracted_content() returns a single string item ---
+    mock_logging.reset_mock() # Reset all logging mocks (info, warning, etc.)
+    mock_run_result_2 = Mock()
+    mock_run_result_2.extracted_content = Mock(return_value='Final summary.')
+    mock_browser_use_instance.run = AsyncMock(return_value=mock_run_result_2)
+    
     result = await agent._run_browser_task("test task 2")
-    assert result == "direct_content"
-    mock_logging_warning.assert_not_called()
+    assert result == "Final summary."
+    mock_logging.warning.assert_not_called()
+    mock_logging.info.assert_not_called()
 
-    # --- Test 3: all_results list ---
-    mock_result_item_done = Mock(is_done=True, extracted_content="from_all_results")
-    mock_result_item_not_done = Mock(is_done=False, extracted_content="should_not_be_used")
-    mock_browser_use_instance.run = AsyncMock(return_value=Mock(extracted_content=None, all_results=[mock_result_item_not_done, mock_result_item_done]))
-    mock_logging_warning.reset_mock()
+    # --- Test 3: extracted_content() returns None ---
+    mock_logging.reset_mock()
+    mock_run_result_3 = Mock()
+    mock_run_result_3.extracted_content = Mock(return_value=None)
+    mock_browser_use_instance.run = AsyncMock(return_value=mock_run_result_3)
+    
     result = await agent._run_browser_task("test task 3")
-    assert result == "from_all_results"
-    mock_logging_warning.assert_not_called()
+    assert result == ""
+    mock_logging.info.assert_called_once_with("BrowserUseAgent: result.extracted_content() returned None.")
+    mock_logging.warning.assert_not_called()
 
-    # --- Test 4: Fallback to str(result) ---
-    final_fallback_result = Mock(spec=[]) # A mock that doesn't have any of the specific attributes
-    final_fallback_result.__str__ = Mock(return_value="string_fallback")
-    mock_browser_use_instance.run = AsyncMock(return_value=final_fallback_result)
-    mock_logging_warning.reset_mock()
+    # --- Test 4: extracted_content is not callable (or missing) ---
+    mock_logging.reset_mock()
+    mock_run_result_4 = Mock(spec=['__str__']) # Mock that doesn't have extracted_content or it's not callable
+    mock_run_result_4.__str__ = Mock(return_value="string_fallback_for_no_method")
+    # To ensure hasattr(result, 'extracted_content') is True but callable(...) is False
+    # we can set extracted_content to a non-callable Mock.
+    # However, the current code checks `hasattr(result, 'extracted_content') and callable(result.extracted_content)`
+    # So, if `extracted_content` is not present, it will also fall into the else block.
+    # Let's explicitly make it a non-callable attribute for this test for clarity.
+    mock_run_result_4.extracted_content = "not_a_callable_attribute" 
+    # Or, to test missing attribute: del mock_run_result_4.extracted_content # (but spec makes this tricky)
+    
+    mock_browser_use_instance.run = AsyncMock(return_value=mock_run_result_4)
+    
     result = await agent._run_browser_task("test task 4")
-    assert result == "string_fallback"
-    mock_logging_warning.assert_called_once()
-    # Check that the log message contains the expected substring
-    assert "Could not extract specific content" in mock_logging_warning.call_args[0][0]
+    assert result == "string_fallback_for_no_method"
+    mock_logging.warning.assert_called_once()
+    assert "Could not find 'extracted_content' method on result or it's not callable" in mock_logging.warning.call_args[0][0]
+    mock_logging.info.assert_not_called()
+
+    # --- Test 5: extracted_content attribute exists but is not callable (more explicit) ---
+    mock_logging.reset_mock()
+    mock_run_result_5 = Mock() # Create a fresh mock
+    mock_run_result_5.extracted_content = "I am an attribute, not a method" # Non-callable
+    mock_run_result_5.__str__ = Mock(return_value="string_fallback_attr_not_callable")
+    mock_browser_use_instance.run = AsyncMock(return_value=mock_run_result_5)
+
+    result = await agent._run_browser_task("test task 5")
+    assert result == "string_fallback_attr_not_callable"
+    mock_logging.warning.assert_called_once()
+    assert "Could not find 'extracted_content' method on result or it's not callable" in mock_logging.warning.call_args[0][0]
+    mock_logging.info.assert_not_called()
+    
+    # Obsolete test for all_results fallback is removed.
 
 
 # AsyncMock for Python 3.7 compatibility if needed, otherwise MagicMock for >=3.8

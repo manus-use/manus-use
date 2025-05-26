@@ -207,60 +207,52 @@ class BrowserUseAgent(Agent):
             return asyncio.run(self._run_browser_task(task_str))
     
     async def _run_browser_task(self, task: str) -> str:
-        """Performs the browser task asynchronously by instantiating and running `browser_use.Agent`.
-
-        This method sets up and runs a single instance of `browser_use.Agent` for the
-        given task. It configures the agent with the appropriate LLM (from
-        `_get_browser_llm`), browser profile (including headless mode settings from
-        `self.headless`), and memory settings (from `self.enable_memory`).
-
-        After the `browser_use.Agent` completes its run, this method attempts to
-        extract meaningful content from the result. If specific content attributes
-        are not found, it logs a warning and falls back to a string representation
-        of the entire result object.
-
-        Args:
-            task: The task string to be executed by the `browser_use.Agent`.
-
-        Returns:
-            A string representing the outcome or extracted content from the
-            browser task.
+        """Run browser task asynchronously using browser-use.
+        
+        Instantiates a browser-use.Agent for the given task and executes it,
+        then processes the result to return a summary string.
         """
+        # Create browser profile with headless setting
         browser_profile = BrowserProfile(
             headless=self.headless
         )
         
-        # Each task gets a fresh browser_use.Agent instance.
-        # This ensures task isolation and clean state for browser operations.
-        browser_use_agent_instance = BrowserUse( # Renamed to avoid confusion with self
+        # Create a new browser-use agent for this task
+        # Ensure Controller is imported or defined
+        # from browser_use.controller.service import Controller # Assuming it's available
+        browser_use_agent_instance = BrowserUse( # Renamed from browser_use_agent to avoid confusion
             task=task,
             llm=self._get_browser_llm(),
             browser_profile=browser_profile,
-            controller=Controller(),
-            enable_memory=self.enable_memory, # Uses the configured value for memory
-            validate_output=False
+            controller=Controller(), 
+            enable_memory=self.enable_memory,
+            validate_output=False # Kept from original
         )
         
-        result = await browser_use_agent_instance.run()
+        # Run the agent
+        result = await browser_use_agent_instance.run() # result is likely AgentHistoryList
         
-        # Attempt to extract specific content from the result object.
-        if hasattr(result, 'extracted_content'):
-            extracted = result.extracted_content
-            # If extracted_content is a method (e.g., a callable that processes data), call it.
-            return extracted() if callable(extracted) else extracted
-        elif hasattr(result, 'all_results') and result.all_results:
-            # Fallback: check if 'all_results' list exists and has content.
-            # Iterate in reverse to find the last "done" result with content.
-            for res_item in reversed(result.all_results): # Renamed to avoid conflict
-                if hasattr(res_item, 'is_done') and res_item.is_done and \
-                   hasattr(res_item, 'extracted_content') and res_item.extracted_content:
-                    return res_item.extracted_content
-        
-        logging.warning(
-            "BrowserUseAgent: Could not extract specific content from browser-use result. "
-            f"Falling back to str(result). Result object type: {type(result)}"
-        )
-        return str(result) # Fallback to string representation of the whole result
+        if hasattr(result, 'extracted_content') and callable(result.extracted_content):
+            extracted_items = result.extracted_content() # This should return a list
+            if isinstance(extracted_items, list):
+                # Join multiple pieces of extracted content with newlines.
+                # Convert all items to string in case they are not already.
+                return "\n".join(str(item) for item in extracted_items)
+            elif extracted_items is not None:
+                # If it's not a list but some other single value
+                return str(extracted_items)
+            else:
+                # extracted_content() returned None
+                logging.info("BrowserUseAgent: result.extracted_content() returned None.")
+                return "" # Return empty string if no content was extracted
+        else:
+            # Fallback if the result object doesn't match AgentHistoryList structure
+            # or if extracted_content is not available as expected.
+            logging.warning(
+                "BrowserUseAgent: Could not find 'extracted_content' method on result or it's not callable. "
+                f"Falling back to str(result). Result type: {type(result)}, Result: {result}"
+            )
+            return str(result)
     
     async def cleanup(self):
         """Cleans up browser resources.
