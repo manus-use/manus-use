@@ -45,19 +45,3 @@ class BaseManusAgent(Agent):
     def _get_default_system_prompt(self) -> str:
         """Get default system prompt for this agent type."""
         return "You are a helpful AI assistant."
-        
-    def add_tools(self, tools: List[AgentTool]) -> None:
-        """Add tools to the agent."""
-        if hasattr(self, "_tools"):
-            self._tools.extend(tools)
-        else:
-            # For compatibility with different Strands versions
-            current_tools = list(self.tools) if hasattr(self, "tools") else []
-            current_tools.extend(tools)
-            self._update_tools(current_tools)
-            
-    def _update_tools(self, tools: List[AgentTool]) -> None:
-        """Update agent tools."""
-        # This method handles the actual tool update
-        # Implementation depends on Strands SDK internals
-        self._tools = tools

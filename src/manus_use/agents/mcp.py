@@ -62,10 +62,7 @@ These tools may include:
 Use the available tools to help accomplish user tasks efficiently. Always check what tools are available before attempting a task."""
         
     def add_mcp_server(self, server: MCPClient) -> None:
-        """Add an MCP server and its tools to the agent."""
+        """Add an MCP server to the agent's list of servers."""
         self.mcp_servers.append(server)
-        
-        # Add tools from the server
-        if hasattr(server, "list_tools_sync"):
-            tools = server.list_tools_sync()
-            self.add_tools(tools)
+        # Tools from this server will not be dynamically added to the agent.
+        # The agent should be initialized with all necessary MCP servers and their tools.
