@@ -1,99 +1,59 @@
 #!/usr/bin/env python3
-"""Simple test for browser agent functionality."""
+"""Simple test for BrowserUseAgent to verify basic functionality."""
 
 import asyncio
 import sys
 from pathlib import Path
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent))
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from src.manus_use.agents.browser import BrowserAgent
-from src.manus_use.config import Config
-from src.manus_use.tools.browser_tools import (
-    browser_navigate,
-    browser_get_state,
-    browser_extract,
-    browser_close,
-)
+from manus_use.agents.browser_use_agent import BrowserUseAgent
+from manus_use.config import Config
 
 
-async def test_browser_tools():
-    """Test individual browser tools."""
-    print("=== Testing Browser Tools ===\n")
+async def test_simple():
+    """Test basic BrowserUseAgent functionality."""
+    print("Testing BrowserUseAgent...")
     
-    # Test 1: Navigate
-    print("1. Testing browser_navigate...")
-    try:
-        nav_result = await browser_navigate(url="https://example.com")
-        print(f"✓ Navigation successful: {nav_result}")
-    except Exception as e:
-        print(f"✗ Navigation failed: {e}")
-    
-    # Test 2: Get state
-    print("\n2. Testing browser_get_state...")
-    try:
-        state_result = await browser_get_state()
-        print(f"✓ State retrieved: {state_result[:200]}...")
-    except Exception as e:
-        print(f"✗ Get state failed: {e}")
-    
-    # Test 3: Extract content
-    print("\n3. Testing browser_extract...")
-    try:
-        extract_result = await browser_extract(goal="Extract the main heading")
-        print(f"✓ Content extracted: {extract_result}")
-    except Exception as e:
-        print(f"✗ Extract failed: {e}")
-    
-    # Test 4: Close browser
-    print("\n4. Testing browser_close...")
-    try:
-        close_result = await browser_close()
-        print(f"✓ Browser closed: {close_result}")
-    except Exception as e:
-        print(f"✗ Close failed: {e}")
-
-
-async def test_browser_agent_simple():
-    """Test BrowserAgent without AWS credentials."""
-    print("\n\n=== Testing BrowserAgent ===\n")
-    
-    # Create a mock config
+    # Create config
     config = Config()
-    config.tools.browser_headless = False
+    config.llm.provider = "bedrock"
+    config.llm.model = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
     
-    print("Creating BrowserAgent...")
+    # Create agent
+    agent = BrowserUseAgent(config=config)
+    
+    # Test 1: Simple calculation (no browser needed)
+    print("\n1. Testing simple calculation...")
     try:
-        browser_agent = BrowserAgent(
-            config=config,
-            headless=False
-        )
-        print("✓ BrowserAgent created successfully")
-        
-        # Check available tools
-        print(f"\nAvailable tools: {[tool.name for tool in browser_agent.tools]}")
-        
+        result = await agent("What is 2+2?")
+        print(f"✅ Result: {result}")
     except Exception as e:
-        print(f"✗ Failed to create BrowserAgent: {e}")
-        import traceback
-        traceback.print_exc()
-
-
-async def main():
-    """Run all tests."""
-    print("Browser Agent Test Suite")
-    print("=" * 50)
+        print(f"❌ Error: {e}")
     
-    # Test individual tools
-    await test_browser_tools()
+    # Test 2: Basic web navigation
+    print("\n2. Testing web navigation...")
+    try:
+        result = await agent("Go to https://example.com and tell me the page title")
+        print(f"✅ Result: {result[:100]}..." if len(str(result)) > 100 else f"✅ Result: {result}")
+    except Exception as e:
+        print(f"❌ Error: {e}")
     
-    # Test agent creation
-    await test_browser_agent_simple()
+    # Test 3: Streaming
+    print("\n3. Testing streaming...")
+    try:
+        events = []
+        async for event in agent.stream_async("What is the capital of France?"):
+            events.append(event)
+            if event.get("type") == "token":
+                print(event.get("data", ""), end="", flush=True)
+        print(f"\n✅ Received {len(events)} streaming events")
+    except Exception as e:
+        print(f"❌ Error: {e}")
     
-    print("\n" + "=" * 50)
-    print("✓ Test completed!")
+    print("\nTest completed!")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(test_simple())

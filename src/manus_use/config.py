@@ -67,12 +67,51 @@ class ToolsConfig(BaseModel):
     max_search_results: int = 5
 
 
+class BrowserUseConfig(BaseModel):
+    """Browser-use specific configuration."""
+    
+    # LLM settings for browser-use (can override main LLM config)
+    provider: Optional[str] = None  # "bedrock", "openai", etc. If None, uses main LLM config
+    model: Optional[str] = None  # Model ID. If None, uses main LLM config
+    api_key: Optional[str] = None  # API key. If None, uses main LLM config or env vars
+    temperature: float = 0.0
+    max_tokens: int = 4096
+    
+    # Browser settings
+    headless: bool = True
+    keep_alive: bool = False  # Keep browser open between tasks
+    disable_security: bool = False  # Disable browser security features (use with caution)
+    extra_chromium_args: list[str] = Field(default_factory=list)  # Additional Chrome/Chromium args
+    
+    # Agent settings
+    max_steps: int = 100  # Maximum steps per task
+    max_actions_per_step: int = 10  # Maximum actions in a single step
+    use_vision: bool = True  # Use vision capabilities
+    save_conversation_path: Optional[str] = None  # Path to save conversation history
+    max_error_length: int = 400  # Maximum error message length
+    tool_calling_method: str = "auto"  # "auto", "function_calling", "json_mode", etc.
+    
+    # Memory and context
+    enable_memory: bool = False  # Enable conversation memory between tasks
+    memory_window: int = 10  # Number of previous messages to keep in memory
+    
+    # Performance settings
+    timeout: int = 300  # Task timeout in seconds
+    retry_count: int = 3  # Number of retries on failure
+    
+    # Debugging
+    debug: bool = False  # Enable debug logging
+    save_screenshots: bool = False  # Save screenshots during execution
+    screenshot_path: Optional[str] = None  # Path to save screenshots
+
+
 class Config(BaseModel):
     """Main configuration."""
     
     llm: LLMConfig = Field(default_factory=LLMConfig)
     sandbox: SandboxConfig = Field(default_factory=SandboxConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
+    browser_use: BrowserUseConfig = Field(default_factory=BrowserUseConfig)
     
     @classmethod
     def from_file(cls, path: Optional[Path] = None) -> "Config":

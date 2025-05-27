@@ -32,7 +32,6 @@ try:
     from browser_use.controller.service import Controller
     from langchain_aws import ChatBedrock
     from langchain_openai import ChatOpenAI
-    from langchain_core.language_models.chat_models import BaseChatModel
 
     BROWSER_USE_AVAILABLE = True
     IMPORTED_MODULES = {
@@ -67,7 +66,6 @@ except ImportError as e:
     Controller = None
     ChatBedrock = None
     ChatOpenAI = None
-    BaseChatModel = None
 
 
 class BrowserUseAgent(Agent):
@@ -124,38 +122,17 @@ class BrowserUseAgent(Agent):
             raise ImportError(error_message)
 
         self.config = config or Config.from_file()
-        
-        # Get browser_use specific config
-        browser_config = self.config.browser_use
-        
-        # Use parameters if provided, otherwise fall back to browser_use config
         self.headless = (
             headless
             if headless is not None
-            else browser_config.headless
+            else getattr(self.config.tools, "browser_headless", True)
         )
         self.enable_memory = (
             enable_memory
             if enable_memory is not None
-            else browser_config.enable_memory
+            else getattr(self.config.tools, "browser_use_enable_memory", False)
         )
         self.output_model = output_model
-        
-        # Store other browser_use settings
-        self.max_steps = browser_config.max_steps
-        self.max_actions_per_step = browser_config.max_actions_per_step
-        self.use_vision = browser_config.use_vision
-        self.save_conversation_path = browser_config.save_conversation_path
-        self.max_error_length = browser_config.max_error_length
-        self.tool_calling_method = browser_config.tool_calling_method
-        self.keep_alive = browser_config.keep_alive
-        self.disable_security = browser_config.disable_security
-        self.extra_chromium_args = browser_config.extra_chromium_args
-        self.timeout = browser_config.timeout
-        self.retry_count = browser_config.retry_count
-        self.debug = browser_config.debug
-        self.save_screenshots = browser_config.save_screenshots
-        self.screenshot_path = browser_config.screenshot_path
         
         # Initialize Strands Agent with a dummy model and no tools,
         # as browser-use handles its own LLM and actions.
@@ -178,20 +155,16 @@ class BrowserUseAgent(Agent):
     def _get_browser_llm(self) -> BaseChatModel:
         """
         Get the LangChain BaseChatModel for the browser-use agent.
-        Uses browser_use config section if available, otherwise falls back to main LLM config.
+        Dynamically selects and configures the LLM (e.g., ChatBedrock, ChatOpenAI)
+        based on `self.config.llm` settings (provider, model, temperature, max_tokens).
         Raises ImportError if required LLM packages are missing, or ValueError for
         unsupported providers.
         """
-        # Use browser_use config if provider is specified, otherwise fall back to main LLM config
-        browser_config = self.config.browser_use
-        provider = browser_config.provider or self.config.llm.provider
-        model_name = browser_config.model or self.config.llm.model
-        temperature = browser_config.temperature
-        max_tokens = browser_config.max_tokens
-        api_key = browser_config.api_key or self.config.llm.api_key
-        
-        # Get AWS region from environment for Bedrock
-        aws_region = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+        provider = self.config.llm.provider
+        model_name = self.config.llm.model
+        temperature = self.config.llm.temperature
+        max_tokens = self.config.llm.max_tokens
+        aws_region = self.config.llm.aws_region or os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 
         if provider == "bedrock":
             if not ChatBedrock:
@@ -208,15 +181,12 @@ class BrowserUseAgent(Agent):
                 raise ImportError(
                     "langchain-openai package is missing. Please install with: pip install langchain-openai"
                 )
-            kwargs = {
-                "model_name": model_name,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-            }
-            # Add API key if provided in config
-            if api_key:
-                kwargs["api_key"] = api_key
-            return ChatOpenAI(**kwargs)
+            return ChatOpenAI(
+                model_name=model_name,
+                temperature=temperature,
+                max_tokens=max_tokens
+                # API key is typically handled by environment variable OPENAI_API_KEY
+            )
         else:
             raise ValueError(
                 f"Unsupported LLM provider for BrowserUseAgent: {provider}. "
@@ -232,12 +202,7 @@ class BrowserUseAgent(Agent):
         """
         browser_use_agent_instance: Optional[BrowserUse] = None
         try:
-            browser_profile = BrowserProfile(
-                headless=self.headless,
-                disable_security=self.disable_security,
-                extra_chromium_args=self.extra_chromium_args,
-                keep_alive=self.keep_alive,
-            )
+            browser_profile = BrowserProfile(headless=self.headless)
             
             controller_kwargs = {}
             if self.output_model:
@@ -251,12 +216,6 @@ class BrowserUseAgent(Agent):
                 browser_profile=browser_profile,
                 controller=controller,
                 enable_memory=self.enable_memory,
-                max_steps=self.max_steps,
-                max_actions_per_step=self.max_actions_per_step,
-                use_vision=self.use_vision,
-                save_conversation_path=self.save_conversation_path,
-                max_error_length=self.max_error_length,
-                tool_calling_method=self.tool_calling_method if self.tool_calling_method != "auto" else None,
                 validate_output=False, # Kept from original implementation
             )
 
@@ -407,12 +366,7 @@ class BrowserUseAgent(Agent):
                 await queue.put(None)  # End of stream marker
 
         try:
-            browser_profile = BrowserProfile(
-                headless=self.headless,
-                disable_security=self.disable_security,
-                extra_chromium_args=self.extra_chromium_args,
-                keep_alive=self.keep_alive,
-            )
+            browser_profile = BrowserProfile(headless=self.headless)
             
             controller_kwargs = {}
             if self.output_model:
@@ -425,12 +379,6 @@ class BrowserUseAgent(Agent):
                 browser_profile=browser_profile,
                 controller=controller,
                 enable_memory=self.enable_memory,
-                max_steps=self.max_steps,
-                max_actions_per_step=self.max_actions_per_step,
-                use_vision=self.use_vision,
-                save_conversation_path=self.save_conversation_path,
-                max_error_length=self.max_error_length,
-                tool_calling_method=self.tool_calling_method if self.tool_calling_method != "auto" else None,
                 validate_output=False, 
                 register_new_step_callback=step_callback,
                 register_done_callback=done_callback,

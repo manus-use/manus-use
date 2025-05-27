@@ -23,33 +23,50 @@ except ImportError:
 class BrowserAgentSession:
     """Manages a browser-use agent session."""
     
-    def __init__(self, headless: bool = True, config: Optional[Any] = None):
-        self.headless = headless
+    def __init__(self, headless: Optional[bool] = None, config: Optional[Any] = None):
         self.config = config
+        # Use browser_use config if available, otherwise fall back to parameter or default
+        if headless is not None:
+            self.headless = headless
+        elif config and hasattr(config, 'browser_use'):
+            self.headless = config.browser_use.headless
+        else:
+            self.headless = True
     
     def _get_llm(self):
         """Get LLM instance from config."""
-        if self.config and self.config.llm.provider == 'bedrock':
-            # Use config settings for Bedrock
+        # Check if browser_use config has provider/model overrides
+        if self.config and hasattr(self.config, 'browser_use'):
+            browser_config = self.config.browser_use
+            provider = browser_config.provider or self.config.llm.provider
+            model_id = browser_config.model or self.config.llm.model
+            temperature = browser_config.temperature
+            max_tokens = browser_config.max_tokens
+        elif self.config:
+            # Fall back to main LLM config
+            provider = self.config.llm.provider
             model_id = self.config.llm.model
-            region = os.getenv('AWS_DEFAULT_REGION', 'us-east-1')
             temperature = self.config.llm.temperature
             max_tokens = self.config.llm.max_tokens
         else:
             # Default settings
+            provider = 'bedrock'
             model_id = 'us.anthropic.claude-3-5-sonnet-20241022-v2:0'
-            region = 'us-east-1'
             temperature = 0.0
             max_tokens = 4096
-            
-        return ChatBedrock(
-            model_id=model_id,
-            model_kwargs={
-                "temperature": temperature,
-                "max_tokens": max_tokens
-            },
-            region_name=region
-        )
+        
+        if provider == 'bedrock':
+            region = os.getenv('AWS_DEFAULT_REGION', 'us-east-1')
+            return ChatBedrock(
+                model_id=model_id,
+                model_kwargs={
+                    "temperature": temperature,
+                    "max_tokens": max_tokens
+                },
+                region_name=region
+            )
+        else:
+            raise ValueError(f"Unsupported provider for browser tools: {provider}")
     
     async def run_task(self, task: str) -> str:
         """Run a browser task."""
@@ -151,9 +168,12 @@ async def browser_do(
         from ..config import Config
         config = Config.from_file()
         
-        # Determine headless mode
+        # Determine headless mode - use browser_use config if available
         if headless is None:
-            headless = config.tools.browser_headless
+            if hasattr(config, 'browser_use'):
+                headless = config.browser_use.headless
+            else:
+                headless = config.tools.browser_headless
             
         # Get or create session
         session = get_browser_session(headless=headless, config=config)

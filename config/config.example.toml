@@ -46,3 +46,41 @@ max_search_results = 5
 # Optional: Google Custom Search credentials
 # google_api_key = "..."
 # google_cx = "..."
+
+[browser_use]
+# Browser-use specific configuration
+# These settings override the main LLM config when using browser-use agent
+
+# LLM settings for browser-use (optional - defaults to main LLM config)
+# provider = "bedrock"  # or "openai"
+# model = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+# api_key = "..."  # Optional, defaults to main LLM api_key or env vars
+temperature = 0.0
+max_tokens = 4096
+
+# Browser settings
+headless = true  # Run browser in headless mode
+keep_alive = false  # Keep browser open between tasks
+disable_security = false  # Disable browser security features (use with caution)
+extra_chromium_args = []  # Additional Chrome/Chromium args, e.g. ["--no-sandbox"]
+
+# Agent settings
+max_steps = 100  # Maximum steps per task
+max_actions_per_step = 10  # Maximum actions in a single step
+use_vision = true  # Use vision capabilities for browser automation
+save_conversation_path = ""  # Optional: Path to save conversation history
+max_error_length = 400  # Maximum error message length in logs
+tool_calling_method = "auto"  # Options: "auto", "function_calling", "json_mode"
+
+# Memory and context
+enable_memory = false  # Enable conversation memory between tasks
+memory_window = 10  # Number of previous messages to keep in memory
+
+# Performance settings
+timeout = 300  # Task timeout in seconds
+retry_count = 3  # Number of retries on failure
+
+# Debugging
+debug = false  # Enable debug logging
+save_screenshots = false  # Save screenshots during execution
+screenshot_path = ""  # Optional: Path to save screenshots
