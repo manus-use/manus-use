@@ -251,12 +251,8 @@ class BrowserUseAgent(Agent):
                 browser_profile=browser_profile,
                 controller=controller,
                 enable_memory=self.enable_memory,
-                max_steps=self.max_steps,
-                max_actions_per_step=self.max_actions_per_step,
-                use_vision=self.use_vision,
-                save_conversation_path=self.save_conversation_path,
-                max_error_length=self.max_error_length,
-                tool_calling_method=self.tool_calling_method if self.tool_calling_method != "auto" else None,
+                # Only pass parameters that browser-use actually supports
+                # max_steps, max_actions_per_step, etc. are not supported in current version
                 validate_output=False, # Kept from original implementation
             )
 
@@ -425,12 +421,7 @@ class BrowserUseAgent(Agent):
                 browser_profile=browser_profile,
                 controller=controller,
                 enable_memory=self.enable_memory,
-                max_steps=self.max_steps,
-                max_actions_per_step=self.max_actions_per_step,
-                use_vision=self.use_vision,
-                save_conversation_path=self.save_conversation_path,
-                max_error_length=self.max_error_length,
-                tool_calling_method=self.tool_calling_method if self.tool_calling_method != "auto" else None,
+                # Only pass parameters that browser-use actually supports
                 validate_output=False, 
                 register_new_step_callback=step_callback,
                 register_done_callback=done_callback,

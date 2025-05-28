@@ -193,4 +193,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 - Built with [Strands SDK](https://github.com/strands-agents/sdk-python) - A powerful Python SDK for building AI agents
-- Browser automation powered by [browser-use](https://github.com/browser-use/browser-use) - Framework for AI-driven web aut
+- Browser automation powered by [browser-use](https://github.com/browser-use/browser-use) - Framework for AI-driven web automation

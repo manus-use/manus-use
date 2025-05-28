@@ -67,31 +67,93 @@ Always strive for accuracy and completeness in your responses."""
         
     def _get_default_tools(self, config: Optional[Config] = None) -> List[AgentTool]:
         """Get default tools based on configuration."""
-        from ..tools import get_tools_by_names
-        
-        config = config or Config.from_file()
-        tool_names = config.tools.enabled
-        
-        # Always include basic tools
-        default_tools = ["file_read", "file_write", "code_execute"]
-        
-        # Add configured tools
-        for name in tool_names:
-            if name == "file_operations":
-                default_tools.extend(["file_list", "file_delete", "file_move"])
-            elif name == "web_search":
-                default_tools.append("web_search")
-            elif name == "browser":
-                default_tools.append("browser_navigate")
-            elif name == "visualization":
-                default_tools.extend(["create_chart", "data_analyze"])
-                
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_tools = []
-        for tool in default_tools:
-            if tool not in seen:
-                seen.add(tool)
-                unique_tools.append(tool)
-                
-        return get_tools_by_names(unique_tools, config=config)
+        try:
+            # Import strands_tools
+            from strands_tools import (
+                file_read, file_write, python_repl, shell,
+                http_request, editor, environment, retrieve,
+                generate_image, current_time, calculator
+            )
+            
+            config = config or Config.from_file()
+            tool_names = config.tools.enabled
+            
+            # Map of tool names to actual tool functions from strands_tools
+            available_tools = {
+                "file_read": file_read.file_read,
+                "file_write": file_write.file_write,
+                "code_execute": python_repl.python_repl,
+                "shell": shell.shell,
+                "http_request": http_request.http_request,
+                "editor": editor.editor,
+                "environment": environment.environment,
+                "web_search": retrieve.retrieve,  # Using retrieve for web search
+                "generate_image": generate_image.generate_image,
+                "current_time": current_time.current_time,
+                "calculator": calculator.calculator,
+            }
+            
+            # Always include basic tools
+            default_tool_names = ["file_read", "file_write", "code_execute"]
+            
+            # Add configured tools
+            for name in tool_names:
+                if name == "file_operations":
+                    default_tool_names.extend(["file_read", "file_write", "editor"])
+                elif name == "web_search":
+                    default_tool_names.append("web_search")
+                elif name == "shell":
+                    default_tool_names.append("shell")
+                elif name == "environment":
+                    default_tool_names.append("environment")
+                elif name == "visualization":
+                    default_tool_names.extend(["generate_image", "python_repl"])
+                elif name == "utilities":
+                    default_tool_names.extend(["calculator", "current_time"])
+                    
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_tool_names = []
+            for tool in default_tool_names:
+                if tool not in seen:
+                    seen.add(tool)
+                    unique_tool_names.append(tool)
+            
+            # Return the actual tool functions
+            tools = []
+            for tool_name in unique_tool_names:
+                if tool_name in available_tools:
+                    tools.append(available_tools[tool_name])
+            
+            return tools
+            
+        except ImportError:
+            # Fallback to original tools if strands_tools is not available
+            from ..tools import get_tools_by_names
+            
+            config = config or Config.from_file()
+            tool_names = config.tools.enabled
+            
+            # Always include basic tools
+            default_tools = ["file_read", "file_write", "code_execute"]
+            
+            # Add configured tools
+            for name in tool_names:
+                if name == "file_operations":
+                    default_tools.extend(["file_list", "file_delete", "file_move"])
+                elif name == "web_search":
+                    default_tools.append("web_search")
+                elif name == "browser":
+                    default_tools.append("browser_navigate")
+                elif name == "visualization":
+                    default_tools.extend(["create_chart", "data_analyze"])
+                    
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_tools = []
+            for tool in default_tools:
+                if tool not in seen:
+                    seen.add(tool)
+                    unique_tools.append(tool)
+                    
+            return get_tools_by_names(unique_tools, config=config)

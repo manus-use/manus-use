@@ -3,12 +3,14 @@
 import json
 import re
 import hashlib
+import logging
 from typing import Any, Dict, List, Optional, Union, Callable
 from enum import Enum
 from functools import lru_cache
 from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
+from strands.tools import tool
 
 from ..agents.base import BaseManusAgent
 from ..config import Config
@@ -20,6 +22,26 @@ class AgentType(str, Enum):
     BROWSER = "browser"
     DATA_ANALYSIS = "data_analysis"
     MCP = "mcp"
+
+
+AGENT_SYSTEM_PROMPTS = {
+    AgentType.MANUS: (
+        "You are a helpful AI assistant. Perform general computation, "
+        "file operations, or code execution as requested."
+    ),
+    AgentType.BROWSER: (
+        "You are an expert web browsing agent. "
+        "Perform the requested web task autonomously."
+    ),
+    AgentType.DATA_ANALYSIS: (
+        "You are a data analysis expert. Analyze the provided data "
+        "and generate insights or visualizations."
+    ),
+    AgentType.MCP: (
+        "You are an agent that interacts with external tools "
+        "via the Model Context Protocol."
+    )
+}
 
 
 class ComplexityLevel(str, Enum):
@@ -512,7 +534,8 @@ Format as JSON."""
             json_match = re.search(r'\{[\s\S]*\}', content)
             if json_match:
                 return json.loads(json_match.group())
-        except:
+        except Exception as e:
+            logging.error(f"Error during query complexity analysis: {e}")
             pass
         
         return {
@@ -523,3 +546,29 @@ Format as JSON."""
             "approach": "Direct execution",
             "parallelization": "none"
         }
+
+
+@tool
+def create_task_plan_tool(request: str) -> List[Dict]:
+    # ... (docstring as before) ...
+    planning_agent_instance = PlanningAgent()
+    task_plans_pydantic = planning_agent_instance.create_plan(request)
+    workflow_tasks = []
+    for plan_model in task_plans_pydantic:
+        task_dict = plan_model.model_dump()
+        system_prompt_for_agent = AGENT_SYSTEM_PROMPTS.get(
+            plan_model.agent_type, 
+            AGENT_SYSTEM_PROMPTS[AgentType.MANUS]
+        )
+        workflow_task_dict = {
+            'task_id': task_dict.get('task_id'),
+            'description': task_dict.get('description') or plan_model.description or "No description provided.",
+            'dependencies': task_dict.get('dependencies', []),
+            'system_prompt': system_prompt_for_agent,
+            'priority': task_dict.get('priority', 1),
+            'metadata': task_dict.get('metadata', {})
+        }
+        if workflow_task_dict['task_id'] is None:
+             workflow_task_dict['task_id'] = f"gen_task_{hashlib.md5(workflow_task_dict['description'].encode()).hexdigest()[:6]}"
+        workflow_tasks.append(workflow_task_dict)
+    return workflow_tasks

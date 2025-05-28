@@ -33,6 +33,7 @@ dependencies = [
     "pydantic>=2.0.0",
     "toml>=0.10.2",
     "rich>=13.9.4",
+    "click>=8.1.0",
     "httpx>=0.28.1",
     "beautifulsoup4>=4.12.3",
     "duckduckgo-search>=6.3.7",
@@ -78,9 +79,16 @@ visualization = [
     "plotly>=5.24.1",
     "kaleido>=0.2.1",
 ]
+cli = [
+    "click>=8.1.0",
+    "textual>=0.47.0",
+    "rich>=13.9.4",
+]
 
 [project.scripts]
 manus-use = "manus_use.cli:main"
+manus-use-v2 = "manus_use.cli_v2:main"
+manus-use-enhanced = "manus_use.cli_enhanced:main"
 
 [tool.hatch.envs.default]
 features = ["dev", "browser", "search", "visualization"]

@@ -1,13 +1,18 @@
-"""Flow orchestrator for multi-agent coordination."""
+"""Refactored flow orchestrator for multi-agent coordination using Strands SDK patterns."""
 
 import asyncio
+import hashlib
+import json 
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
+import traceback # Import for detailed error logging
 
-from ..agents import ManusAgent, BrowserAgent, BrowserUseAgent, DataAnalysisAgent, MCPAgent
+from strands import Agent as StrandsAgentAlias
+from strands_tools.workflow import workflow
 from ..config import Config
-from .planning_agent import PlanningAgent, TaskPlan
-
+from .planning_agent import create_task_plan_tool 
+# TaskPlan import removed as it's not directly used in this file's type hints anymore.
+# create_task_plan_tool is assumed to return List[Dict]
 
 @dataclass
 class FlowResult:
@@ -16,9 +21,8 @@ class FlowResult:
     output: str = ""
     error: Optional[str] = None
 
-
 class Orchestrator:
-    """Orchestrates multi-agent workflows."""
+    """Orchestrates multi-agent workflows using StrandsAgent and workflow tool."""
     
     def __init__(self, config: Optional[Config] = None):
         """Initialize orchestrator.
@@ -27,179 +31,132 @@ class Orchestrator:
             config: Configuration object
         """
         self.config = config or Config.from_file()
-        self.agents: Dict[str, Any] = {}
-        self.results: Dict[str, Any] = {}
         
-        # Add default planning agent
-        self.add_agent("planner", PlanningAgent(config=self.config))
-        
-    def add_agent(self, name: str, agent: Any) -> None:
-        """Add an agent to the orchestrator.
-        
-        Args:
-            name: Unique name for the agent
-            agent: Agent instance
-        """
-        self.agents[name] = agent
-        
-    def get_agent(self, agent_type: str) -> Any:
-        """Get or create an agent of the specified type.
-        
-        Args:
-            agent_type: Type of agent (manus, browser, data_analysis, mcp)
-            
-        Returns:
-            Agent instance
-        """
-        # Check if we already have an agent of this type
-        if agent_type in self.agents:
-            return self.agents[agent_type]
-            
-        # Create new agent based on type
-        if agent_type == "manus":
-            agent = ManusAgent(config=self.config)
-        elif agent_type == "browser":
-            # Use BrowserUseAgent as the default browser agent
-            agent = BrowserUseAgent(config=self.config)
-        elif agent_type == "data_analysis":
-            agent = DataAnalysisAgent(config=self.config)
-        elif agent_type == "mcp":
-            agent = MCPAgent(config=self.config)
-        else:
-            # Default to Manus agent
-            agent = ManusAgent(config=self.config)
-            
-        self.agents[agent_type] = agent
-        return agent
-        
-    async def execute_task(self, task: TaskPlan) -> Any:
-        """Execute a single task.
-        
-        Args:
-            task: Task to execute
-            
-        Returns:
-            Task result
-        """
-        # Wait for dependencies
-        for dep_id in task.dependencies:
-            while dep_id not in self.results:
-                await asyncio.sleep(0.1)
-                
-        # Get agent for this task
-        agent = self.get_agent(task.agent_type)
-        
-        # Prepare inputs (include dependency results)
-        inputs = task.inputs.copy()
-        for dep_id in task.dependencies:
-            inputs[f"result_{dep_id}"] = self.results[dep_id]
-            
-        # Create prompt with context
-        prompt = task.description
-        if inputs:
-            prompt += "\n\nContext/Inputs:"
-            for key, value in inputs.items():
-                prompt += f"\n- {key}: {value}"
-                
-        # Execute task
-        # Check if the agent returns a coroutine (async agents like BrowserUseAgent)
-        result = agent(prompt)
-        if asyncio.iscoroutine(result):
-            result = await result
-        
-        # Store result
-        self.results[task.task_id] = result
-        
-        return result
-        
-    async def execute_plan(self, plan: List[TaskPlan]) -> Dict[str, Any]:
-        """Execute a plan concurrently.
-        
-        Args:
-            plan: List of tasks to execute
-            
-        Returns:
-            Dictionary of task results
-        """
-        # Create tasks for concurrent execution
-        tasks = []
-        for task in plan:
-            tasks.append(self.execute_task(task))
-            
-        # Execute all tasks
-        await asyncio.gather(*tasks)
-        
-        return self.results
-        
-    def run(self, request: str) -> FlowResult:
-        """Run a complete flow from user request.
-        
-        Args:
-            request: User's request
-            
-        Returns:
-            FlowResult with success status and output
-        """
-        try:
-            # Get planning agent
-            planner = self.agents.get("planner")
-            if not planner:
-                return FlowResult(success=False, error="No planning agent configured")
-                
-            # Create plan
-            plan = planner.create_plan(request)
-            
-            # Execute plan
-            loop = asyncio.new_event_loop()
-            try:
-                results = loop.run_until_complete(self.execute_plan(plan))
-                
-                # Return the final result (last task's output)
-                if plan:
-                    output = results.get(plan[-1].task_id, "No result")
-                    return FlowResult(success=True, output=str(output))
-                return FlowResult(success=True, output="No tasks in plan")
-                
-            finally:
-                loop.close()
-                
-        except Exception as e:
-            return FlowResult(success=False, error=str(e))
-    
-    async def cleanup(self):
-        """Cleanup resources for all agents."""
-        for agent_name, agent in self.agents.items():
-            if hasattr(agent, 'cleanup'):
-                try:
-                    await agent.cleanup()
-                except Exception as e:
-                    # Log but don't fail cleanup
-                    print(f"Warning: Failed to cleanup {agent_name}: {e}")
-            
+        # pylint: disable=no-member 
+        self.main_agent = StrandsAgentAlias(
+            tools=[create_task_plan_tool, workflow],
+            model=self.config.get_model() 
+        )
+
     async def run_async(self, request: str) -> FlowResult:
-        """Async version of run."""
+        """Async version of run, using StrandsAgent and workflow tool.
+        Assumes workflow_async(action='start',...) can be awaited for completion 
+        and returns the final status object.
+        """
         try:
-            planner = self.agents.get("planner")
-            if not planner:
-                return FlowResult(success=False, error="No planning agent configured")
+            # Step 1: Generate the plan
+            plan_generation_prompt = (
+                f"You MUST use the create_task_plan_tool to generate a task plan for this request. "
+                f"Do NOT respond with text, only call the tool. "
+                f"Request: {request}"
+            )
+            # pylint: disable=not-callable
+            # Check if the agent call returns a coroutine or a result directly
+            plan_response = self.main_agent(plan_generation_prompt)
+            if asyncio.iscoroutine(plan_response):
+                plan_response = await plan_response
+            # pylint: enable=not-callable
+
+            # Extract content from the response
+            task_list = None
+            
+            # Debug: log the response type and attributes
+            import logging
+            logging.info(f"Response type: {type(plan_response)}")
+            logging.info(f"Response attributes: {dir(plan_response)}")
+            
+            # Since the agent is not properly storing tool results in state,
+            # we'll call the planning tool directly
+            from .planning_agent import create_task_plan_tool
+            logging.info("Calling create_task_plan_tool directly...")
+            task_list = create_task_plan_tool(request)
+            logging.info(f"Got task list with {len(task_list)} tasks")
+
+            if not task_list: # Ensure task_list is not empty after parsing
+                return FlowResult(success=False, error="Planning tool returned an empty plan.")
+
+            workflow_id = "wf_async_" + hashlib.md5(request.encode()).hexdigest()[:10]
+            
+            # Import the workflow tool directly
+            from strands_tools.workflow import workflow as workflow_tool
+            
+            # Create the workflow - construct the tool use object
+            create_tool_use = {
+                "toolUseId": f"create_{workflow_id}",
+                "input": {
+                    "action": "create",
+                    "workflow_id": workflow_id,
+                    "tasks": task_list
+                }
+            }
+            
+            create_action_result = workflow_tool(tool=create_tool_use)
+            if asyncio.iscoroutine(create_action_result):
+                create_action_result = await create_action_result
                 
-            plan = planner.create_plan(request)
-            results = await self.execute_plan(plan)
+            if isinstance(create_action_result, dict) and create_action_result.get("status") == "error":
+                error_msg = create_action_result.get('content', [{}])[0].get('text', 'Unknown error')
+                return FlowResult(success=False, error=f"Failed to create workflow: {error_msg}")
+
+            # Step 2: Start the workflow AND AWAIT ITS COMPLETION
+            start_tool_use = {
+                "toolUseId": f"start_{workflow_id}",
+                "input": {
+                    "action": "start",
+                    "workflow_id": workflow_id
+                }
+            }
             
-            if plan:
-                output = results.get(plan[-1].task_id, "No result")
-                return FlowResult(success=True, output=str(output))
-            return FlowResult(success=True, output="No tasks in plan")
+            final_status_result = workflow_tool(tool=start_tool_use)
+            if asyncio.iscoroutine(final_status_result):
+                final_status_result = await final_status_result
+
+            if not isinstance(final_status_result, dict):
+                return FlowResult(success=False, error=f"Workflow execution returned unexpected result type: {str(final_status_result)[:200]}")
+
+            # Get workflow status from the result
+            if final_status_result.get("status") == "success":
+                # The workflow completed successfully
+                content = final_status_result.get("content", [{}])[0].get("text", "")
+                return FlowResult(success=True, output=content)
             
+            current_workflow_status = final_status_result.get("workflow_status")
+            tasks_status_list = final_status_result.get("tasks", [])
+
+            if current_workflow_status == "completed":
+                final_task_id_in_plan = task_list[-1]['task_id'] if task_list else None
+                result_content = "Workflow completed. No tasks in plan or result for last task not found."
+                if final_task_id_in_plan:
+                    for task_s in tasks_status_list:
+                        if task_s.get('task_id') == final_task_id_in_plan and task_s.get('status') == 'completed':
+                            result_content = str(task_s.get('result', 'Result not available for the final task.'))
+                            break
+                return FlowResult(success=True, output=result_content)
+            
+            elif current_workflow_status == "failed":
+                failed_tasks_details = [
+                    f"Task '{t.get('task_id', 'Unknown_ID')}' failed: {t.get('error', 'Unknown error')}" 
+                    for t in tasks_status_list if t.get('status') == 'failed'
+                ]
+                error_msg = f"Workflow failed. Details: {'; '.join(failed_tasks_details) if failed_tasks_details else 'Unknown error.'}"
+                return FlowResult(success=False, error=error_msg)
+            else: 
+                return FlowResult(success=False, error=f"Workflow {workflow_id} ended with status: {current_workflow_status}. Full status: {str(final_status_result)[:500]}")
+
         except Exception as e:
-            return FlowResult(success=False, error=str(e))
-    
-    async def cleanup(self):
-        """Cleanup resources for all agents."""
-        for agent_name, agent in self.agents.items():
-            if hasattr(agent, 'cleanup'):
-                try:
-                    await agent.cleanup()
-                except Exception as e:
-                    # Log but don't fail cleanup
-                    print(f"Warning: Failed to cleanup {agent_name}: {e}")
+            return FlowResult(success=False, error=f"An unexpected error occurred in run_async: {str(e)}\n{traceback.format_exc()}")
+
+    def run(self, request: str) -> FlowResult:
+        """Synchronous version of run.
+        
+        This will execute the async workflow and block until completion.
+        """
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                raise RuntimeError("Current event loop is closed.")
+        except RuntimeError: 
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        return loop.run_until_complete(self.run_async(request))

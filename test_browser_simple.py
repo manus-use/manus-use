@@ -19,7 +19,7 @@ async def test_simple():
     # Create config
     config = Config()
     config.llm.provider = "bedrock"
-    config.llm.model = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+    config.llm.model = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
     
     # Create agent
     agent = BrowserUseAgent(config=config)

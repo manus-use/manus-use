@@ -130,6 +130,7 @@ class Config(BaseModel):
         
         if path and path.exists():
             data = toml.load(path)
+            print(data)
             return cls(**data)
         
         # Return default config if no file found
