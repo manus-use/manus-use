@@ -78,12 +78,14 @@ class DockerSandbox:
         """Synchronous container stop."""
         try:
             self.container.kill()
-        except:
+        except Exception as e:
+            print(f"Error killing container {self.container_name}: {e}")
             pass  # Container might already be stopped
             
         try:
             self.container.remove(force=True)
-        except:
+        except Exception as e:
+            print(f"Error removing container {self.container_name}: {e}")
             pass  # Container might already be removed
             
         self.container = None
@@ -169,7 +171,8 @@ class DockerSandbox:
             # Try to stop the execution
             try:
                 exec_info = self.container.exec_run("pkill -9 -f " + command.split()[0])
-            except:
+            except Exception as e:
+                print(f"Error trying to pkill command in {self.container_name}: {e}")
                 pass
             return "", f"Command timed out after {timeout} seconds", -1
             

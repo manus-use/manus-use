@@ -165,16 +165,6 @@ class Orchestrator:
                 
         except Exception as e:
             return FlowResult(success=False, error=str(e))
-    
-    async def cleanup(self):
-        """Cleanup resources for all agents."""
-        for agent_name, agent in self.agents.items():
-            if hasattr(agent, 'cleanup'):
-                try:
-                    await agent.cleanup()
-                except Exception as e:
-                    # Log but don't fail cleanup
-                    print(f"Warning: Failed to cleanup {agent_name}: {e}")
             
     async def run_async(self, request: str) -> FlowResult:
         """Async version of run."""
@@ -193,13 +183,3 @@ class Orchestrator:
             
         except Exception as e:
             return FlowResult(success=False, error=str(e))
-    
-    async def cleanup(self):
-        """Cleanup resources for all agents."""
-        for agent_name, agent in self.agents.items():
-            if hasattr(agent, 'cleanup'):
-                try:
-                    await agent.cleanup()
-                except Exception as e:
-                    # Log but don't fail cleanup
-                    print(f"Warning: Failed to cleanup {agent_name}: {e}")

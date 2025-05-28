@@ -3,12 +3,14 @@
 import json
 import re
 import hashlib
+import logging
 from typing import Any, Dict, List, Optional, Union, Callable
 from enum import Enum
 from functools import lru_cache
 from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
+from strands.tools import tool
 
 from ..agents.base import BaseManusAgent
 from ..config import Config
@@ -20,6 +22,26 @@ class AgentType(str, Enum):
     BROWSER = "browser"
     DATA_ANALYSIS = "data_analysis"
     MCP = "mcp"
+
+
+AGENT_SYSTEM_PROMPTS = {
+    AgentType.MANUS: (
+        "You are a helpful AI assistant. Perform general computation, "
+        "file operations, or code execution as requested."
+    ),
+    AgentType.BROWSER: (
+        "You are an expert web browsing agent. "
+        "Perform the requested web task autonomously."
+    ),
+    AgentType.DATA_ANALYSIS: (
+        "You are a data analysis expert. Analyze the provided data "
+        "and generate insights or visualizations."
+    ),
+    AgentType.MCP: (
+        "You are an agent that interacts with external tools "
+        "via the Model Context Protocol."
+    )
+}
 
 
 class ComplexityLevel(str, Enum):
@@ -512,7 +534,8 @@ Format as JSON."""
             json_match = re.search(r'\{[\s\S]*\}', content)
             if json_match:
                 return json.loads(json_match.group())
-        except:
+        except Exception as e:
+            logging.error(f"Error during query complexity analysis: {e}")
             pass
         
         return {
@@ -523,3 +546,40 @@ Format as JSON."""
             "approach": "Direct execution",
             "parallelization": "none"
         }
+
+
+@tool
+def create_task_plan_tool(request: str) -> List[Dict]:
+    """Generates a structured task plan based on a user request.
+    
+    Args:
+        request: The user's request or task description.
+        
+    Returns:
+        A list of dictionaries, where each dictionary represents a task 
+        with details like task_id, description, agent_type, dependencies, 
+        inputs, and expected_output.
+    """
+    planning_agent = PlanningAgent()
+    task_plans_pydantic = planning_agent.create_plan(request)
+    
+    processed_tasks = []
+    for plan in task_plans_pydantic:
+        task_dict = plan.model_dump()
+        
+        # Get system prompt for the agent type, defaulting to MANUS
+        system_prompt_for_agent = AGENT_SYSTEM_PROMPTS.get(plan.agent_type, AGENT_SYSTEM_PROMPTS[AgentType.MANUS])
+        task_dict['system_prompt'] = system_prompt_for_agent
+        
+        # Ensure description is populated (it should be from plan.description)
+        # task_dict['description'] is already plan.description via model_dump()
+
+        # Remove agent_type and inputs as per requirements
+        if 'agent_type' in task_dict:
+            del task_dict['agent_type']
+        if 'inputs' in task_dict:
+            del task_dict['inputs']
+            
+        processed_tasks.append(task_dict)
+        
+    return processed_tasks

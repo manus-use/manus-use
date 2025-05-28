@@ -145,8 +145,8 @@ class Config(BaseModel):
             "bedrock": BedrockModel,
         }
         
-        model_class = provider_map.get(self.llm.provider)
+        model_class = provider_map.get(self.llm.provider)  # pylint: disable=no-member
         if not model_class:
-            raise ValueError(f"Unknown provider: {self.llm.provider}")
+            raise ValueError(f"Unknown provider: {self.llm.provider}")  # pylint: disable=no-member
             
-        return model_class(**self.llm.model_kwargs)
+        return model_class(**self.llm.model_kwargs)  # pylint: disable=no-member

@@ -15,6 +15,7 @@ from typing import (
 from pydantic import BaseModel
 from strands import Agent
 from strands.types.tools import AgentTool # Though not used directly, often part of agent modules
+from langchain_core.language_models.chat_models import BaseChatModel
 
 from ..config import Config
 
@@ -66,6 +67,7 @@ except ImportError as e:
     Controller = None
     ChatBedrock = None
     ChatOpenAI = None
+    # BaseChatModel = None # Removed as BaseChatModel is now imported from langchain_core
 
 
 class BrowserUseAgent(Agent):
@@ -286,7 +288,7 @@ class BrowserUseAgent(Agent):
             return asyncio.run(self._run_browser_task(task_str))
 
     async def stream_async(
-        self, task: Union[str, List[dict]], **kwargs: Any
+        self, prompt: Union[str, List[dict]], **kwargs: Any
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Execute a browser task using browser-use and stream intermediate updates.
@@ -296,19 +298,19 @@ class BrowserUseAgent(Agent):
         step updates, final results, or errors.
 
         Args:
-            task: Task description (string) or a list of message dictionaries.
+            prompt: Task description (string) or a list of message dictionaries.
             **kwargs: Additional arguments (currently not used but part of signature).
 
         Yields:
             Dictionaries representing streaming events (e.g., step updates, final results, errors).
         """
         task_str: str
-        if isinstance(task, list):
-            task_str = task[-1].get("content", "") if task and task[-1].get("role") == "user" else ""
+        if isinstance(prompt, list):
+            task_str = prompt[-1].get("content", "") if prompt and prompt[-1].get("role") == "user" else ""
             if not task_str:
-                 task_str = str(task)
+                 task_str = str(prompt)
         else:
-            task_str = task
+            task_str = prompt
 
         queue: asyncio.Queue[Optional[Dict[str, Any]]] = asyncio.Queue()
         browser_use_agent_instance: Optional[BrowserUse] = None

@@ -105,7 +105,7 @@ async def web_search_async(
         - snippet: Brief description
     """
     config = Config.from_file()
-    max_results = max_results or config.tools.max_search_results
+    max_results = max_results or config.tools.max_search_results  # pylint: disable=no-member
     
     engine = get_search_engine(config)
     
@@ -136,7 +136,7 @@ def web_search(query: str, max_results: Optional[int] = None) -> List[Dict[str, 
         - snippet: Brief description
     """
     config = Config.from_file()
-    max_results = max_results or config.tools.max_search_results
+    max_results = max_results or config.tools.max_search_results  # pylint: disable=no-member
     
     engine = get_search_engine(config)
     

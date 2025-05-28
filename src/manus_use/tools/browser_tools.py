@@ -29,7 +29,7 @@ class BrowserAgentSession:
         if headless is not None:
             self.headless = headless
         elif config and hasattr(config, 'browser_use'):
-            self.headless = config.browser_use.headless
+            self.headless = config.browser_use.headless  # pylint: disable=no-member
         else:
             self.headless = True
     
@@ -171,9 +171,9 @@ async def browser_do(
         # Determine headless mode - use browser_use config if available
         if headless is None:
             if hasattr(config, 'browser_use'):
-                headless = config.browser_use.headless
+                headless = config.browser_use.headless  # pylint: disable=no-member
             else:
-                headless = config.tools.browser_headless
+                headless = config.tools.browser_headless  # pylint: disable=no-member
             
         # Get or create session
         session = get_browser_session(headless=headless, config=config)

@@ -66,12 +66,12 @@ class BrowserSession:
     
     def _get_llm(self):
         """Get LLM instance from config."""
-        if self.config and self.config.llm.provider == 'bedrock':
+        if self.config and self.config.llm.provider == 'bedrock': # pylint: disable=no-member
             # Use config settings for Bedrock
-            model_id = self.config.llm.model
+            model_id = self.config.llm.model # pylint: disable=no-member
             region = os.getenv('AWS_DEFAULT_REGION', 'us-east-1')
-            temperature = self.config.llm.temperature
-            max_tokens = self.config.llm.max_tokens
+            temperature = self.config.llm.temperature # pylint: disable=no-member
+            max_tokens = self.config.llm.max_tokens # pylint: disable=no-member
         else:
             # Default to demo settings
             model_id = 'us.anthropic.claude-3-7-sonnet-20250219-v1:0'
@@ -123,7 +123,7 @@ async def browser_navigate(url: str) -> Dict[str, Any]:
     """
     from ..config import Config
     config = Config.from_file()
-    session = get_browser_session(headless=config.tools.browser_headless, config=config)
+    session = get_browser_session(headless=config.tools.browser_headless, config=config)  # pylint: disable=no-member
     await session.initialize()
     
     try:
@@ -162,7 +162,7 @@ async def browser_click(index: int) -> Dict[str, Any]:
     """
     from ..config import Config
     config = Config.from_file()
-    session = get_browser_session(headless=config.tools.browser_headless, config=config)
+    session = get_browser_session(headless=config.tools.browser_headless, config=config)  # pylint: disable=no-member
     
     if not session._initialized:
         return {
@@ -204,7 +204,7 @@ async def browser_type(index: int, text: str) -> Dict[str, Any]:
     """
     from ..config import Config
     config = Config.from_file()
-    session = get_browser_session(headless=config.tools.browser_headless, config=config)
+    session = get_browser_session(headless=config.tools.browser_headless, config=config)  # pylint: disable=no-member
     
     if not session._initialized:
         return {
@@ -246,7 +246,7 @@ async def browser_extract(goal: str) -> Dict[str, Any]:
     """
     from ..config import Config
     config = Config.from_file()
-    session = get_browser_session(headless=config.tools.browser_headless, config=config)
+    session = get_browser_session(headless=config.tools.browser_headless, config=config)  # pylint: disable=no-member
     
     if not session._initialized:
         return {
@@ -302,7 +302,7 @@ async def browser_screenshot(path: Optional[str] = None, full_page: bool = True)
     """
     from ..config import Config
     config = Config.from_file()
-    session = get_browser_session(headless=config.tools.browser_headless, config=config)
+    session = get_browser_session(headless=config.tools.browser_headless, config=config)  # pylint: disable=no-member
     
     if not session._initialized:
         return {
@@ -358,7 +358,7 @@ async def browser_scroll(direction: Literal["up", "down"], amount: Optional[int]
     """
     from ..config import Config
     config = Config.from_file()
-    session = get_browser_session(headless=config.tools.browser_headless, config=config)
+    session = get_browser_session(headless=config.tools.browser_headless, config=config)  # pylint: disable=no-member
     
     if not session._initialized:
         return {
@@ -400,7 +400,7 @@ async def browser_get_state() -> Dict[str, Any]:
     """
     from ..config import Config
     config = Config.from_file()
-    session = get_browser_session(headless=config.tools.browser_headless, config=config)
+    session = get_browser_session(headless=config.tools.browser_headless, config=config)  # pylint: disable=no-member
     
     if not session._initialized:
         return {
