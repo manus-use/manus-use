@@ -196,6 +196,7 @@ Generate a JSON array with max {self.max_tasks_per_plan} tasks:
 - priority: 1 (highest) to 10 (lowest), affects scheduling
 - complexity helps estimate resource allocation
 - metadata can include retry policies, timeouts, or other execution hints
+- **VERY IMPORTANT**: Your response MUST be only the raw JSON array itself. Do not include any other text, explanations, apologies, or markdown formatting such as ```json ... ``` around the JSON array.
 
 Remember: The goal is to create an efficient, parallelizable plan that leverages each agent's strengths while ensuring reliability and clarity."""
 
@@ -212,26 +213,51 @@ Remember: The goal is to create an efficient, parallelizable plan that leverages
             # pylint: enable=not-callable
             
             response_content = llm_response.content if hasattr(llm_response, 'content') else str(llm_response)
+            parsed_tasks_data = None
+
+            try:
+                parsed_tasks_data = json.loads(response_content)
+                logging.info("Successfully parsed LLM response as direct JSON.")
+            except json.JSONDecodeError as e_direct:
+                logging.warning(f"Direct JSON parsing failed: {e_direct}. Attempting regex extraction...")
+                # Fallback to regex extraction
+                json_match = re.search(r'\[[\s\S]*\]', response_content)
+                if json_match:
+                    try:
+                        parsed_tasks_data = json.loads(json_match.group(0))
+                        logging.info("Successfully parsed LLM response using regex extraction.")
+                    except json.JSONDecodeError as e_regex:
+                        logging.error(f"JSON parsing failed with regex extraction: {e_regex}. Response content (first 500 chars): {response_content[:500]}")
+                        return [
+                            {
+                                'task_id': f"fallback_task_{hashlib.md5(request.encode()).hexdigest()[:6]}",
+                                'description': f"Fallback: Could not parse plan from LLM. Original request: {request[:100]}...",
+                                'dependencies': [],
+                                'system_prompt': AGENT_SYSTEM_PROMPTS[AgentType.MANUS],
+                                'priority': 1,
+                                'metadata': {"fallback": True, "parsing_error": str(e_regex)}
+                            }
+                        ]
+                else:
+                    logging.error("No JSON array found in LLM response even with regex.")
+                    return [
+                        {
+                            'task_id': f"fallback_task_{hashlib.md5(request.encode()).hexdigest()[:6]}",
+                            'description': f"Fallback: No JSON parsable content from LLM. Original request: {request[:100]}...",
+                            'dependencies': [],
+                            'system_prompt': AGENT_SYSTEM_PROMPTS[AgentType.MANUS],
+                            'priority': 1,
+                            'metadata': {"fallback": True, "no_json_found": True}
+                        }
+                    ]
             
-            json_match = re.search(r'\[[\s\S]*\]', response_content)
-            if not json_match:
-                logging.error("No JSON array found in LLM response.")
-                # Fallback: create a single task for the entire request
-                return [
-                    {
-                        'task_id': f"fallback_task_{hashlib.md5(request.encode()).hexdigest()[:6]}",
-                        'description': request,
-                        'dependencies': [],
-                        'system_prompt': AGENT_SYSTEM_PROMPTS[AgentType.MANUS], # Default to MANUS
-                        'priority': 1,
-                        'metadata': {"fallback": True}
-                    }
-                ]
-            
-            parsed_tasks_data = json.loads(json_match.group())
-            
+            if parsed_tasks_data is None:
+                # This case should ideally be covered by the fallbacks above, but as a safeguard:
+                logging.error("parsed_tasks_data is None after parsing attempts, returning empty list.")
+                return []
+
             if not isinstance(parsed_tasks_data, list):
-                logging.error("Parsed JSON is not a list.")
+                logging.error(f"Parsed data is not a list, but type {type(parsed_tasks_data)}. Content (first 500 chars): {str(parsed_tasks_data)[:500]}")
                 return []
 
             if len(parsed_tasks_data) > self.max_tasks_per_plan:

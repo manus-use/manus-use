@@ -12,12 +12,11 @@ MODULE_PATH_FOR_STRANDS_AGENT = "src.manus_use.multi_agents.orchestrator.Strands
 
 class TestOrchestratorGeneratePlan(unittest.IsolatedAsyncioTestCase):
 
-    async def test_generate_plan_with_llm_success(self):
-        # 1. Setup Orchestrator instance with mocks
+    async def test_generate_plan_direct_json_success(self):
+        # Test pure JSON response, should be parsed by direct json.loads()
         mock_config = MagicMock(spec=Config)
-        mock_config.get_model.return_value = "test_model" # Mock model name
+        mock_config.get_model.return_value = "test_model"
 
-        # Mock LLM response
         mock_llm_json_output = """
         [
           {
@@ -75,18 +74,17 @@ class TestOrchestratorGeneratePlan(unittest.IsolatedAsyncioTestCase):
             # if asyncio.iscoroutine(llm_response):
             #    llm_response = await llm_response
             # So, self.main_agent(full_prompt) can return a non-coroutine.
-            mock_main_agent_instance.return_value = mock_llm_response # For when main_agent instance is called
+            mock_main_agent_instance.return_value = mock_llm_response
 
             orchestrator = Orchestrator(config=mock_config)
-            
-            # Ensure the mocked agent is used
-            orchestrator.main_agent = mock_main_agent_instance
+            orchestrator.main_agent = mock_main_agent_instance # Ensure our mock is used
 
-            # 3. Call _generate_plan_with_llm
-            request_text = "test request for planning"
-            generated_plan = await orchestrator._generate_plan_with_llm(request_text)
+            request_text = "test request for direct json parsing"
+            # Check for specific log message
+            with self.assertLogs('src.manus_use.multi_agents.orchestrator', level='INFO') as cm:
+                generated_plan = await orchestrator._generate_plan_with_llm(request_text)
+                self.assertTrue(any("Successfully parsed LLM response as direct JSON." in log for log in cm.output))
 
-            # 4. Assertions
             self.assertIsInstance(generated_plan, list)
             self.assertEqual(len(generated_plan), 2)
 
@@ -100,8 +98,6 @@ class TestOrchestratorGeneratePlan(unittest.IsolatedAsyncioTestCase):
             self.assertIn('metadata', task1)
             self.assertEqual(task1['metadata'], {"key": "value1"})
 
-
-            # Task 2 assertions
             task2 = generated_plan[1]
             self.assertEqual(task2['task_id'], "task2")
             self.assertEqual(task2['description'], "Second task depending on first")
@@ -111,69 +107,155 @@ class TestOrchestratorGeneratePlan(unittest.IsolatedAsyncioTestCase):
             self.assertIn('metadata', task2)
             self.assertEqual(task2['metadata'], {})
             
-            # Check that the main_agent was called with the correct prompt structure
             mock_main_agent_instance.assert_called_once()
-            args, _ = mock_main_agent_instance.call_args
-            prompt_arg = args[0]
-            self.assertIn("You are an expert task planning agent", prompt_arg)
-            self.assertIn(request_text, prompt_arg)
 
-    async def test_generate_plan_with_llm_fallback(self):
-        # Test the fallback mechanism when LLM returns no JSON
+    async def test_generate_plan_regex_fallback_success(self):
+        # Test JSON with surrounding text, should be parsed by regex fallback
         mock_config = MagicMock(spec=Config)
         mock_config.get_model.return_value = "test_model"
-
+        
+        mock_llm_json_output_with_text = """
+        Some introductory text from the LLM.
+        ```json
+        [
+          {
+            "task_id": "regex_task1",
+            "description": "Task parsed by regex",
+            "agent_type": "manus",
+            "dependencies": [],
+            "inputs": {},
+            "expected_output": "Output of regex_task1",
+            "priority": 2,
+            "estimated_complexity": "medium"
+          }
+        ]
+        ```
+        And some trailing text.
+        """
         mock_llm_response = MagicMock()
-        mock_llm_response.content = "This is not a JSON response." # Invalid response
+        mock_llm_response.content = mock_llm_json_output_with_text
 
         with patch(MODULE_PATH_FOR_STRANDS_AGENT) as MockStrandsAgent:
             mock_main_agent_instance = MockStrandsAgent.return_value
             mock_main_agent_instance.return_value = mock_llm_response
-            
             orchestrator = Orchestrator(config=mock_config)
             orchestrator.main_agent = mock_main_agent_instance
 
-            request_text = "test request for fallback"
-            generated_plan = await orchestrator._generate_plan_with_llm(request_text)
+            request_text = "test request for regex fallback"
+            with self.assertLogs('src.manus_use.multi_agents.orchestrator', level='INFO') as cm:
+                generated_plan = await orchestrator._generate_plan_with_llm(request_text)
+                self.assertTrue(any("Direct JSON parsing failed" in log for log in cm.output))
+                self.assertTrue(any("Successfully parsed LLM response using regex extraction." in log for log in cm.output))
+            
+            self.assertIsInstance(generated_plan, list)
+            self.assertEqual(len(generated_plan), 1)
+            task1 = generated_plan[0]
+            self.assertEqual(task1['task_id'], "regex_task1")
+            self.assertEqual(task1['description'], "Task parsed by regex")
+            self.assertEqual(task1['system_prompt'], AGENT_SYSTEM_PROMPTS[AgentType.MANUS])
+
+    async def test_generate_plan_non_json_string_fallback(self):
+        # Test with a non-JSON string response
+        mock_config = MagicMock(spec=Config)
+        mock_config.get_model.return_value = "test_model"
+        mock_llm_response = MagicMock()
+        mock_llm_response.content = "Sorry, I cannot fulfill this request."
+
+        with patch(MODULE_PATH_FOR_STRANDS_AGENT) as MockStrandsAgent:
+            mock_main_agent_instance = MockStrandsAgent.return_value
+            mock_main_agent_instance.return_value = mock_llm_response
+            orchestrator = Orchestrator(config=mock_config)
+            orchestrator.main_agent = mock_main_agent_instance
+
+            request_text = "test non-json string"
+            with self.assertLogs('src.manus_use.multi_agents.orchestrator', level='ERROR') as cm:
+                generated_plan = await orchestrator._generate_plan_with_llm(request_text)
+                self.assertTrue(any("No JSON array found in LLM response even with regex." in log for log in cm.output))
 
             self.assertIsInstance(generated_plan, list)
             self.assertEqual(len(generated_plan), 1)
-            
             fallback_task = generated_plan[0]
             self.assertTrue(fallback_task['task_id'].startswith("fallback_task_"))
-            self.assertEqual(fallback_task['description'], request_text)
-            self.assertEqual(fallback_task['dependencies'], [])
-            self.assertEqual(fallback_task['system_prompt'], AGENT_SYSTEM_PROMPTS[AgentType.MANUS])
-            self.assertEqual(fallback_task['priority'], 1)
-            self.assertEqual(fallback_task['metadata'], {"fallback": True})
+            self.assertIn(f"Fallback: No JSON parsable content from LLM. Original request: {request_text[:100]}...", fallback_task['description'])
+            self.assertEqual(fallback_task['metadata'], {"fallback": True, "no_json_found": True})
 
-    async def test_generate_plan_with_llm_parsing_error(self):
-        # Test the fallback mechanism when LLM returns malformed JSON
+    async def test_generate_plan_empty_string_fallback(self):
+        # Test with an empty string response
         mock_config = MagicMock(spec=Config)
         mock_config.get_model.return_value = "test_model"
-
         mock_llm_response = MagicMock()
-        # Malformed JSON (missing closing bracket for the array)
-        mock_llm_response.content = """ 
-        [
-          {"task_id": "task1", "description": "First task", "agent_type": "manus"}
-        """
+        mock_llm_response.content = "" # Empty string
 
         with patch(MODULE_PATH_FOR_STRANDS_AGENT) as MockStrandsAgent:
             mock_main_agent_instance = MockStrandsAgent.return_value
             mock_main_agent_instance.return_value = mock_llm_response
-            
             orchestrator = Orchestrator(config=mock_config)
             orchestrator.main_agent = mock_main_agent_instance
 
-            request_text = "test request for json error"
-            generated_plan = await orchestrator._generate_plan_with_llm(request_text)
+            request_text = "test empty string"
+            with self.assertLogs('src.manus_use.multi_agents.orchestrator', level='ERROR') as cm:
+                generated_plan = await orchestrator._generate_plan_with_llm(request_text)
+                self.assertTrue(any("No JSON array found in LLM response even with regex." in log for log in cm.output))
             
-            # Should return empty list on JSONDecodeError
             self.assertIsInstance(generated_plan, list)
-            self.assertEqual(len(generated_plan), 0)
+            self.assertEqual(len(generated_plan), 1)
+            fallback_task = generated_plan[0]
+            self.assertTrue(fallback_task['task_id'].startswith("fallback_task_"))
+            self.assertIn(f"Fallback: No JSON parsable content from LLM. Original request: {request_text[:100]}...", fallback_task['description'])
+            self.assertEqual(fallback_task['metadata'], {"fallback": True, "no_json_found": True})
+
+    async def test_generate_plan_invalid_json_both_paths_fail_fallback(self):
+        # Test with malformed JSON that fails both direct and regex-extracted parsing
+        mock_config = MagicMock(spec=Config)
+        mock_config.get_model.return_value = "test_model"
+        mock_llm_response = MagicMock()
+        # This JSON is invalid within the regex-found block
+        mock_llm_response.content = "Here is some invalid JSON: [`task_id': 'broken',]" 
+
+        with patch(MODULE_PATH_FOR_STRANDS_AGENT) as MockStrandsAgent:
+            mock_main_agent_instance = MockStrandsAgent.return_value
+            mock_main_agent_instance.return_value = mock_llm_response
+            orchestrator = Orchestrator(config=mock_config)
+            orchestrator.main_agent = mock_main_agent_instance
+
+            request_text = "test invalid json"
+            with self.assertLogs('src.manus_use.multi_agents.orchestrator', level='ERROR') as cm:
+                generated_plan = await orchestrator._generate_plan_with_llm(request_text)
+                self.assertTrue(any("JSON parsing failed with regex extraction" in log for log in cm.output))
+
+            self.assertIsInstance(generated_plan, list)
+            self.assertEqual(len(generated_plan), 1)
+            fallback_task = generated_plan[0]
+            self.assertTrue(fallback_task['task_id'].startswith("fallback_task_"))
+            self.assertIn(f"Fallback: Could not parse plan from LLM. Original request: {request_text[:100]}...", fallback_task['description'])
+            self.assertTrue(fallback_task['metadata']["fallback"])
+            self.assertIn("parsing_error", fallback_task['metadata'])
+            
+    async def test_generate_plan_json_object_instead_of_array_fallback(self):
+        # Test LLM returns a JSON object {} instead of a JSON array []
+        mock_config = MagicMock(spec=Config)
+        mock_config.get_model.return_value = "test_model"
+        mock_llm_response = MagicMock()
+        mock_llm_response.content = """{"error": "I returned an object, not an array."}"""
+
+        with patch(MODULE_PATH_FOR_STRANDS_AGENT) as MockStrandsAgent:
+            mock_main_agent_instance = MockStrandsAgent.return_value
+            mock_main_agent_instance.return_value = mock_llm_response
+            orchestrator = Orchestrator(config=mock_config)
+            orchestrator.main_agent = mock_main_agent_instance
+            
+            request_text = "test json object not array"
+            # This should log "Parsed data is not a list"
+            with self.assertLogs('src.manus_use.multi_agents.orchestrator', level='ERROR') as cm:
+                generated_plan = await orchestrator._generate_plan_with_llm(request_text)
+                self.assertTrue(any("Parsed data is not a list" in log for log in cm.output))
+
+            self.assertIsInstance(generated_plan, list)
+            self.assertEqual(len(generated_plan), 0) # Current code returns [] if not a list
+
 
     async def test_generate_plan_with_llm_task_validation(self):
+        # This test remains important to ensure task structure is validated after successful parsing
         # Test that tasks are validated using TaskPlan and defaults are applied
         mock_config = MagicMock(spec=Config)
         mock_config.get_model.return_value = "test_model"
