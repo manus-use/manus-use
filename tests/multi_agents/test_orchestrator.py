@@ -278,7 +278,226 @@ class TestOrchestratorGeneratePlan(unittest.IsolatedAsyncioTestCase):
             # REVISING the expectation based on current implementation:
             # Task "invalid_agent_type_task" will fail validation because 'non_existent_agent' is not a valid AgentType.
             # Task "missing task_id" will fail validation because 'task_id' and 'expected_output' are required.
-            self.assertEqual(len(generated_plan), 2) 
+            self.assertEqual(len(generated_plan), 2)
+
+
+class TestOrchestratorRunAsync(unittest.IsolatedAsyncioTestCase):
+
+    async def test_run_async_successful_workflow(self):
+        mock_config = MagicMock(spec=Config)
+        mock_config.get_model.return_value = "test_model"
+
+        # 1. Mock for planning call
+        mock_llm_plan_response = MagicMock()
+        mock_llm_plan_response.content = """
+        [
+            {"task_id": "task1", "description": "First task", "agent_type": "manus", "dependencies": [], "inputs": {}, "expected_output": "Output 1", "priority": 1, "estimated_complexity": "low"}
+        ]
+        """
+
+        # 2. Mock for workflow execution call (direct dictionary output from tool)
+        mock_workflow_tool_output_success = {
+            "workflow_status": "completed",
+            "tasks": [
+                {"task_id": "task1", "status": "completed", "result": "Result of task 1"}
+            ]
+        }
+
+        with patch(MODULE_PATH_FOR_STRANDS_AGENT) as MockStrandsAgent:
+            mock_main_agent_instance = MockStrandsAgent.return_value
+            mock_main_agent_instance.side_effect = [
+                mock_llm_plan_response,          # For _generate_plan_with_llm
+                mock_workflow_tool_output_success # For workflow execution prompt
+            ]
+
+            orchestrator = Orchestrator(config=mock_config)
+            orchestrator.main_agent = mock_main_agent_instance # Ensure our mock is used
+
+            result = await orchestrator.run_async("test request")
+
+            self.assertTrue(result.success)
+            self.assertEqual(result.output, "Result of task 1")
+            self.assertIsNone(result.error)
+            
+            self.assertEqual(mock_main_agent_instance.call_count, 2)
+            # Assert planning prompt
+            self.assertIn("You are an expert task planning agent", mock_main_agent_instance.call_args_list[0][0][0])
+            # Assert workflow execution prompt
+            self.assertIn("I have a pre-defined workflow plan", mock_main_agent_instance.call_args_list[1][0][0])
+
+
+    async def test_run_async_failed_workflow(self):
+        mock_config = MagicMock(spec=Config)
+        mock_config.get_model.return_value = "test_model"
+
+        mock_llm_plan_response = MagicMock()
+        mock_llm_plan_response.content = """
+        [
+            {"task_id": "task1", "description": "Task to fail", "agent_type": "manus", "dependencies": [], "inputs": {}, "expected_output": "Output 1"}
+        ]
+        """
+        
+        mock_workflow_tool_output_failed = {
+            "workflow_status": "failed",
+            "tasks": [
+                {"task_id": "task1", "status": "failed", "error": "Task failed miserably"}
+            ]
+        }
+
+        with patch(MODULE_PATH_FOR_STRANDS_AGENT) as MockStrandsAgent:
+            mock_main_agent_instance = MockStrandsAgent.return_value
+            mock_main_agent_instance.side_effect = [
+                mock_llm_plan_response,
+                mock_workflow_tool_output_failed
+            ]
+            orchestrator = Orchestrator(config=mock_config)
+            orchestrator.main_agent = mock_main_agent_instance
+
+            result = await orchestrator.run_async("test request for failure")
+
+            self.assertFalse(result.success)
+            self.assertIn("Workflow (via agent) failed. Details: Task 'task1' failed: Task failed miserably", result.error)
+
+    async def test_run_async_unexpected_workflow_status(self):
+        mock_config = MagicMock(spec=Config)
+        mock_config.get_model.return_value = "test_model"
+
+        mock_llm_plan_response = MagicMock()
+        mock_llm_plan_response.content = """
+        [{"task_id": "task1", "description": "Task", "agent_type": "manus", "expected_output": "out"}]
+        """
+        
+        mock_workflow_tool_output_unknown = {
+            "workflow_status": "unknown_weird_status",
+            "tasks": []
+        }
+
+        with patch(MODULE_PATH_FOR_STRANDS_AGENT) as MockStrandsAgent:
+            mock_main_agent_instance = MockStrandsAgent.return_value
+            mock_main_agent_instance.side_effect = [
+                mock_llm_plan_response,
+                mock_workflow_tool_output_unknown
+            ]
+            orchestrator = Orchestrator(config=mock_config)
+            orchestrator.main_agent = mock_main_agent_instance
+
+            result = await orchestrator.run_async("test request for unknown status")
+
+            self.assertFalse(result.success)
+            self.assertIn("ended with status: unknown_weird_status", result.error)
+
+    async def test_run_async_plan_generation_fails(self):
+        # Test when _generate_plan_with_llm returns an empty list
+        mock_config = MagicMock(spec=Config)
+        mock_config.get_model.return_value = "test_model"
+
+        mock_llm_plan_response_empty = MagicMock()
+        mock_llm_plan_response_empty.content = "This is not JSON, so plan will be empty or fallback." 
+        # Current _generate_plan_with_llm returns fallback for non-JSON, let's make it return empty for this test
+        # To do that, we can mock _generate_plan_with_llm itself, or ensure it produces empty.
+        # Let's refine: if LLM returns non-JSON, _generate_plan_with_llm returns a fallback list of 1 task.
+        # If LLM returns malformed JSON (e.g. "[{"), _generate_plan_with_llm returns [].
+
+        mock_llm_malformed_json_response = MagicMock()
+        mock_llm_malformed_json_response.content = "[{'task_id': 'bad_json'" # Malformed
+
+        with patch(MODULE_PATH_FOR_STRANDS_AGENT) as MockStrandsAgent:
+            mock_main_agent_instance = MockStrandsAgent.return_value
+            # Only one call to main_agent will happen if planning fails this way
+            mock_main_agent_instance.return_value = mock_llm_malformed_json_response
+            
+            orchestrator = Orchestrator(config=mock_config)
+            orchestrator.main_agent = mock_main_agent_instance
+
+            result = await orchestrator.run_async("test request where planning fails")
+
+            self.assertFalse(result.success)
+            self.assertEqual(result.error, "LLM failed to generate a valid task plan.")
+            mock_main_agent_instance.assert_called_once() # Only called for planning
+
+    async def test_run_async_agent_returns_non_json_str_for_workflow(self):
+        mock_config = MagicMock(spec=Config)
+        mock_config.get_model.return_value = "test_model"
+
+        mock_llm_plan_response = MagicMock()
+        mock_llm_plan_response.content = """
+        [{"task_id": "task1", "description": "Task", "agent_type": "manus", "expected_output": "out"}]
+        """
+        
+        # Simulate agent returning a non-JSON string instead of a dict for workflow tool call
+        mock_agent_workflow_response_str = MagicMock()
+        mock_agent_workflow_response_str.content = "This is just a string, not workflow JSON."
+
+        with patch(MODULE_PATH_FOR_STRANDS_AGENT) as MockStrandsAgent:
+            mock_main_agent_instance = MockStrandsAgent.return_value
+            mock_main_agent_instance.side_effect = [
+                mock_llm_plan_response,
+                mock_agent_workflow_response_str # This is the response for the workflow execution call
+            ]
+            orchestrator = Orchestrator(config=mock_config)
+            orchestrator.main_agent = mock_main_agent_instance
+
+            result = await orchestrator.run_async("test agent string response for workflow")
+
+            self.assertFalse(result.success)
+            self.assertEqual(result.error, "Agent returned non-JSON for workflow execution.")
+
+    async def test_run_async_agent_returns_unexpected_type_for_workflow(self):
+        mock_config = MagicMock(spec=Config)
+        mock_config.get_model.return_value = "test_model"
+
+        mock_llm_plan_response = MagicMock()
+        mock_llm_plan_response.content = """
+        [{"task_id": "task1", "description": "Task", "agent_type": "manus", "expected_output": "out"}]
+        """
+        
+        # Simulate agent returning an unexpected type (e.g., an int) for workflow tool call
+        # This tests the case where agent_response_for_workflow.content is not str/dict
+        # or agent_response_for_workflow itself is not a dict (if .content is not present)
+        mock_agent_workflow_response_unexpected = MagicMock()
+        mock_agent_workflow_response_unexpected.content = 12345 # An integer
+
+        with patch(MODULE_PATH_FOR_STRANDS_AGENT) as MockStrandsAgent:
+            mock_main_agent_instance = MockStrandsAgent.return_value
+            mock_main_agent_instance.side_effect = [
+                mock_llm_plan_response,
+                mock_agent_workflow_response_unexpected
+            ]
+            orchestrator = Orchestrator(config=mock_config)
+            orchestrator.main_agent = mock_main_agent_instance
+
+            result = await orchestrator.run_async("test agent unexpected type for workflow")
+
+            self.assertFalse(result.success)
+            self.assertEqual(result.error, "Agent returned unexpected content type for workflow execution.")
+
+    async def test_run_async_agent_returns_direct_non_dict_for_workflow(self):
+        # This test covers the case where the agent returns a non-dict, non-MagicMock object directly
+        # (i.e., it doesn't have a .content attribute and is not a dict itself)
+        mock_config = MagicMock(spec=Config)
+        mock_config.get_model.return_value = "test_model"
+
+        mock_llm_plan_response = MagicMock()
+        mock_llm_plan_response.content = """
+        [{"task_id": "task1", "description": "Task", "agent_type": "manus", "expected_output": "out"}]
+        """
+        
+        # Simulate agent returning an int directly for workflow tool call
+        mock_agent_direct_int_response = 12345 
+
+        with patch(MODULE_PATH_FOR_STRANDS_AGENT) as MockStrandsAgent:
+            mock_main_agent_instance = MockStrandsAgent.return_value
+            mock_main_agent_instance.side_effect = [
+                mock_llm_plan_response,
+                mock_agent_direct_int_response # Agent returns an int directly
+            ]
+            orchestrator = Orchestrator(config=mock_config)
+            orchestrator.main_agent = mock_main_agent_instance
+
+            result = await orchestrator.run_async("test agent direct int for workflow")
+
+            self.assertFalse(result.success)
+            self.assertEqual(result.error, "Agent returned unexpected response type for workflow execution.")
 
 
 if __name__ == '__main__':

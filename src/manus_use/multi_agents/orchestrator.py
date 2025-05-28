@@ -121,10 +121,10 @@ class Orchestrator:
         self.max_tasks_per_plan = 20 # Max tasks per plan
         
         # pylint: disable=no-member 
-        # The main_agent is used for its LLM, not for its tools here.
-        # Tools for the workflow are called directly.
+        # The main_agent is used for its LLM and potentially for tools.
+        # Adding 'workflow' tool as requested for self.main_agent.
         self.main_agent = StrandsAgentAlias(
-            tools=[], # No tools needed for this agent's direct LLM call
+            tools=[workflow], # Added workflow tool
             model=self.config.get_model() 
         )
 
@@ -298,87 +298,95 @@ Remember: The goal is to create an efficient, parallelizable plan that leverages
                 logging.error("Plan generation failed or returned an empty plan.")
                 return FlowResult(success=False, error="LLM failed to generate a valid task plan.")
 
-            logging.info(f"Orchestrator: Plan generated with {len(task_list)} tasks.")
-            workflow_id = "wf_async_" + hashlib.md5(request.encode()).hexdigest()[:10]
+            logging.info(f"Orchestrator: Plan generated with {len(task_list)} tasks. Requesting agent to execute workflow.")
+            workflow_id = "wf_agent_" + hashlib.md5(request.encode()).hexdigest()[:10]
+            task_list_json = json.dumps(task_list)
 
-            # Import the workflow tool directly
-            from strands_tools.workflow import workflow as workflow_tool
+            # Step 2: Construct prompt for main_agent to use the 'workflow' tool
+            workflow_prompt = f"""
+I have a pre-defined workflow plan that needs to be executed using the 'workflow' tool.
 
-            # Create the workflow - construct the tool use object
-            create_tool_use = {
-                "toolUseId": f"create_{workflow_id}",
-                "input": {
-                    "action": "create",
-                    "workflow_id": workflow_id,
-                    "tasks": task_list
-                }
-            }
+Workflow ID: {workflow_id}
+Tasks (JSON format):
+{task_list_json}
+
+Instructions for using the 'workflow' tool:
+1. Action 'create': Use this action first to create the workflow with the provided Workflow ID and Tasks.
+2. Action 'start': After successful creation, use this action to start the workflow execution.
+3. Await Completion: Ensure the workflow runs to completion.
+4. Final Result: Provide the final status object from the 'workflow' tool, which includes the overall workflow_status, and the status/results of individual tasks. The final output of the workflow is typically the result of the last task in the plan.
+
+You MUST use the 'workflow' tool to perform these actions. Do not respond with text other than the direct output from the tool.
+"""
+            logging.info(f"Orchestrator: Prompting main_agent to execute workflow {workflow_id}...")
             
-            # Ensure workflow_tool is treated as a function that might be async or sync
-            # Forcing it to be async for now, as workflow operations can be I/O bound
-            create_action_result_maybe_coro = workflow_tool(tool=create_tool_use)
-            if asyncio.iscoroutine(create_action_result_maybe_coro):
-                create_action_result = await create_action_result_maybe_coro
-            else:
-                create_action_result = create_action_result_maybe_coro # Assuming it's already a result
-                
-            if isinstance(create_action_result, dict) and create_action_result.get("status") == "error":
-                error_msg = create_action_result.get('content', [{}])[0].get('text', 'Unknown error creating workflow')
-                logging.error(f"Failed to create workflow: {error_msg}")
-                return FlowResult(success=False, error=f"Failed to create workflow: {error_msg}")
-            elif not (isinstance(create_action_result, dict) and create_action_result.get("status") == "success"):
-                 logging.error(f"Workflow creation returned unexpected result: {str(create_action_result)[:200]}")
-                 return FlowResult(success=False, error=f"Workflow creation returned unexpected result: {str(create_action_result)[:200]}")
+            # pylint: disable=not-callable
+            agent_response_for_workflow = self.main_agent(workflow_prompt)
+            if asyncio.iscoroutine(agent_response_for_workflow):
+                agent_response_for_workflow = await agent_response_for_workflow
+            # pylint: enable=not-callable
 
-
-            logging.info(f"Orchestrator: Workflow {workflow_id} created. Starting execution...")
-            # Step 2: Start the workflow AND AWAIT ITS COMPLETION
-            start_tool_use = {
-                "toolUseId": f"start_{workflow_id}",
-                "input": {
-                    "action": "start", # This should ideally be 'run' or 'execute_and_poll'
-                    "workflow_id": workflow_id
-                }
-            }
+            # The agent's response content should be the direct output from the workflow tool
+            # This assumes the agent correctly calls the tool and returns its structured output.
+            # If the agent wraps the tool output in its own message structure, this needs adjustment.
+            # For StrandsAgent, response.content usually holds the primary text or tool output.
             
-            final_status_result_maybe_coro = workflow_tool(tool=start_tool_use)
-            if asyncio.iscoroutine(final_status_result_maybe_coro):
-                final_status_result = await final_status_result_maybe_coro
+            final_status_result = None
+            if hasattr(agent_response_for_workflow, 'content'):
+                # Try to parse content if it's a string (might be JSON string from tool)
+                if isinstance(agent_response_for_workflow.content, str):
+                    try:
+                        final_status_result = json.loads(agent_response_for_workflow.content)
+                    except json.JSONDecodeError:
+                        logging.error(f"Failed to parse JSON from agent's workflow execution response content: {agent_response_for_workflow.content[:200]}")
+                        return FlowResult(success=False, error="Agent returned non-JSON for workflow execution.")
+                elif isinstance(agent_response_for_workflow.content, dict): # Already a dict
+                    final_status_result = agent_response_for_workflow.content
+                else:
+                    logging.error(f"Agent's workflow execution response content is not a string or dict: {type(agent_response_for_workflow.content)}")
+                    return FlowResult(success=False, error="Agent returned unexpected content type for workflow execution.")
+            elif isinstance(agent_response_for_workflow, dict): # Direct dict response
+                 final_status_result = agent_response_for_workflow
             else:
-                final_status_result = final_status_result_maybe_coro
+                logging.error(f"Unexpected response type from agent for workflow execution: {type(agent_response_for_workflow)}")
+                return FlowResult(success=False, error="Agent returned unexpected response type for workflow execution.")
 
+            if not isinstance(final_status_result, dict): # Should be a dict after parsing/assignment
+                logging.error(f"Workflow execution result from agent is not a dict: {str(final_status_result)[:200]}")
+                return FlowResult(success=False, error=f"Workflow execution result from agent is not a dict: {str(final_status_result)[:200]}")
 
-            if not isinstance(final_status_result, dict):
-                logging.error(f"Workflow execution returned unexpected result type: {str(final_status_result)[:200]}")
-                return FlowResult(success=False, error=f"Workflow execution returned unexpected result type: {str(final_status_result)[:200]}")
-
-            logging.info(f"Orchestrator: Workflow {workflow_id} execution finished. Final status: {final_status_result.get('workflow_status')}")
+            logging.info(f"Orchestrator: Workflow {workflow_id} execution by agent finished. Final status from tool: {final_status_result.get('workflow_status')}")
             
             current_workflow_status = final_status_result.get("workflow_status")
-            tasks_status_list = final_status_result.get("tasks", [])
+            tasks_status_list = final_status_result.get("tasks", []) # Ensure this key exists or default
 
             if current_workflow_status == "completed":
                 final_task_id_in_plan = task_list[-1]['task_id'] if task_list else None
                 result_content = "Workflow completed. Final result not found or plan was empty."
-                if final_task_id_in_plan:
+                if final_task_id_in_plan and tasks_status_list: # Ensure tasks_status_list is not None
                     for task_s in tasks_status_list:
                         if task_s.get('task_id') == final_task_id_in_plan and task_s.get('status') == 'completed':
                             result_content = str(task_s.get('result', 'Result not available for the final task.'))
                             break
-                logging.info(f"Orchestrator: Workflow {workflow_id} completed successfully. Output: {result_content[:100]}")
+                logging.info(f"Orchestrator: Workflow {workflow_id} (via agent) completed successfully. Output: {result_content[:100]}")
                 return FlowResult(success=True, output=result_content)
             
             elif current_workflow_status == "failed":
-                failed_tasks_details = [
-                    f"Task '{t.get('task_id', 'Unknown_ID')}' failed: {t.get('error', 'Unknown error')}" 
-                    for t in tasks_status_list if t.get('status') == 'failed'
-                ]
-                error_msg = f"Workflow failed. Details: {'; '.join(failed_tasks_details) if failed_tasks_details else 'Unknown error.'}"
-                logging.error(f"Orchestrator: Workflow {workflow_id} failed. Error: {error_msg}")
+                error_details = "Unknown error."
+                if tasks_status_list: # Ensure tasks_status_list is not None
+                    failed_tasks_details = [
+                        f"Task '{t.get('task_id', 'Unknown_ID')}' failed: {t.get('error', 'Unknown error')}" 
+                        for t in tasks_status_list if t.get('status') == 'failed'
+                    ]
+                    if failed_tasks_details:
+                        error_details = '; '.join(failed_tasks_details)
+                
+                error_msg = f"Workflow (via agent) failed. Details: {error_details}"
+                logging.error(f"Orchestrator: Workflow {workflow_id} (via agent) failed. Error: {error_msg}")
                 return FlowResult(success=False, error=error_msg)
             else: 
-                logging.warning(f"Orchestrator: Workflow {workflow_id} ended with unhandled status: {current_workflow_status}. Full status: {str(final_status_result)[:500]}")
-                return FlowResult(success=False, error=f"Workflow {workflow_id} ended with status: {current_workflow_status}. Full status: {str(final_status_result)[:500]}")
+                logging.warning(f"Orchestrator: Workflow {workflow_id} (via agent) ended with unhandled status: {current_workflow_status}. Full status from tool: {str(final_status_result)[:500]}")
+                return FlowResult(success=False, error=f"Workflow {workflow_id} (via agent) ended with status: {current_workflow_status}. Full status: {str(final_status_result)[:500]}")
 
         except Exception as e:
             logging.error(f"An unexpected error occurred in run_async: {str(e)}\n{traceback.format_exc()}")
