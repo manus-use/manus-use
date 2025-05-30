@@ -103,23 +103,41 @@ class ManusWorkflowManager(WorkflowManager):
             agent = self.get_agent_for_task(task)
             
             # Execute task using the agent
-            result = agent(task_prompt)
+            potential_coroutine = agent(task_prompt) # This might be a coroutine or a direct result
 
+            actual_result: Any # Define type for clarity
+            if asyncio.iscoroutine(potential_coroutine):
+                logger.info(f"Task {task.get('task_id', 'unknown')} returned a coroutine, running it to completion.")
+                try:
+                    loop = asyncio.get_running_loop()
+                    # If loop is running, use run_until_complete.
+                    # This will block execute_task until the coroutine is done.
+                    actual_result = loop.run_until_complete(potential_coroutine)
+                except RuntimeError:
+                    # No event loop is currently running, or other asyncio.run() related issue.
+                    # Use asyncio.run() to create one and run the coroutine.
+                    logger.info(f"No running loop for task {task.get('task_id', 'unknown')}, using asyncio.run().")
+                    actual_result = asyncio.run(potential_coroutine)
+            else:
+                logger.info(f"Task {task.get('task_id', 'unknown')} returned a direct result.")
+                actual_result = potential_coroutine
+
+            # Now 'actual_result' holds the actual result from the agent call.
             # Extract response content - handle both dict and custom object return types
             try:
-                # If result is a dict or has .get() method
-                content = result.get("content", [])
+                # If actual_result is a dict or has .get() method
+                content = actual_result.get("content", [])
             except AttributeError:
-                # If result is an object with .content attribute
-                content = getattr(result, "content", [])
+                # If actual_result is an object with .content attribute
+                content = getattr(actual_result, "content", [])
 
             # Extract stop_reason - handle both dict and custom object return types
             try:
-                # If result is a dict or has .get() method
-                stop_reason = result.get("stop_reason", "")
+                # If actual_result is a dict or has .get() method
+                stop_reason = actual_result.get("stop_reason", "")
             except AttributeError:
-                # If result is an object with .stop_reason attribute
-                stop_reason = getattr(result, "stop_reason", "")
+                # If actual_result is an object with .stop_reason attribute
+                stop_reason = getattr(actual_result, "stop_reason", "")
 
             # Update task status
             status = "success" if stop_reason != "error" else "error"
