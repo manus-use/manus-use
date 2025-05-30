@@ -1,74 +1,88 @@
-"""Custom workflow tool for ManusUse that supports different agent types."""
+"""Custom workflow tool that supports ManusUse agent types."""
 
+import asyncio
+import json
 import logging
-from typing import Any, Dict, Optional
+import uuid
+from typing import Any, Dict
 
-from strands_tools.workflow import WorkflowManager, workflow, TOOL_SPEC
-from strands.tools import tool
+from strands.types.tools import ToolResult, ToolUse
+from strands_tools.workflow import (
+    WorkflowManager,WORKFLOW_DIR, TOOL_SPEC as BASE_TOOL_SPEC
+)
 
 from ..agents import ManusAgent, BrowserUseAgent, DataAnalysisAgent, MCPAgent
 from ..config import Config
 
 logger = logging.getLogger(__name__)
 
+# Copy the tool spec from base but customize description
+TOOL_SPEC = BASE_TOOL_SPEC.copy()
+TOOL_SPEC["name"] = "manus_workflow"
+TOOL_SPEC["description"] = TOOL_SPEC["description"] + """
+This version supports ManusUse agent types:
+- manus: General computation and file operations
+- browser: Web browsing using browser-use
+- data_analysis: Data analysis and visualization
+- mcp: Model Context Protocol tools
+"""
+
+# Add agent_type to the task schema
+TOOL_SPEC["inputSchema"]["json"]["properties"]["tasks"]["items"]["properties"]["agent_type"] = {
+    "type": "string",
+    "enum": ["manus", "browser", "data_analysis", "mcp"],
+    "description": "Agent type to use for executing this task (defaults to 'manus')",
+    "default": "manus"
+}
 
 class ManusWorkflowManager(WorkflowManager):
     """Extended workflow manager that supports ManusUse agent types."""
     
     def __init__(self, tool_context: Dict[str, Any]):
+        """Initialize with agent registry."""
         super().__init__(tool_context)
         
-        # Get config for agent initialization
-        self.manus_config = Config.from_file()
+        # Get config from tool context
+        self.config = Config.from_file()
         
         # Initialize agent registry
         self.agent_registry = {
             "manus": ManusAgent,
             "browser": BrowserUseAgent,
             "data_analysis": DataAnalysisAgent,
-            "mcp": MCPAgent,
+            "mcp": MCPAgent
         }
         
         # Cache for agent instances
-        self.agent_cache = {}
-    
+        self.agent_instances = {}
+        
     def get_agent_for_task(self, task: Dict) -> Any:
-        """Get the appropriate agent instance for a task based on agent_type."""
+        """Get the appropriate agent for a task based on agent_type."""
         agent_type = task.get("agent_type", "manus")
         
         # Check cache first
-        if agent_type in self.agent_cache:
-            return self.agent_cache[agent_type]
-        
-        # Get agent class from registry
+        if agent_type in self.agent_instances:
+            return self.agent_instances[agent_type]
+            
+        # Create new agent instance
         agent_class = self.agent_registry.get(agent_type)
         if not agent_class:
-            logger.warning(f"Unknown agent type: {agent_type}, falling back to ManusAgent")
+            logger.warning(f"Unknown agent type: {agent_type}, using ManusAgent")
             agent_class = ManusAgent
+            
+        # Create agent with system prompt if provided
+        system_prompt = task.get("system_prompt")
+        if system_prompt:
+            agent = agent_class(config=self.config, system_prompt=system_prompt)
+        else:
+            agent = agent_class(config=self.config)
+            
+        # Cache the instance
+        self.agent_instances[agent_type] = agent
+        return agent
         
-        # Create agent instance
-        try:
-            if agent_type == "browser":
-                # BrowserUseAgent might need special initialization
-                agent = agent_class(config=self.manus_config)
-            else:
-                # Other agents use standard initialization
-                agent = agent_class(
-                    model=self.manus_config.get_model(),
-                    config=self.manus_config
-                )
-            
-            # Cache the agent
-            self.agent_cache[agent_type] = agent
-            return agent
-            
-        except Exception as e:
-            logger.error(f"Error creating {agent_type} agent: {str(e)}")
-            # Fall back to base agent
-            return self.base_agent
-    
     def execute_task(self, task: Dict, workflow: Dict, tool_use_id: str) -> Dict:
-        """Execute a single task using the appropriate agent type."""
+        """Execute a single task using the appropriate agent."""
         try:
             # Build context from dependent tasks
             context = []
@@ -88,20 +102,8 @@ class ManusWorkflowManager(WorkflowManager):
             # Get the appropriate agent for this task
             agent = self.get_agent_for_task(task)
             
-            # Get task-specific overrides if provided
-            task_kwargs = {}
-            if task.get("system_prompt"):
-                # For agents that support system_prompt override
-                if hasattr(agent, 'system_prompt'):
-                    original_prompt = agent.system_prompt
-                    agent.system_prompt = task["system_prompt"]
-
-            # Execute task using the appropriate agent
-            result = agent(task_prompt, **task_kwargs)
-            
-            # Restore original system prompt if changed
-            if task.get("system_prompt") and hasattr(agent, 'system_prompt') and 'original_prompt' in locals():
-                agent.system_prompt = original_prompt
+            # Execute task using the agent
+            result = agent(task_prompt)
 
             # Extract response content - handle both dict and custom object return types
             try:
@@ -110,9 +112,6 @@ class ManusWorkflowManager(WorkflowManager):
             except AttributeError:
                 # If result is an object with .content attribute
                 content = getattr(result, "content", [])
-                # For string results (like from BrowserUseAgent)
-                if isinstance(result, str):
-                    content = [{"text": result}]
 
             # Extract stop_reason - handle both dict and custom object return types
             try:
@@ -135,19 +134,17 @@ class ManusWorkflowManager(WorkflowManager):
             logger.error(f"\nError: {error_msg}")
             return {"status": "error", "content": [{"text": error_msg}]}
 
-
-# Create a custom tool spec that uses our extended workflow manager
-MANUS_TOOL_SPEC = TOOL_SPEC.copy()
-MANUS_TOOL_SPEC["name"] = "manus_workflow"
-MANUS_TOOL_SPEC["description"] = TOOL_SPEC["description"] + "\n\nExtended to support ManusUse agent types: manus, browser, data_analysis, mcp."
-
-
-#@tool
-def manus_workflow(tool: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
-    """ManusUse workflow tool that supports different agent types."""
-    import uuid
-    from strands.types.tools import ToolResult
+def manus_workflow(tool: ToolUse, **kwargs: Any) -> ToolResult:
+    """ManusUse-aware workflow tool implementation.
     
+    This tool extends the base workflow tool with support for ManusUse agent types:
+    - manus: General computation and file operations
+    - browser: Web browsing using browser-use
+    - data_analysis: Data analysis and visualization
+    - mcp: Model Context Protocol tools
+    
+    Each task can specify an agent_type to route to the appropriate agent.
+    """
     system_prompt = kwargs.get("system_prompt")
     inference_config = kwargs.get("inference_config")
     messages = kwargs.get("messages")
@@ -158,7 +155,10 @@ def manus_workflow(tool: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
         tool_input = tool.get("input", {})
         action = tool_input.get("action")
 
-        # Initialize our custom workflow manager
+        print("==========================")
+        print(tool_input)
+
+        # Initialize workflow manager
         manager = ManusWorkflowManager(
             {
                 "system_prompt": system_prompt,
@@ -229,7 +229,7 @@ def manus_workflow(tool: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
         import traceback
         error_trace = traceback.format_exc()
         error_msg = f"Error: {str(e)}\n\nTraceback:\n{error_trace}"
-        logger.error(f"\nError in manus_workflow tool: {error_msg}")
+        logger.error(f"\nError in workflow tool: {error_msg}")
         return {
             "toolUseId": tool_use_id,
             "status": "error",

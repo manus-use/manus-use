@@ -4,7 +4,6 @@ Strands Agent that uses the workflow tool to handle complex tasks
 with headless=False for browser operations
 """
 
-import os
 import sys
 from pathlib import Path
 from typing import Optional, Dict, Any

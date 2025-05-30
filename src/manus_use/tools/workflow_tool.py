@@ -4,24 +4,21 @@ import asyncio
 import json
 import logging
 import uuid
-from typing import Any, Dict, List, Optional
-from datetime import datetime, timezone
+from typing import Any, Dict
 
-from strands.tools import tool
 from strands.types.tools import ToolResult, ToolUse
 from strands_tools.workflow import (
-    WorkflowManager, WORKFLOW_DIR, TaskExecutor, 
-    MIN_THREADS, MAX_THREADS, TOOL_SPEC as BASE_TOOL_SPEC
+    WorkflowManager,WORKFLOW_DIR, TOOL_SPEC as BASE_TOOL_SPEC
 )
 
-from ..agents import ManusAgent, BrowserUseAgent, DataAnalysisAgent, MCPAgent
-from ..config import Config
+from manus_use.agents import ManusAgent, BrowserUseAgent, DataAnalysisAgent, MCPAgent
+from manus_use.config import Config
 
 logger = logging.getLogger(__name__)
 
 # Copy the tool spec from base but customize description
-TOOL_SPEC = BASE_TOOL_SPEC.copy()
-TOOL_SPEC["name"] = "manus_workflow"
+TOOL_SPEC = json.loads(json.dumps(BASE_TOOL_SPEC))
+TOOL_SPEC["name"] = "workflow_tool"
 TOOL_SPEC["description"] = TOOL_SPEC["description"] + """
 This version supports ManusUse agent types:
 - manus: General computation and file operations
@@ -137,8 +134,7 @@ class ManusWorkflowManager(WorkflowManager):
             logger.error(f"\nError: {error_msg}")
             return {"status": "error", "content": [{"text": error_msg}]}
 
-
-def manus_workflow(tool: ToolUse, **kwargs: Any) -> ToolResult:
+def workflow_tool(tool: ToolUse, **kwargs: Any) -> ToolResult:
     """ManusUse-aware workflow tool implementation.
     
     This tool extends the base workflow tool with support for ManusUse agent types:
