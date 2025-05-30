@@ -18,6 +18,8 @@ from strands.types.tools import AgentTool # Though not used directly, often part
 
 from ..config import Config
 
+BROWSER_CLOSE_TIMEOUT = 10.0  # Seconds
+
 # Attempt to import browser_use and its dependencies
 try:
     from browser_use import Agent as BrowserUse
@@ -285,10 +287,19 @@ class BrowserUseAgent(Agent):
         finally:
             if browser_use_agent_instance and hasattr(browser_use_agent_instance, 'close'):
                 try:
-                    logging.debug("Closing browser_use agent instance in _run_browser_task.")
-                    await browser_use_agent_instance.close()
+                    logging.info(f"Attempting to close browser_use agent instance in _run_browser_task. keep_alive: {self.keep_alive}")
+                    if self.keep_alive:
+                        logging.info(f"Applying {BROWSER_CLOSE_TIMEOUT}s timeout to close() due to keep_alive=True.")
+                        try:
+                            await asyncio.wait_for(browser_use_agent_instance.close(), timeout=BROWSER_CLOSE_TIMEOUT)
+                            logging.info(f"Successfully closed browser_use agent instance in _run_browser_task within timeout. keep_alive: {self.keep_alive}")
+                        except asyncio.TimeoutError:
+                            logging.warning(f"Timeout closing browser_use agent instance in _run_browser_task after {BROWSER_CLOSE_TIMEOUT}s (keep_alive: {self.keep_alive}). Proceeding with agent shutdown.")
+                    else:
+                        await browser_use_agent_instance.close()
+                        logging.info(f"Successfully closed browser_use agent instance in _run_browser_task. keep_alive: {self.keep_alive}")
                 except Exception as e_close:
-                    logging.error(f"Error closing browser_use_agent_instance in _run_browser_task: {e_close}")
+                    logging.error(f"Error closing browser_use_agent_instance in _run_browser_task (keep_alive: {self.keep_alive}): {e_close}", exc_info=True)
         return "" # Should be unreachable if try block returns
 
     def __call__(
@@ -464,10 +475,19 @@ class BrowserUseAgent(Agent):
             
             if browser_use_agent_instance and hasattr(browser_use_agent_instance, 'close'):
                 try:
-                    logging.debug("Closing browser_use agent instance in stream_async.")
-                    await browser_use_agent_instance.close()
+                    logging.info(f"Attempting to close browser_use agent instance in stream_async. keep_alive: {self.keep_alive}")
+                    if self.keep_alive:
+                        logging.info(f"Applying {BROWSER_CLOSE_TIMEOUT}s timeout to close() due to keep_alive=True.")
+                        try:
+                            await asyncio.wait_for(browser_use_agent_instance.close(), timeout=BROWSER_CLOSE_TIMEOUT)
+                            logging.info(f"Successfully closed browser_use agent instance in stream_async within timeout. keep_alive: {self.keep_alive}")
+                        except asyncio.TimeoutError:
+                            logging.warning(f"Timeout closing browser_use agent instance in stream_async after {BROWSER_CLOSE_TIMEOUT}s (keep_alive: {self.keep_alive}). Proceeding with agent shutdown.")
+                    else:
+                        await browser_use_agent_instance.close()
+                        logging.info(f"Successfully closed browser_use agent instance in stream_async. keep_alive: {self.keep_alive}")
                 except Exception as e_close:
-                    logging.error(f"Error closing browser_use_agent_instance in stream_async: {e_close}")
+                    logging.error(f"Error closing browser_use_agent_instance in stream_async (keep_alive: {self.keep_alive}): {e_close}", exc_info=True)
 
     async def cleanup(self):
         """
