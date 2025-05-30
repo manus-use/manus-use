@@ -127,6 +127,10 @@ class BrowserUseAgent(Agent):
         
         # Get browser_use specific config
         browser_config = self.config.browser_use
+
+        print("==================================")
+
+        print(browser_config)
         
         # Use parameters if provided, otherwise fall back to browser_use config
         self.headless = (
