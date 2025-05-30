@@ -123,28 +123,61 @@ class ManusWorkflowManager(WorkflowManager):
                 actual_result = potential_coroutine
 
             # Now 'actual_result' holds the actual result from the agent call.
-            # Extract response content - handle both dict and custom object return types
-            try:
-                # If actual_result is a dict or has .get() method
-                content = actual_result.get("content", [])
-            except AttributeError:
-                # If actual_result is an object with .content attribute
-                content = getattr(actual_result, "content", [])
+            processed_content = []
+            # Default stop_reason, can be overridden if actual_result provides it
+            stop_reason_str = "completed"
 
-            # Extract stop_reason - handle both dict and custom object return types
-            try:
-                # If actual_result is a dict or has .get() method
-                stop_reason = actual_result.get("stop_reason", "")
-            except AttributeError:
-                # If actual_result is an object with .stop_reason attribute
-                stop_reason = getattr(actual_result, "stop_reason", "")
+            if isinstance(actual_result, str):
+                logger.info(f"Task {task.get('task_id', 'unknown')} returned a string result. Wrapping it.")
+                # Ensure actual_result is not None before assigning to text
+                processed_content = [{"text": actual_result if actual_result is not None else ""}]
+            elif hasattr(actual_result, "get"):  # Check if dict-like (e.g., a Strands ToolResult dict)
+                logger.info(f"Task {task.get('task_id', 'unknown')} returned a dict-like result.")
+                # Attempt to get 'content' which might be a list of message dicts, or a string, or other
+                raw_content = actual_result.get("content")
+                if isinstance(raw_content, list): # Expecting list of message dicts e.g. [{"text": "..."}]
+                    processed_content = raw_content
+                elif isinstance(raw_content, str): # If content itself is a string
+                     processed_content = [{"text": raw_content if raw_content is not None else ""}]
+                elif raw_content is None:
+                    processed_content = []
+                else: # Some other type, wrap its string representation
+                    processed_content = [{"text": str(raw_content)}]
 
-            # Update task status
-            status = "success" if stop_reason != "error" else "error"
+                stop_reason_str = actual_result.get("stop_reason", "completed")
+            elif hasattr(actual_result, "content"):  # Check if object with .content attribute
+                logger.info(f"Task {task.get('task_id', 'unknown')} returned an object with .content attribute.")
+                raw_object_content = getattr(actual_result, "content", None)
+                if isinstance(raw_object_content, list):
+                    processed_content = raw_object_content
+                elif isinstance(raw_object_content, str):
+                    processed_content = [{"text": raw_object_content if raw_object_content is not None else ""}]
+                elif raw_object_content is None:
+                    processed_content = []
+                else:
+                    processed_content = [{"text": str(raw_object_content)}]
+
+                if hasattr(actual_result, "stop_reason"):
+                    stop_reason_str = getattr(actual_result, "stop_reason", "completed")
+            elif actual_result is None:
+                logger.info(f"Task {task.get('task_id', 'unknown')} returned None. Resulting in empty content.")
+                processed_content = []
+            else:
+                # Fallback for other unexpected result types
+                logger.warning(f"Task {task.get('task_id', 'unknown')} returned an unexpected result type: {type(actual_result)}. Converting to string.")
+                processed_content = [{"text": str(actual_result)}]
+
+            # Determine status based on stop_reason_str or presence of error indicators
+            # (This part of status determination can be refined if there are specific error formats)
+            status = "error" if stop_reason_str == "error" else "success"
+            # Example: if processed_content itself indicates error:
+            # if any(item.get("type") == "error" for item in processed_content):
+            #     status = "error"
+
             return {
-                "toolUseId": tool_use_id,
+                "toolUseId": tool_use_id, # Assuming tool_use_id is defined earlier in the method
                 "status": status,
-                "content": content,
+                "content": processed_content,
             }
 
         except Exception as e:
