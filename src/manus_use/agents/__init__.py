@@ -1,14 +1,12 @@
 """Agent implementations for ManusUse."""
 
-from .manus import ManusAgent
-from .browser import BrowserAgent
-from .browser_use_agent import BrowserUseAgent
-from .data_analysis import DataAnalysisAgent
-from .mcp import MCPAgent
+from manus_use.agents.manus import ManusAgent
+from manus_use.agents.browser_use_agent import BrowserUseAgent
+from manus_use.agents.data_analysis import DataAnalysisAgent
+from manus_use.agents.mcp import MCPAgent
 
 __all__ = [
     "ManusAgent",
-    "BrowserAgent",
     "BrowserUseAgent",
     "DataAnalysisAgent",
     "MCPAgent",

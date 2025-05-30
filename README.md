@@ -11,6 +11,7 @@ manus-use provides a simple yet flexible framework for creating AI agents that c
 - 🔒 **Secure Sandbox**: Docker-based isolated execution environment
 - 🌐 **MCP Support**: Native Model Context Protocol integration
 - 🔄 **Multi-Agent Orchestration**: Intelligent task planning and routing with specialized agents
+- 📋 **Workflow Management**: Create and manage complex multi-step workflows with dependencies
 - 🎯 **Model Agnostic**: Support for OpenAI, Anthropic, Bedrock, Ollama, and more
 - 🌐 **Browser-Use Integration**: Powerful browser automation through natural language commands
 - 🤝 **CLI with Multi-Agent Support**: Command-line interface that automatically detects and routes complex tasks
@@ -133,6 +134,29 @@ result = orchestrator.run("Research the latest AI trends and create a technical 
 # 4. Coordinate results from all agents
 ```
 
+### Workflow Management
+
+```python
+from manus_use.workflow_agent import WorkflowAgent
+
+# Create a workflow agent
+agent = WorkflowAgent()
+
+# Create and manage complex workflows
+result = agent.handle_request("""
+    Create a workflow to analyze security vulnerabilities:
+    1. Browse security databases for recent CVEs
+    2. Analyze the data and assess risks
+    3. Generate a comprehensive report
+""")
+
+# The workflow agent supports:
+# - Task dependencies and sequencing
+# - Parallel execution where possible
+# - Different agent types for each task (manus, browser, data_analysis, mcp)
+# - Automatic status tracking and error handling
+```
+
 ### Browser Tools
 
 ```python
@@ -164,6 +188,7 @@ content = await browser_extract_content("confirmation message")
 - **DataAnalysisAgent**: Specialized agent for data analysis and visualization
 - **PlanningAgent**: Task decomposition and planning for multi-agent workflows
 - **MCPAgent**: Model Context Protocol integration for extended tool capabilities
+- **WorkflowAgent**: Manages complex workflows with task dependencies and multi-agent coordination
 
 ### Tools
 - **File Operations**: Read, write, list, delete, and move files
@@ -171,6 +196,7 @@ content = await browser_extract_content("confirmation message")
 - **Web Search**: Search the web using various search engines
 - **Browser Automation**: Complete set of browser tools powered by browser-use
 - **Visualization**: Create charts and visualizations from data
+- **Workflow Tool**: Create, manage, and execute multi-step workflows with agent type specification
 
 ### Orchestration
 - **Intelligent Task Routing**: Automatically routes tasks to appropriate agents
@@ -189,6 +215,14 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Recent Updates
+
+### Workflow System Improvements
+- **Enhanced Tool Format**: Updated workflow tool to use TOOL_SPEC format for better compatibility
+- **Improved Agent Instructions**: Clearer documentation for tool calling conventions
+- **Fixed Import Issues**: Resolved relative import problems for better module loading
+- **Better Error Handling**: More informative error messages for workflow operations
 
 ## Acknowledgments
 
