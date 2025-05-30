@@ -103,30 +103,100 @@ class ManusWorkflowManager(WorkflowManager):
             agent = self.get_agent_for_task(task)
             
             # Execute task using the agent
-            result = agent(task_prompt)
+            potential_coroutine = agent(task_prompt) # This might be a coroutine or a direct result
 
-            # Extract response content - handle both dict and custom object return types
-            try:
-                # If result is a dict or has .get() method
-                content = result.get("content", [])
-            except AttributeError:
-                # If result is an object with .content attribute
-                content = getattr(result, "content", [])
+            actual_result: Any # Define type for clarity
+            if asyncio.iscoroutine(potential_coroutine):
+                logger.info(f"Task {task.get('task_id', 'unknown')} returned a coroutine, running it to completion.")
+                try:
+                    loop = asyncio.get_running_loop()
+                    # If loop is running, use run_until_complete.
+                    # This will block execute_task until the coroutine is done.
+                    actual_result = loop.run_until_complete(potential_coroutine)
+                except RuntimeError:
+                    # No event loop is currently running, or other asyncio.run() related issue.
+                    # Use asyncio.run() to create one and run the coroutine.
+                    logger.info(f"No running loop for task {task.get('task_id', 'unknown')}, using asyncio.run().")
+                    actual_result = asyncio.run(potential_coroutine)
+            else:
+                logger.info(f"Task {task.get('task_id', 'unknown')} returned a direct result.")
+                actual_result = potential_coroutine
 
-            # Extract stop_reason - handle both dict and custom object return types
-            try:
-                # If result is a dict or has .get() method
-                stop_reason = result.get("stop_reason", "")
-            except AttributeError:
-                # If result is an object with .stop_reason attribute
-                stop_reason = getattr(result, "stop_reason", "")
+            # Now 'actual_result' holds the actual result from the agent call.
+            processed_content = []
+            # Default stop_reason, can be overridden if actual_result provides it
+            stop_reason_str = "completed"
 
-            # Update task status
-            status = "success" if stop_reason != "error" else "error"
+            if isinstance(actual_result, str):
+                logger.info(f"Task {task.get('task_id', 'unknown')} returned a string result. Wrapping it.")
+                # Ensure actual_result is not None before assigning to text
+                processed_content = [{"text": actual_result if actual_result is not None else ""}]
+            elif isinstance(actual_result, dict): # Handler for dicts
+                logger.info(f"Task {task.get('task_id', 'unknown')} returned a dict result. Stringifying and formatting as text content.")
+                if actual_result.get("error") == "JSONDecodeError": # Check for our specific error structure
+                    error_details = actual_result.get("message", "")
+                    raw_output_snippet = str(actual_result.get("raw_output", ""))[:200] # Truncate for log/text
+                    error_summary = f"Agent internal error: Failed to parse expected JSON output. Details: {error_details}. Raw output snippet: {raw_output_snippet}"
+                    logger.warning(f"Task {task.get('task_id', 'unknown')} resulted in a JSON decode error from agent: {error_summary}")
+                    processed_content = [{"text": error_summary}]
+                    stop_reason_str = "error"
+                else:
+                    # Convert the dictionary to a JSON string
+                    try:
+                        json_string = json.dumps(actual_result)
+                        processed_content = [{"text": json_string}]
+                    except TypeError as e: # Handle cases where dict might not be JSON serializable
+                        error_summary = f"Agent returned a dictionary that is not JSON serializable: {str(e)}. Object: {str(actual_result)[:200]}"
+                        logger.error(f"Task {task.get('task_id', 'unknown')} error: {error_summary}")
+                        processed_content = [{"text": error_summary}]
+                        stop_reason_str = "error"
+            elif hasattr(actual_result, "get"):  # Generic dict-like (e.g. ToolResult from Strands)
+                # This will now mostly handle Strands ToolResult like structures if they were not plain dicts.
+                logger.info(f"Task {task.get('task_id', 'unknown')} returned a generic dict-like object.")
+                raw_content = actual_result.get("content")
+                if isinstance(raw_content, list): # Expecting list of message dicts e.g. [{"text": "..."}]
+                    processed_content = raw_content
+                elif isinstance(raw_content, str): # If content itself is a string
+                     processed_content = [{"text": raw_content if raw_content is not None else ""}]
+                elif raw_content is None:
+                    processed_content = []
+                else: # Some other type, wrap its string representation
+                    processed_content = [{"text": str(raw_content)}]
+
+                stop_reason_str = actual_result.get("stop_reason", "completed")
+            elif hasattr(actual_result, "content"):  # Check if object with .content attribute
+                logger.info(f"Task {task.get('task_id', 'unknown')} returned an object with .content attribute.")
+                raw_object_content = getattr(actual_result, "content", None)
+                if isinstance(raw_object_content, list):
+                    processed_content = raw_object_content
+                elif isinstance(raw_object_content, str):
+                    processed_content = [{"text": raw_object_content if raw_object_content is not None else ""}]
+                elif raw_object_content is None:
+                    processed_content = []
+                else:
+                    processed_content = [{"text": str(raw_object_content)}]
+
+                if hasattr(actual_result, "stop_reason"):
+                    stop_reason_str = getattr(actual_result, "stop_reason", "completed")
+            elif actual_result is None:
+                logger.info(f"Task {task.get('task_id', 'unknown')} returned None. Resulting in empty content.")
+                processed_content = []
+            else:
+                # Fallback for other unexpected result types
+                logger.warning(f"Task {task.get('task_id', 'unknown')} returned an unexpected result type: {type(actual_result)}. Converting to string.")
+                processed_content = [{"text": str(actual_result)}]
+
+            # Determine status based on stop_reason_str or presence of error indicators
+            # (This part of status determination can be refined if there are specific error formats)
+            status = "error" if stop_reason_str == "error" else "success"
+            # Example: if processed_content itself indicates error:
+            # if any(item.get("type") == "error" for item in processed_content):
+            #     status = "error"
+
             return {
-                "toolUseId": tool_use_id,
+                "toolUseId": tool_use_id, # Assuming tool_use_id is defined earlier in the method
                 "status": status,
-                "content": content,
+                "content": processed_content,
             }
 
         except Exception as e:
