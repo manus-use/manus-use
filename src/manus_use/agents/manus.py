@@ -4,8 +4,8 @@ from typing import Any, List, Optional
 
 from strands.types.tools import AgentTool
 
-from .base import BaseManusAgent
-from ..config import Config
+from manus_use.agents.base import BaseManusAgent
+from manus_use.config import Config
 
 
 class ManusAgent(BaseManusAgent):
@@ -80,21 +80,21 @@ Always strive for accuracy and completeness in your responses."""
             
             # Map of tool names to actual tool functions from strands_tools
             available_tools = {
-                "file_read": file_read.file_read,
-                "file_write": file_write.file_write,
-                "code_execute": python_repl.python_repl,
-                "shell": shell.shell,
-                "http_request": http_request.http_request,
-                "editor": editor.editor,
-                "environment": environment.environment,
-                "web_search": retrieve.retrieve,  # Using retrieve for web search
-                "generate_image": generate_image.generate_image,
-                "current_time": current_time.current_time,
-                "calculator": calculator.calculator,
+                "file_read": file_read,
+                "file_write": file_write,
+                "python_repl": python_repl,
+                "shell": shell,
+                "http_request": http_request,
+                "editor": editor,
+                "environment": environment,
+                #"web_search": retrieve.retrieve,  # Using retrieve for web search
+                "generate_image": generate_image,
+                "current_time": current_time,
+                "calculator": calculator
             }
             
             # Always include basic tools
-            default_tool_names = ["file_read", "file_write", "code_execute"]
+            default_tool_names = ["file_read", "file_write", "python_repl", "current_time"]
             
             # Add configured tools
             for name in tool_names:
@@ -107,9 +107,9 @@ Always strive for accuracy and completeness in your responses."""
                 elif name == "environment":
                     default_tool_names.append("environment")
                 elif name == "visualization":
-                    default_tool_names.extend(["generate_image", "python_repl"])
+                    default_tool_names.extend(["generate_image"])
                 elif name == "utilities":
-                    default_tool_names.extend(["calculator", "current_time"])
+                    default_tool_names.extend(["calculator"])
                     
             # Remove duplicates while preserving order
             seen = set()
@@ -129,29 +129,33 @@ Always strive for accuracy and completeness in your responses."""
             
         except ImportError:
             # Fallback to original tools if strands_tools is not available
-            from ..tools import get_tools_by_names
+            from manus_use.tools import get_tools_by_names
             
             config = config or Config.from_file()
             tool_names = config.tools.enabled
             
             # Always include basic tools
-            default_tools = ["file_read", "file_write", "code_execute"]
+            default_tool_names = ["file_read", "file_write", "python_repl", "current_time"]
             
             # Add configured tools
             for name in tool_names:
                 if name == "file_operations":
-                    default_tools.extend(["file_list", "file_delete", "file_move"])
+                    default_tool_names.extend(["file_read", "file_write", "editor"])
                 elif name == "web_search":
-                    default_tools.append("web_search")
-                elif name == "browser":
-                    default_tools.append("browser_navigate")
+                    default_tool_names.append("web_search")
+                elif name == "shell":
+                    default_tool_names.append("shell")
+                elif name == "environment":
+                    default_tool_names.append("environment")
                 elif name == "visualization":
-                    default_tools.extend(["create_chart", "data_analyze"])
+                    default_tool_names.extend(["generate_image"])
+                elif name == "utilities":
+                    default_tool_names.extend(["calculator"])
                     
             # Remove duplicates while preserving order
             seen = set()
             unique_tools = []
-            for tool in default_tools:
+            for tool in default_tool_names:
                 if tool not in seen:
                     seen.add(tool)
                     unique_tools.append(tool)

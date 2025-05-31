@@ -29,7 +29,7 @@ class WorkflowAgent:
         self.system_prompt = """You are a Workflow Management Agent that coordinates complex multi-step tasks using different specialized agents:
 
 Available agent types for tasks:
-- manus: General computation, file operations, and Python code execution
+- manus: General computation, http request for web_search, file operations, and Python code execution
 - browser: Web browsing and scraping (runs with visible browser)
 - data_analysis: Data processing, analysis, and visualization
 - mcp: Model Context Protocol tools
@@ -79,8 +79,7 @@ def main():
     # Example 1: Research and Analysis Task
     print("\n--- Example 1: Web Research and Analysis ---")
     research_request = """
-    Assesss the 2 most recent vulnerabilities
-    Make sure to use the appropriate agent types for each task as specified.
+    Assesss the 2 most recent vulnerabilities, and find the valid poc links and save them into marddown file.
     """
     response1 = agent.handle_request(research_request)
     print(f"Response: {response1}")

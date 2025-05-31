@@ -5,8 +5,7 @@ from typing import Dict, List, Optional
 
 from strands.tools import tool
 
-from ..config import Config
-
+from manus_use.config import Config
 
 class SearchEngine:
     """Base search engine interface."""

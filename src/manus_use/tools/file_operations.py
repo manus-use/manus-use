@@ -8,7 +8,7 @@ from typing import List, Optional
 from strands import tool
 
 
-@tool
+#@tool
 def file_read(file_path: str) -> str:
     """Read contents of a file.
     
@@ -38,7 +38,7 @@ def file_read(file_path: str) -> str:
         return f"Binary file ({len(content)} bytes): {content[:100].hex()}..."
 
 
-@tool
+#@tool
 def file_write(file_path: str, content: str, create_dirs: bool = True) -> str:
     """Write content to a file.
     
@@ -65,7 +65,7 @@ def file_write(file_path: str, content: str, create_dirs: bool = True) -> str:
         raise RuntimeError(f"Failed to write file: {str(e)}")
 
 
-@tool
+#@tool
 def file_list(directory: str = ".", pattern: Optional[str] = None) -> List[str]:
     """List files in a directory.
     
@@ -99,7 +99,7 @@ def file_list(directory: str = ".", pattern: Optional[str] = None) -> List[str]:
         raise RuntimeError(f"Failed to list directory: {str(e)}")
 
 
-@tool
+#@tool
 def file_delete(file_path: str, force: bool = False) -> str:
     """Delete a file or directory.
     
@@ -134,7 +134,7 @@ def file_delete(file_path: str, force: bool = False) -> str:
         raise RuntimeError(f"Failed to delete: {str(e)}")
 
 
-@tool
+#@tool
 def file_move(source: str, destination: str, overwrite: bool = False) -> str:
     """Move or rename a file or directory.
     

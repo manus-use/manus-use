@@ -105,7 +105,7 @@ def get_executor(config: Optional[Config] = None) -> CodeExecutor:
     return _executor
 
 
-@tool
+#@tool
 async def code_execute(
     code: str,
     language: str = "python",
