@@ -145,7 +145,21 @@ class ManusWorkflowManager(WorkflowManager):
                     processed_content = [{"text": str(raw_content)}]
 
                 stop_reason_str = actual_result.get("stop_reason", "completed")
-            elif hasattr(actual_result, "content"):  # Check if object with .content attribute
+            elif type(actual_result).__name__ == "AgentResult": # Explicitly check for AgentResult by class name
+                logger.info(f"Task {task.get('task_id', 'unknown')} returned an AgentResult.")
+                if hasattr(actual_result, "content") and isinstance(actual_result.content, list):
+                    # Assuming .content is like [{'type': 'text', 'text': '...'}]
+                    processed_content = actual_result.content
+                elif hasattr(actual_result, "text") and isinstance(actual_result.text, str):
+                    processed_content = [{"text": actual_result.text}]
+                else:
+                    # Fallback if AgentResult doesn't have .content as list or .text as string
+                    processed_content = [{"text": str(actual_result)}]
+
+                if hasattr(actual_result, "stop_reason") and actual_result.stop_reason is not None:
+                    stop_reason_str = str(actual_result.stop_reason)
+
+            elif hasattr(actual_result, "content"):  # Check if object with .content attribute (for other types)
                 logger.info(f"Task {task.get('task_id', 'unknown')} returned an object with .content attribute.")
                 raw_object_content = getattr(actual_result, "content", None)
                 if isinstance(raw_object_content, list):
@@ -157,14 +171,15 @@ class ManusWorkflowManager(WorkflowManager):
                 else:
                     processed_content = [{"text": str(raw_object_content)}]
 
-                if hasattr(actual_result, "stop_reason"):
-                    stop_reason_str = getattr(actual_result, "stop_reason", "completed")
+                if hasattr(actual_result, "stop_reason"): # Ensure stop_reason is checked for these types too
+                    stop_reason_value = getattr(actual_result, "stop_reason", "completed")
+                    stop_reason_str = str(stop_reason_value) if stop_reason_value is not None else "completed"
             elif actual_result is None:
                 logger.info(f"Task {task.get('task_id', 'unknown')} returned None. Resulting in empty content.")
                 processed_content = []
             else:
-                # Fallback for other unexpected result types
-                logger.warning(f"Task {task.get('task_id', 'unknown')} returned an unexpected result type: {type(actual_result)}. Converting to string.")
+                # Fallback for truly unexpected result types
+                logger.warning(f"Task {task.get('task_id', 'unknown')} returned an unhandled result type: {type(actual_result)}. Converting to string.")
                 processed_content = [{"text": str(actual_result)}]
 
             # Determine status based on stop_reason_str or presence of error indicators

@@ -59,7 +59,7 @@ Always ensure workflows are well-structured and tasks are properly sequenced.
             tools=[workflow_tool]
         )
     
-    def handle_request(self, request: str) -> str:
+    def handle_request(self, request: str) -> Any: # Changed return type to Any
         """Handle a user request by creating and executing appropriate workflows"""
         response = self.agent(request)
         return response
