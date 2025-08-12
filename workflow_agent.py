@@ -8,15 +8,20 @@ import os
 import sys
 from pathlib import Path
 from typing import Optional, Dict, Any
+import warnings
+warnings.filterwarnings("ignore")
 
 # Add the src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 # Import Strands SDK
 from strands import Agent
+from strands_tools import think,stop
 
 # Import our workflow tool
 import manus_use.tools.workflow_tool as workflow_tool
+import manus_use.tools.create_lark_document as create_lark_document
+#import manus_use.tools.web_search
 
 # Create custom tools for the workflow agent
 
@@ -26,38 +31,13 @@ class WorkflowAgent:
     def __init__(self, model_name: str = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"):
         """Initialize the workflow agent"""
         # Create system prompt
-        self.system_prompt = """You are a Workflow Management Agent that coordinates complex multi-step tasks using different specialized agents:
-
-Available agent types for tasks:
-- manus: General computation, file operations, and Python code execution
-- browser: Web browsing and scraping (runs with visible browser)
-- data_analysis: Data processing, analysis, and visualization
-- mcp: Model Context Protocol tools
-
-When creating workflows, each task should have:
-- task_id: A unique identifier
-- description: What the task should do
-- agent_type: The type of agent to use
-- dependencies: List of task_ids this depends on (optional)
-- priority: 1-5 priority level (optional)
-
-Example task format:
-{
-    "task_id": "analyze_data",
-    "description": "Analyze the collected data",
-    "agent_type": "data_analysis",
-    "dependencies": ["collect_data"],
-    "priority": 2
-}
-
-Always ensure workflows are well-structured and tasks are properly sequenced.
-"""
+        self.system_prompt = """You are a cybersecurity and vulnerability intelligence expert, and a Workflow Management Agent that coordinates complex multi-step tasks using different specialized agents for vulnerability intelligence"""
         
         # Initialize the agent with tools
         self.agent = Agent(
             model=model_name,
             system_prompt=self.system_prompt,
-            tools=[workflow_tool]
+            tools=[workflow_tool, think, create_lark_document, stop]
         )
     
     def handle_request(self, request: str) -> str:
@@ -79,8 +59,7 @@ def main():
     # Example 1: Research and Analysis Task
     print("\n--- Example 1: Web Research and Analysis ---")
     research_request = """
-    Assesss the 2 most recent vulnerabilities
-    Make sure to use the appropriate agent types for each task as specified.
+    Please assess the CVE-2025-6545 with detailed information try to find the POCs, and create a lark document for the vulnerability assessment.
     """
     response1 = agent.handle_request(research_request)
     print(f"Response: {response1}")

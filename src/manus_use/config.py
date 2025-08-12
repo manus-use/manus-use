@@ -105,6 +105,27 @@ class BrowserUseConfig(BaseModel):
     screenshot_path: Optional[str] = None  # Path to save screenshots
 
 
+class OTXConfig(BaseModel):
+    """OTX configuration."""
+    api_key: Optional[str] = None
+
+
+class MCPConfig(BaseModel):
+    """MCP server configuration."""
+    server_url: Optional[str] = None
+
+
+class WebhooksConfig(BaseModel):
+    """Webhooks configuration."""
+    cve_submit_url: Optional[str] = None
+
+
+class LarkConfig(BaseModel):
+    """Lark document API configuration."""
+    document_url: Optional[str] = None
+    api_token: Optional[str] = None
+
+
 class Config(BaseModel):
     """Main configuration."""
     
@@ -112,6 +133,10 @@ class Config(BaseModel):
     sandbox: SandboxConfig = Field(default_factory=SandboxConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
     browser_use: BrowserUseConfig = Field(default_factory=BrowserUseConfig)
+    otx: OTXConfig = Field(default_factory=OTXConfig)
+    mcp: MCPConfig = Field(default_factory=MCPConfig)
+    webhooks: WebhooksConfig = Field(default_factory=WebhooksConfig)
+    lark: LarkConfig = Field(default_factory=LarkConfig)
     
     @classmethod
     def from_file(cls, path: Optional[Path] = None) -> "Config":
