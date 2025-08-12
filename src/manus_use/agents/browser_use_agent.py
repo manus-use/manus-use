@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from strands import Agent
 from strands.types.tools import AgentTool # Though not used directly, often part of agent modules
 
-from ..config import Config
+from manus_use.config import Config
 
 BROWSER_CLOSE_TIMEOUT = 10.0  # Seconds
 

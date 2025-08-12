@@ -35,7 +35,7 @@ class WorkflowAgent:
 4. **mcp**: Model Context Protocol tools
 
 Your capabilities:
-- Call manus_workflow to create workflows with multiple tasks and dependencies
+- Call manus_workflow to manage workflows with multiple tasks and dependencies
 - Assign appropriate agent types to each task
 - Monitor workflow execution and status
 - Handle complex real-world scenarios
@@ -198,3 +198,29 @@ if __name__ == "__main__":
         print("Using default agent configuration")
     
     main()
+
+
+
+Available agent types for tasks:
+- manus: General computation, http request for real-time api search in the future, file operations, and python code execution. 
+- browser: Web browsing and scraping when you need a browser to obtain real-time information, like poc, in the future
+- data_analysis: Data processing, analysis, and visualization
+- mcp: Model Context Protocol tools
+
+When creating workflows, each task should have:
+- task_id: A unique identifier
+- description: What the task should do
+- agent_type: The type of agent to use
+- dependencies: List of task_ids this depends on (optional)
+- priority: 1-5 priority level (optional)
+
+Example task format:
+{
+    "task_id": "analyze_data",
+    "description": "Analyze the collected data",
+    "agent_type": "data_analysis",
+    "dependencies": ["collect_data"],
+    "priority": 2
+}
+
+Always ensure workflows are well-structured and tasks are properly sequenced without parallel_execution 

@@ -4,11 +4,12 @@ import asyncio
 import json
 import logging
 import uuid
-from typing import Any, Dict
+from datetime import datetime, timezone
+from typing import Any, Dict, List
 
 from strands.types.tools import ToolResult, ToolUse
 from strands_tools.workflow import (
-    WorkflowManager,WORKFLOW_DIR, TOOL_SPEC as BASE_TOOL_SPEC
+    WorkflowManager,WORKFLOW_DIR #, TOOL_SPEC as BASE_TOOL_SPEC
 )
 
 from manus_use.agents import ManusAgent, BrowserUseAgent, DataAnalysisAgent, MCPAgent
@@ -17,18 +18,21 @@ from manus_use.config import Config
 logger = logging.getLogger(__name__)
 
 # Copy the tool spec from base but customize description
-TOOL_SPEC = json.loads(json.dumps(BASE_TOOL_SPEC))
+# TOOL_SPEC = json.loads(json.dumps(BASE_TOOL_SPEC))
+TOOL_SPEC = {}
 TOOL_SPEC["name"] = "workflow_tool"
-TOOL_SPEC["description"] = TOOL_SPEC["description"] + """
+# TOOL_SPEC["description"] = TOOL_SPEC["description"] + """
+TOOL_SPEC["description"] = """
 This version supports ManusUse agent types:
-- manus: General computation and file operations
-- browser: Web browsing using browser-use
+- manus: General computation, http request for real-time api search in the future, file operations, and python code execution. 
+- browser: Web browsing and scraping when you need a browser to obtain real-time information, like poc, in the future
 - data_analysis: Data analysis and visualization
 - mcp: Model Context Protocol tools
 """
 
 # Add agent_type to the task schema
-TOOL_SPEC["inputSchema"]["json"]["properties"]["tasks"]["items"]["properties"]["agent_type"] = {
+# TOOL_SPEC["inputSchema"]["json"]["properties"]["tasks"]["items"]["properties"]["agent_type"] = {
+TOOL_SPEC["inputSchema"] ={
     "type": "string",
     "enum": ["manus", "browser", "data_analysis", "mcp"],
     "description": "Agent type to use for executing this task (defaults to 'manus')",
@@ -182,6 +186,49 @@ class ManusWorkflowManager(WorkflowManager):
 
         except Exception as e:
             error_msg = f"Error executing task {task['task_id']}: {str(e)}"
+            logger.error(f"\nError: {error_msg}")
+            return {"status": "error", "content": [{"text": error_msg}]}
+    def create_workflow(self, workflow_id: str, tasks: List[Dict], tool_use_id: str) -> Dict:
+        """Create a new workflow with the given tasks."""
+        try:
+            if not workflow_id:
+                workflow_id = str(uuid.uuid4())
+
+            # Add default priorities if not specified
+            for task in tasks:
+                if "priority" not in task:
+                    task["priority"] = 3  # Default priority
+
+            workflow = {
+                "workflow_id": workflow_id,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "status": "created",
+                "tasks": tasks,
+                "current_task_index": 0,
+                "task_results": {
+                    task["task_id"]: {
+                        "status": "pending",
+                        "result": None,
+                        "priority": task.get("priority", 3),
+                    }
+                    for task in tasks
+                },
+                "parallel_execution": False,  # Enable parallel execution by default
+            }
+
+            store_result = self.store_workflow(workflow_id, workflow, tool_use_id)
+            if store_result["status"] == "error":
+                return {
+                    "status": "error",
+                    "content": [{"text": f"Failed to create workflow: {store_result['error']}"}],
+                }
+            return {
+                "status": "success",
+                "content": [{"text": f"Created workflow {workflow_id} with {len(tasks)} tasks"}],
+            }
+
+        except Exception as e:
+            error_msg = f"Error creating workflow: {str(e)}"
             logger.error(f"\nError: {error_msg}")
             return {"status": "error", "content": [{"text": error_msg}]}
 

@@ -6,8 +6,20 @@ from strands.types.tools import AgentTool
 
 from manus_use.agents.base import BaseManusAgent
 from manus_use.config import Config
+from typing import Dict, List, Optional
 
+from mcp.client.sse import sse_client
+from strands.tools.mcp import MCPClient
+from strands.tools import tool
+import manus_use.tools.web_search as web_search  
+import manus_use.tools.code_execute as code_execute
 
+from strands_tools import (
+    file_read, file_write, python_repl, shell,
+    http_request, editor, environment, retrieve,
+    generate_image, current_time, calculator
+)
+# Connect to an MCP server using SSE transport
 class ManusAgent(BaseManusAgent):
     """Manus-style agent with comprehensive tool support."""
     
@@ -28,17 +40,30 @@ class ManusAgent(BaseManusAgent):
             enable_sandbox: Whether to enable sandbox for code execution
             **kwargs: Additional arguments for Agent
         """
+        # Example of loading MCP server URL from config
+        #mcp_url = config.mcp.server_url if config and hasattr(config, 'mcp') and getattr(config.mcp, 'server_url', None) else None
+        #self.sse_mcp_client = MCPClient(lambda: sse_client(mcp_url))
+        self.thread_pool_wrapper = None
         self.enable_sandbox = enable_sandbox
         
         # Get default tools if none provided
         if tools is None:
             tools = self._get_default_tools(config)
+        tools.append(code_execute)
+        tools.append(http_request)
+        #self.sse_mcp_client.start()
+            # Get the tools from the MCP server
+        #tools.extend(self.sse_mcp_client.list_tools_sync())
+        
+        # Remove system_prompt from kwargs if present to avoid duplicate argument
+        system_prompt = kwargs.pop('system_prompt', '')
+        print(f'xxxxxx: {system_prompt}')
             
         super().__init__(
             tools=tools,
             model=model,
             config=config,
-            system_prompt=self._get_default_system_prompt(),
+            system_prompt=system_prompt + '\n' + self._get_default_system_prompt(),
             **kwargs
         )
         
@@ -47,6 +72,7 @@ class ManusAgent(BaseManusAgent):
         # Properly handle cleanup by checking if parent class has __del__
         if hasattr(super(), '__del__'):
             super().__del__()
+        # self.sse_mcp_client.stop(None, None, None)
         
     def _get_default_system_prompt(self) -> str:
         """Get Manus-style system prompt."""
@@ -68,33 +94,26 @@ Always strive for accuracy and completeness in your responses."""
     def _get_default_tools(self, config: Optional[Config] = None) -> List[AgentTool]:
         """Get default tools based on configuration."""
         try:
-            # Import strands_tools
-            from strands_tools import (
-                file_read, file_write, python_repl, shell,
-                http_request, editor, environment, retrieve,
-                generate_image, current_time, calculator
-            )
-            
             config = config or Config.from_file()
             tool_names = config.tools.enabled
             
             # Map of tool names to actual tool functions from strands_tools
             available_tools = {
-                "file_read": file_read,
-                "file_write": file_write,
-                "python_repl": python_repl,
-                "shell": shell,
+                #"file_read": file_read,
+                #"file_write": file_write,
+                #"python_repl": python_repl,
+                #"shell": shell,
                 "http_request": http_request,
-                "editor": editor,
+                #"editor": editor,
                 "environment": environment,
                 #"web_search": retrieve.retrieve,  # Using retrieve for web search
-                "generate_image": generate_image,
+                #"generate_image": generate_image,
                 "current_time": current_time,
                 "calculator": calculator
             }
             
             # Always include basic tools
-            default_tool_names = ["file_read", "file_write", "python_repl", "current_time"]
+            default_tool_names = ["file_read", "file_write", "current_time"]
             
             # Add configured tools
             for name in tool_names:
@@ -135,7 +154,7 @@ Always strive for accuracy and completeness in your responses."""
             tool_names = config.tools.enabled
             
             # Always include basic tools
-            default_tool_names = ["file_read", "file_write", "python_repl", "current_time"]
+            default_tool_names = ["file_read", "file_write", "current_time"]
             
             # Add configured tools
             for name in tool_names:

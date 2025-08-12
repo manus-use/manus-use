@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Union
 from strands import Agent
 from strands.types.tools import AgentTool
 
-from ..config import Config
+from manus_use.config import Config
 
 
 class BaseManusAgent(Agent):
@@ -41,7 +41,11 @@ class BaseManusAgent(Agent):
             system_prompt=system_prompt or self._get_default_system_prompt(),
             **kwargs
         )
-        
+    def __del__(self):
+        """Ensure proper cleanup."""
+        # Properly handle cleanup by checking if parent class has __del__
+        if hasattr(super(), '__del__'):
+            super().__del__()
     def _get_default_system_prompt(self) -> str:
         """Get default system prompt for this agent type."""
         return "You are a helpful AI assistant."

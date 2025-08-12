@@ -51,6 +51,9 @@ max_search_results = 5
 # Browser-use specific configuration
 # These settings override the main LLM config when using browser-use agent
 
+[otx]
+api_key = "..." # AlienVault OTX API key
+
 # LLM settings for browser-use (optional - defaults to main LLM config)
 # provider = "bedrock"  # or "openai"
 # model = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
@@ -84,3 +87,19 @@ retry_count = 3  # Number of retries on failure
 debug = false  # Enable debug logging
 save_screenshots = false  # Save screenshots during execution
 screenshot_path = ""  # Optional: Path to save screenshots
+
+[mcp]
+# MCP SSE server URL for agent communication
+server_url = "https://your-mcp-server.example.com/sse?_g_auth=YOUR_TOKEN_HERE"
+# DO NOT commit real tokens to version control!
+
+[webhooks]
+# Webhook URL for CVE submission (do not commit real tokens)
+cve_submit_url = "https://your-webhook.example.com/path/to/webhook"
+# DO NOT commit real tokens to version control!
+
+[lark]
+# Lark document creation API URL and token (do not commit real tokens)
+document_url = "https://your-lark-api.example.com/path/to/endpoint"
+api_token = "your-lark-api-token"
+# DO NOT commit real tokens to version control!

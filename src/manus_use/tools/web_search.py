@@ -2,7 +2,6 @@
 
 import asyncio
 from typing import Dict, List, Optional
-
 from strands.tools import tool
 
 from manus_use.config import Config
@@ -118,8 +117,6 @@ async def web_search_async(
             "url": "",
             "snippet": f"Failed to search: {str(e)}"
         }]
-
-
 @tool
 def web_search(query: str, max_results: Optional[int] = None) -> List[Dict[str, str]]:
     """Search the web for information.

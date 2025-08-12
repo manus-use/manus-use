@@ -6,10 +6,10 @@ import tempfile
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
-from strands import tool
+from strands.tools import tool
 
-from ..config import Config
-from ..sandbox import DockerSandbox
+from manus_use.config import Config
+from manus_use.sandbox import DockerSandbox
 
 
 class CodeExecutor:
@@ -104,8 +104,6 @@ def get_executor(config: Optional[Config] = None) -> CodeExecutor:
         _executor = CodeExecutor(config)
     return _executor
 
-
-#@tool
 async def code_execute(
     code: str,
     language: str = "python",
@@ -163,6 +161,7 @@ async def code_execute(
 
 
 # Make synchronous version for compatibility
+@tool
 def code_execute_sync(
     code: str,
     language: str = "python", 

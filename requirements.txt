@@ -1,6 +1,6 @@
 # Core dependencies
-strands-agents>=0.1.4
-strands-agents-tools>=0.1.0
+strands-agents>=0.1.7
+strands-agents-tools>=0.1.5
 
 # File and async operations
 aiofiles>=24.1.0
@@ -10,7 +10,7 @@ docker>=7.1.0
 
 # Browser automation
 playwright>=1.49.1
-browser-use>=0.2.1
+browser-use>=0.2.7
 
 # Configuration and utilities
 pydantic>=2.0.0
@@ -26,6 +26,7 @@ beautifulsoup4>=4.12.3
 
 # Search engines
 duckduckgo-search>=6.3.7
+vulncheck-sdk>=0.6.0
 
 # Data analysis and visualization
 pandas>=2.2.3
