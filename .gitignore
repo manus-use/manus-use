@@ -59,6 +59,9 @@ config.toml
 config/config.toml
 *.env
 
+# Claude Code configuration
+CLAUDE.md
+
 # Logs
 *.log
 
