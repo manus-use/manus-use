@@ -59,6 +59,9 @@ config.toml
 config/config.toml
 *.env
 
+# Claude Code configuration
+CLAUDE.md
+
 # Logs
 *.log
 
@@ -80,3 +83,6 @@ tmp/
 *.json
 *.html
 fibonacci.py
+repl_state/
+repl_state/*
+

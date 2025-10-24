@@ -96,7 +96,7 @@ class VulnerabilityIntelligenceAgent:
         **Step 8: Final Quality Assurance and Report Generation**
         - **Data Completeness Check**: Verify all critical fields are populated.
         - **Information Consistency**: Ensure the technical description, CVSS vector, and exploitability analysis are consistent.
-        - **Generate Report**: Once all checks pass, use the `create_lark_document` tool to synthesize all validated findings. The report must include a dedicated section on the **Exploitability Analysis** and a **Sources** section listing all URLs.
+        - **Generate Report**: Once all checks pass, use the `create_lark_document` tool to synthesize all validated findings. The report must include a dedicated section on the **Exploitability Analysis** and a **Sources** section listing all URL. **Recommendations** section must consist of concise, actionable, and purely proactive technical steps for remediation or mitigation. Each step should be a bullet point starting with an asterisk "*" and ending with a new line character "\n", without using full sentences or terminal punctuation. **Recommendations** section should exclude all non-technical actions, such as policy reviews, procedural updates, or post-implementation verification and validation steps. Do not include any passive recommendations.
         """
         from strands.models import BedrockModel
         bedrock = BedrockModel(
