@@ -1,0 +1,72 @@
+digraph G {
+  rankdir=TB;
+  node [shape=box, style=rounded];
+
+  subgraph cluster_user {
+    label="User Interaction";
+    color=blue;
+    user_request [label="User Request"];
+    cli [label="CLI"];
+    user_request -> cli;
+  }
+
+  subgraph cluster_main_agent {
+    label="Main Orchestration";
+    color=purple;
+    workflow_agent [label="WorkflowAgent"];
+    cli -> workflow_agent;
+  }
+
+  subgraph cluster_specialized_agents {
+    label="Specialized Agents";
+    color=orange;
+    manus_agent [label="ManusAgent"];
+    browser_agent [label="BrowserUseAgent"];
+    data_agent [label="DataAnalysisAgent"];
+    va_agent [label="VulnerabilityIntelligenceAgent"];
+    vd_agent [label="VulnerabilityDiscoveryAgent"];
+    mcp_agent [label="MCPAgent"];
+  }
+
+  subgraph cluster_tools {
+    label="Tool Ecosystem";
+    color=green;
+    file_ops [label="File Operations"];
+    code_exec [label="Code Execution"];
+    web_search [label="Web Search"];
+    browser_automation [label="Browser Automation"];
+    data_viz [label="Data Visualization"];
+    security_tools [label="Security Analysis"];
+  }
+
+  workflow_agent -> manus_agent [label="delegates task"];
+  workflow_agent -> browser_agent [label="delegates task"];
+  workflow_agent -> data_agent [label="delegates task"];
+  workflow_agent -> va_agent [label="delegates task"];
+  workflow_agent -> vd_agent [label="delegates task"];
+  workflow_agent -> mcp_agent [label="delegates task"];
+
+  manus_agent -> file_ops;
+  manus_agent -> code_exec;
+  browser_agent -> browser_automation;
+  browser_agent -> web_search;
+  data_agent -> data_viz;
+  va_agent -> security_tools;
+  vd_agent -> security_tools;
+
+  file_ops -> sandbox;
+  code_exec -> sandbox;
+
+  subgraph cluster_sandbox {
+    label="Secure Environment";
+    color=red;
+    sandbox [label="Docker Sandbox"];
+  }
+
+  subgraph cluster_info {
+    label="Project Information";
+    color=grey;
+    github [label="GitHub: https://github.com/manus-use/manus-use"];
+    owner [label="Owner/Designer: Zhixi Sun"];
+  }
+}
