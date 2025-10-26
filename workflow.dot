@@ -36,7 +36,20 @@ digraph G {
     web_search [label="Web Search"];
     browser_automation [label="Browser Automation"];
     data_viz [label="Data Visualization"];
-    security_tools [label="Security Analysis"];
+
+    subgraph cluster_security_tools {
+        label="Security Analysis";
+        color=cyan;
+        nvd [label="NVD"];
+        cisa_kev [label="CISA KEV"];
+        otx [label="AlienVault OTX"];
+        epss [label="EPSS"];
+        poc_search [label="PoC Search"];
+        poc_validation [label="PoC Validation"];
+        exploitation_analysis [label="Exploitation Analysis"];
+        attack_vector_analysis [label="Attack Vector Analysis"];
+        attack_simulation [label="Attack Simulation"];
+    }
   }
 
   workflow_agent -> manus_agent [label="delegates task"];
@@ -51,8 +64,15 @@ digraph G {
   browser_agent -> browser_automation;
   browser_agent -> web_search;
   data_agent -> data_viz;
-  va_agent -> security_tools;
-  vd_agent -> security_tools;
+  va_agent -> nvd;
+  va_agent -> cisa_kev;
+  va_agent -> otx;
+  va_agent -> poc_search;
+  va_agent -> poc_validation;
+  va_agent -> exploitation_analysis;
+  va_agent -> attack_vector_analysis;
+  va_agent -> attack_simulation;
+  vd_agent -> epss;
 
   file_ops -> sandbox;
   code_exec -> sandbox;
