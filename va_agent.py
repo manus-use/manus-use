@@ -52,7 +52,7 @@ class VulnerabilityIntelligenceAgent:
 
         **Step 1: Foundational Data Gathering from NVD**
         - Identify the CVE from the user's request.
-        - Immediately call the `get_nvd_data` tool to get foundational information from the NVD. This will provide the official description, CVSS score, and CWE.
+        - Immediately call the `get_nvd_data` tool to get foundational information from the NVD. This will provide the official description, CVSS score (version 3.x), and CWE.
         - Call `get_github_advisory` to get advisory information from GitHub.
 
         **Step 2: Check for Known Exploitation**
@@ -95,8 +95,8 @@ class VulnerabilityIntelligenceAgent:
 
         **Step 8: Final Quality Assurance and Report Generation**
         - **Data Completeness Check**: Verify all critical fields are populated.
-        - **Information Consistency**: Ensure the technical description, CVSS vector, and exploitability analysis are consistent.
-        - **Generate Report**: Once all checks pass, use the `create_lark_document` tool to synthesize all validated findings. The report must include a dedicated section on the **Exploitability Analysis** and a **Sources** section listing all URL. **Recommendations** section must consist of concise, actionable, and purely proactive technical steps for remediation or mitigation. Each step should be a bullet point starting with an asterisk "*" and ending with a new line character "\n", without using full sentences or terminal punctuation. **Recommendations** section should exclude all non-technical actions, such as policy reviews, procedural updates, or post-implementation verification and validation steps. Do not include any passive recommendations.
+        - **Information Consistency**: Ensure the technical description, CVSS 3.x vector, and exploitability analysis are consistent. If there is no CVSS 3.x vector, then convert a CVSS 4.x vector to CVSS 3.x.
+        - **Generate Report**: Once all checks pass, use the `create_lark_document` tool to synthesize all validated findings. The report must include a dedicated section on the **Exploitability Analysis** and a **Sources** section listing all URL.
         """
         from strands.models import BedrockModel
         bedrock = BedrockModel(
