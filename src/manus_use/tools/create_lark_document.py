@@ -59,6 +59,10 @@ TOOL_SPEC = {
                     "type": "string",
                     "description": "Single plain-text paragraph summarizing the Brief background on the affected software without any Markdown formatting, bullet points, or lists. Combine them into one cohesive paragraph suitable for inclusion in a professional report",
                 },
+                "exploit_verification": {
+                    "type": "string",
+                    "description": "Single plain-text paragraph summarizing exploit verification results including verification status, environment setup, and execution outcome. Optional — only include if exploit verification was performed.",
+                },
             },
             "required": [
                 "title",

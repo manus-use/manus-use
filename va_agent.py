@@ -28,6 +28,7 @@ import manus_use.tools.query_threat_intelligence_feeds as query_threat_intellige
 import manus_use.tools.get_github_advisory as get_github_advisory
 import manus_use.tools.check_cisa_kev as check_cisa_kev
 import manus_use.tools.get_otx_cve_details as get_otx_cve_details
+import manus_use.tools.verify_exploit as verify_exploit
 #import manus_use.tools.browser_agent_tool as browser_agent_tool
 
 class VulnerabilityIntelligenceAgent:
@@ -87,6 +88,18 @@ class VulnerabilityIntelligenceAgent:
             - Based on your analysis, classify the PoC. Is it a confirmed RCE? A DoS? A simple vulnerability checker?
             - In your final report, create a dedicated section for this analysis, clearly stating your confidence in the PoC's functionality and impact.
 
+        **Step 5.5: Exploit Verification (if applicable)**
+        - If you identified a functional PoC in Step 5 and have sufficient CVE context:
+          1. Generate a Dockerfile that sets up the vulnerable target environment based on the affected software/version from NVD data
+          2. The Dockerfile should install the vulnerable version, configure it to be exploitable, and expose the relevant service port
+          3. Adapt the exploit code so it targets hostname "target" (the Docker container alias) and uses the TARGET_HOST/TARGET_PORT environment variables
+          4. Call `verify_exploit` with the Dockerfile, exploit code, and target information
+          5. Record the verification result for inclusion in the final report
+        - Skip this step if:
+          - The vulnerability is in a kernel, hardware, or non-containerizable component
+          - The PoC requires interactive/multi-step exploitation
+          - There is insufficient information to build a vulnerable environment
+
         **Step 6: Analyze Weakness**
         - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -120,6 +133,7 @@ class VulnerabilityIntelligenceAgent:
                 get_otx_cve_details,
                 query_threat_intelligence_feeds,
                 get_github_advisory,
+                verify_exploit,
                 use_browser,
             ]
         )
