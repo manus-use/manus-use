@@ -63,6 +63,14 @@ TOOL_SPEC = {
                     "type": "string",
                     "description": "Single plain-text paragraph summarizing exploit verification results including verification status, environment setup, and execution outcome. Optional — only include if exploit verification was performed.",
                 },
+                "dockerfile_content": {
+                    "type": "string",
+                    "description": "The exact Dockerfile used to set up the vulnerable environment for exploit verification. Include the complete content as-is. Optional — only include if exploit verification was performed.",
+                },
+                "exploit_code": {
+                    "type": "string",
+                    "description": "The exact exploit code that was executed against the vulnerable environment during verification. Include the complete code as-is. Optional — only include if exploit verification was performed.",
+                },
             },
             "required": [
                 "title",
