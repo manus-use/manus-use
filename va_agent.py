@@ -89,7 +89,12 @@ class VulnerabilityIntelligenceAgent:
             - In your final report, create a dedicated section for this analysis, clearly stating your confidence in the PoC's functionality and impact.
 
         **Step 5.5: Exploit Verification (if applicable)**
-        - If you identified a functional PoC in Step 5 and have sufficient CVE context:
+        - Select ONE most promising PoC to verify using this priority order:
+          1. NVD reference links that point to the original author/researcher's post containing a PoC
+          2. GitHub Advisory page that contains a PoC
+          3. If neither of the above has a PoC, use the GitHub repository with the most stars that contains a PoC
+        - Do NOT attempt to verify every PoC link — pick the single best candidate.
+        - If you identified a functional PoC and have sufficient CVE context:
           1. Generate a Dockerfile that sets up the vulnerable target environment based on the affected software/version from NVD data
           2. The Dockerfile should install the vulnerable version, configure it to be exploitable, and expose the relevant service port
           3. Adapt the exploit code so it targets hostname "target" (the Docker container alias) and uses the TARGET_HOST/TARGET_PORT environment variables
