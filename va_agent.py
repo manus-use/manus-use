@@ -72,8 +72,12 @@ class VulnerabilityIntelligenceAgent:
             - **Validation:** Based on the complete content, determine if the page contains any code snippets, scripts, or technical descriptions that constitute a Proof-of-Concept (PoC). If any such code is present, you must count the URL as a PoC link. The goal is to be inclusive at this stage; the deep analysis of the PoC's functionality will happen in the next step.
             - Create a new, validated list of URLs that point to these PoCs. You will use this list in the next step. If a link is dead or irrelevant, you must note this and discard it.
 
-        **Step 5: Deep PoC Analysis (for Validated Links Only)**
-        - For each URL that you validated as a genuine PoC in the previous step, perform a deep analysis. Your goal is to determine if the PoC is functional and what its impact is (e.g., RCE vs. DoS).
+        **Step 5: Deep PoC Analysis and Exploit Verification**
+        - From the validated PoC URLs in Step 4, select ONE most promising PoC using this priority order:
+          1. NVD reference links that point to the original author/researcher's post containing a PoC
+          2. GitHub Advisory page that contains a PoC
+          3. If neither of the above has a PoC, use the GitHub repository with the most stars that contains a PoC
+        - Do NOT attempt to analyze or verify every PoC link — pick the single best candidate.
         - **1. Contextual Analysis:**
             - Analyze the PoC's description, README, or accompanying text for keywords that indicate its quality and purpose.
             - **Look for indicators of a functional exploit:** "weaponized," "RCE," "remote code execution," "privilege escalation," "fully functional."
@@ -87,23 +91,24 @@ class VulnerabilityIntelligenceAgent:
         - **3. Synthesize and Classify:**
             - Based on your analysis, classify the PoC. Is it a confirmed RCE? A DoS? A simple vulnerability checker?
             - In your final report, create a dedicated section for this analysis, clearly stating your confidence in the PoC's functionality and impact.
-
-        **Step 5.5: Exploit Verification (if applicable)**
-        - Select ONE most promising PoC to verify using this priority order:
-          1. NVD reference links that point to the original author/researcher's post containing a PoC
-          2. GitHub Advisory page that contains a PoC
-          3. If neither of the above has a PoC, use the GitHub repository with the most stars that contains a PoC
-        - Do NOT attempt to verify every PoC link — pick the single best candidate.
-        - If you identified a functional PoC and have sufficient CVE context:
-          1. Generate a Dockerfile that sets up the vulnerable target environment based on the affected software/version from NVD data
-          2. The Dockerfile should install the vulnerable version, configure it to be exploitable, and expose the relevant service port
-          3. Adapt the exploit code so it targets hostname "target" (the Docker container alias) and uses the TARGET_HOST/TARGET_PORT environment variables
-          4. Call `verify_exploit` with the Dockerfile, exploit code, and target information
-          5. Record the verification result for inclusion in the final report
-        - Skip this step if:
-          - The vulnerability is in a kernel, hardware, or non-containerizable component
-          - The PoC requires interactive/multi-step exploitation
-          - There is insufficient information to build a vulnerable environment
+        - **4. Exploit Verification (if applicable):**
+            - If the PoC is functional and you have sufficient CVE context, call `verify_exploit` with these parameters:
+              - `dockerfile_content`: A complete Dockerfile that installs the vulnerable software version, configures it to be exploitable, and exposes the service port.
+              - `exploit_code`: The PoC code, adapted so it targets hostname "target" using the TARGET_HOST and TARGET_PORT environment variables.
+              - `exploit_language`: The language of the exploit code ("python", "bash", or "sh").
+              - `cve_id`: The CVE identifier being analyzed.
+              - `target_info`: An object with `affected_software`, `affected_versions`, and `vulnerability_type`.
+              - `target_port` (optional): The port the vulnerable service listens on (default 80).
+            - The tool will return a JSON result containing:
+              - `verification_status`: One of "verified", "failed", "build_error", or "target_error".
+              - `summary`: A human-readable summary of the result.
+              - `exploit_output`: The exploit's stdout, stderr, and exit_code.
+              - `target_logs`: Logs from the vulnerable target container.
+            - Record the verification result for inclusion in the final report.
+            - Skip verification if:
+              - The vulnerability is in a kernel, hardware, or non-containerizable component
+              - The PoC requires interactive/multi-step exploitation
+              - There is insufficient information to build a vulnerable environment
 
         **Step 6: Analyze Weakness**
         - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
