@@ -97,7 +97,7 @@ class VulnerabilityIntelligenceAgent:
              - `target_info` (object): Must contain `affected_software`, `affected_versions`, and `vulnerability_type`.
              - `target_port` (integer, optional): The port the service listens on (default 80).
         - The tool returns a JSON object with: `verification_status` ("verified"/"failed"/"build_error"/"target_error"), `summary`, `exploit_output` (stdout/stderr/exit_code), and `target_logs`. Include these results in the final report.
-        - **Save the exact Dockerfile content and exploit code you wrote** — you will pass them to `create_lark_document` in Step 8.
+        - **Save the exact Dockerfile content and exploit code you wrote** — you will pass them to `create_lark_document` in Step 8. Also construct and save: (1) the equivalent Docker CLI command to build and run the target container (e.g., `docker build -t target-env . && docker run --name target -p <PORT>:<PORT> target-env`), and (2) the exploit execution command (e.g., `TARGET_HOST=target TARGET_PORT=<PORT> python /tmp/exploit.py`).
         - **Only skip `verify_exploit` if** the vulnerability targets a kernel, hardware, or hypervisor that cannot run in Docker. If you skip it, you MUST state the specific reason in the report.
 
         **Step 6: Analyze Weakness**
@@ -109,7 +109,7 @@ class VulnerabilityIntelligenceAgent:
         **Step 8: Final Quality Assurance and Report Generation**
         - **Data Completeness Check**: Verify all critical fields are populated.
         - **Information Consistency**: Ensure the technical description, CVSS 3.x vector, and exploitability analysis are consistent. If there is no CVSS 3.x vector, then convert a CVSS 4.x vector to CVSS 3.x.
-        - **Generate Report**: Once all checks pass, use the `create_lark_document` tool to synthesize all validated findings. The report must include a dedicated section on the **Exploitability Analysis** and a **Sources** section listing all URLs. If exploit verification was performed, you MUST include the `dockerfile_content` and `exploit_code` parameters with the exact Dockerfile and exploit code you used in Step 5.
+        - **Generate Report**: Once all checks pass, use the `create_lark_document` tool to synthesize all validated findings. The report must include a dedicated section on the **Exploitability Analysis** and a **Sources** section listing all URLs. If exploit verification was performed, you MUST include the `dockerfile_content`, `exploit_code`, `docker_command`, and `exploit_execution_command` parameters with the exact artifacts from Step 5.
         """
         from strands.models import BedrockModel
         bedrock = BedrockModel(

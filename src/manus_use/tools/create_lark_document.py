@@ -71,6 +71,14 @@ TOOL_SPEC = {
                     "type": "string",
                     "description": "The exact exploit code that was executed against the vulnerable environment during verification. Include the complete code as-is. Optional — only include if exploit verification was performed.",
                 },
+                "docker_command": {
+                    "type": "string",
+                    "description": "The Docker CLI commands used to build and start the vulnerable environment container. Example: 'docker build -t target-env . && docker run --name target -p 8080:8080 target-env'. Optional — only include if exploit verification was performed.",
+                },
+                "exploit_execution_command": {
+                    "type": "string",
+                    "description": "The exact command used to execute the exploit code against the target. Example: 'TARGET_HOST=target TARGET_PORT=8080 python /tmp/exploit.py'. Optional — only include if exploit verification was performed.",
+                },
             },
             "required": [
                 "title",
