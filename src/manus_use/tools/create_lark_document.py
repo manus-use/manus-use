@@ -53,11 +53,31 @@ TOOL_SPEC = {
                 },
                 "recommendations": {
                     "type": "string",
-                    "description": "Single plain-text paragraph summarizing the recommended remediation actions without any Markdown formatting, bullet points, or lists. Combine them into one cohesive paragraph suitable for inclusion in a professional report",
+                    "description": "Consist of concise, actionable, and purely proactive technical steps for remediation or mitigation. Each step should be a bullet point starting with an asterisk '* ' and ending with a new line character '\n', without using full sentences or terminal punctuation. Should exclude all non-technical actions, such as policy reviews, procedural updates, or post-implementation verification and validation steps. Do not include any passive recommendations",
                 },
                 "background": {
                     "type": "string",
                     "description": "Single plain-text paragraph summarizing the Brief background on the affected software without any Markdown formatting, bullet points, or lists. Combine them into one cohesive paragraph suitable for inclusion in a professional report",
+                },
+                "exploit_verification": {
+                    "type": "string",
+                    "description": "Single plain-text paragraph summarizing exploit verification results including verification status, environment setup, and execution outcome. Optional — only include if exploit verification was performed.",
+                },
+                "dockerfile_content": {
+                    "type": "string",
+                    "description": "The exact Dockerfile used to set up the vulnerable environment for exploit verification. Include the complete content as-is. Optional — only include if exploit verification was performed.",
+                },
+                "exploit_code": {
+                    "type": "string",
+                    "description": "The exact exploit code that was executed against the vulnerable environment during verification. Include the complete code as-is. Optional — only include if exploit verification was performed.",
+                },
+                "docker_command": {
+                    "type": "string",
+                    "description": "The Docker CLI commands used to build and start the vulnerable environment container. Example: 'docker build -t target-env . && docker run --name target -p 8080:8080 target-env'. Optional — only include if exploit verification was performed.",
+                },
+                "exploit_execution_command": {
+                    "type": "string",
+                    "description": "The exact command used to execute the exploit code against the target. Example: 'TARGET_HOST=target TARGET_PORT=8080 python /tmp/exploit.py'. Optional — only include if exploit verification was performed.",
                 },
             },
             "required": [
