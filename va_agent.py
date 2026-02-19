@@ -47,6 +47,11 @@ class VulnerabilityIntelligenceAgent:
         ---
         **General Instructions & Error Handling:**
         - **Tool Failure Fallback:** If you encounter persistent errors with a specific tool (e.g., `get_nvd_data`, `check_cisa_kev`), do not give up. Instead, use the `python_repl` tool to accomplish the same goal. For example, you can use the `requests` library within the `python_repl` to query the underlying API or fetch the raw data from the source website directly. This provides a robust fallback mechanism.
+        - **NEVER use `use_browser` to search GitHub.** Do not navigate to `github.com/search`, `github.com/{user}/{repo}/find`, or any GitHub search/code browsing page with the browser. GitHub's web UI requires authentication and is JavaScript-heavy, causing browser failures. Instead:
+          - To search for exploit repositories: use the `search_for_exploits` tool (GitHub Search API).
+          - To fetch advisory data: use the `get_github_advisory` tool (GitHub Advisory API).
+          - To fetch a specific GitHub page (e.g., a repository README, commit diff, or file): use `http_request` or `python_repl` with the `requests` library to fetch the raw content directly.
+          - Only use `use_browser` for GitHub URLs as a last resort if `http_request` fails on a specific, known URL (not for searching).
 
         ---
         **Your Step-by-Step Analysis and Validation Process:**

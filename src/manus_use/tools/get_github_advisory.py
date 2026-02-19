@@ -1,8 +1,10 @@
 """Tool to fetch data from the GitHub Advisory Database."""
 
+import os
 import requests
 from strands.tools import tool
 from typing import Dict, Any
+from src.manus_use.config import Config
 
 @tool
 def get_github_advisory(cve_id: str) -> Dict[str, Any]:
@@ -22,10 +24,19 @@ def get_github_advisory(cve_id: str) -> Dict[str, Any]:
 
     # Use the official GitHub REST API endpoint for getting advisories by CVE ID.
     url = f"https://api.github.com/advisories?cve_id={cve_id}"
+
+    try:
+        config = Config.from_file()
+        github_token = os.environ.get("GITHUB_TOKEN") or (config.github.api_token if config.github else None)
+    except Exception:
+        github_token = os.environ.get("GITHUB_TOKEN")
+
     headers = {
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28"
     }
+    if github_token:
+        headers["Authorization"] = f"token {github_token}"
 
     try:
         response = requests.get(url, headers=headers, timeout=15)
