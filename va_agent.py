@@ -103,15 +103,20 @@ class VulnerabilityIntelligenceAgent:
              - **What the fix does:** What security check, validation, sanitization, or logic change was introduced.
              - **What the pre-patch vulnerable behavior was:** Infer what the code did BEFORE the fix — the absence of the check/validation IS the vulnerability.
              - **The attack vector:** Determine how an attacker would trigger the pre-patch behavior — what input, endpoint, parameter, or sequence of operations would exploit it.
-          4. **Write original exploit code from scratch** based on your analysis. The exploit must:
+          4. **Write original exploit code from scratch** based on your analysis. First, **determine the exploit mode**:
+             - **Remote exploit** (`exploit_mode: "remote"`): The vulnerability is exploited by sending network traffic to a listening service (e.g., HTTP request to a web server, SQL injection against a database, SSRF, etc.). The exploit runs in a separate container and connects to the target using `TARGET_HOST` and `TARGET_PORT` env vars.
+             - **Local exploit** (`exploit_mode: "local"`): The vulnerability is triggered locally — privilege escalation, file parsing bugs, library vulnerabilities, command-line tool exploits, deserialization bugs, buffer overflows in local applications, etc. The exploit runs INSIDE the target container and directly invokes the vulnerable software. Do NOT use `TARGET_HOST` or `TARGET_PORT`.
+             The exploit must:
              - Target the specific pre-patch vulnerable behavior you identified.
-             - Send the crafted malicious input/request that the patch now blocks.
-             - Connect to the target using environment variables `TARGET_HOST` (defaults to "127.0.0.1") and `TARGET_PORT`.
-             - Be written in Python (preferred), bash, or sh.
+             - Be written in Python (preferred), bash, or sh. For local mode, prefer bash/sh since the target container may not have Python installed.
              - Print clear output indicating success (e.g., "EXPLOIT SUCCESSFUL: <evidence>") or failure.
              - Exit with code 0 on success, non-zero on failure.
-          5. **Write a Dockerfile** that installs the exact vulnerable (pre-patch) software version and starts the service.
-          6. **Call `verify_exploit`** with ALL required parameters: `dockerfile_content`, `exploit_code`, `exploit_language`, `cve_id`, `target_info` (with `affected_software`, `affected_versions`, `vulnerability_type`), and optionally `target_port`.
+          5. **Write a Dockerfile** for the vulnerable environment. **CRITICAL Dockerfile rules:**
+             - **Use the REAL vulnerable software.** If the CVE affects Apache httpd 2.4.49, install Apache httpd 2.4.49. If it affects a Java library, create a real Java environment. NEVER simulate or mock the vulnerable service with a Python Flask/FastAPI stub that "mimics" the behavior.
+             - **Use official base images or build from source.** Prefer official Docker images pinned to the vulnerable version (e.g., `FROM httpd:2.4.49`, `FROM nginx:1.18.0`, `FROM php:7.4.21-apache`). If no official image exists, download and compile from the project's release archives or Git tags.
+             - For **remote mode**: the Dockerfile must start the vulnerable service listening on a port.
+             - For **local mode**: the Dockerfile must install the vulnerable software and keep the container alive (e.g., `CMD ["sleep", "infinity"]`). No service needs to listen. If the exploit is written in Python, also install `python3` in the image.
+          6. **Call `verify_exploit`** with ALL required parameters: `dockerfile_content`, `exploit_code`, `exploit_language`, `cve_id`, `target_info` (with `affected_software`, `affected_versions`, `vulnerability_type`), `exploit_mode` (`"remote"` or `"local"`), and `target_port` (required for remote mode, ignored for local mode).
           7. **Handle `verify_exploit` results and retry (up to 3 additional attempts):**
              - If `verification_status` is `"build_error"`: The Dockerfile failed to build. Read the `build_log` carefully, identify the error (e.g., invalid base image, missing package, broken RUN command, incorrect syntax), fix the Dockerfile, and call `verify_exploit` again with the corrected `dockerfile_content`.
              - If `verification_status` is `"target_error"`: The image built but the service failed to start or become ready on the expected port. Read the `target_logs` and `build_log`, identify why (e.g., wrong CMD/ENTRYPOINT, service crash, wrong port, missing config), fix the Dockerfile, and retry.
@@ -129,7 +134,7 @@ class VulnerabilityIntelligenceAgent:
           3. GitHub repository with most stars containing a PoC
         - Do NOT attempt every PoC link — pick the single best candidate.
         - **Analyze the PoC:** Classify it (RCE, DoS, info-leak, etc.) by looking for network calls, command execution, and memory corruption indicators.
-        - Write a Dockerfile for the vulnerable version. Adapt the PoC to use TARGET_HOST and TARGET_PORT env vars.
+        - Write a Dockerfile for the vulnerable version following the **CRITICAL Dockerfile rules** from Step 5A (use REAL software, never simulate with Flask/stubs). Determine the exploit mode: use `"remote"` if the PoC attacks a network service, `"local"` if it triggers the vulnerability locally. For remote mode, adapt the PoC to use `TARGET_HOST` and `TARGET_PORT` env vars. For local mode, the exploit runs inside the container — no network env vars needed.
         - **Call `verify_exploit`** with all required parameters. Handle results and retry up to 3 additional times:
           - If `build_error` or `target_error`: read the logs, fix the Dockerfile, and retry.
           - If `failed`: review exploit output and target logs, adjust the exploit. If it still fails, try a different PoC source from Step 4 and adapt that instead.
@@ -140,6 +145,7 @@ class VulnerabilityIntelligenceAgent:
         - **In the final report, note which path was used** (fix-commit-derived vs. public PoC) and why.
         - **Only skip `verify_exploit` entirely if** the vulnerability targets a kernel, hardware, or hypervisor that cannot run in Docker. State the reason in the report.
         - **Docker cleanup is automatic.** The `verify_exploit` tool removes all containers, networks, and images after each run. No manual cleanup is needed.
+        - **Choosing exploit_mode:** Use `"local"` for: local privilege escalation, file parsing/processing bugs, library vulnerabilities triggered by local input, command injection in local tools, deserialization vulnerabilities, buffer overflows in local applications. Use `"remote"` for: any vulnerability exploited by sending network traffic to a listening service (web servers, databases, APIs, network daemons).
 
         **Step 6: Analyze Weakness**
         - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
