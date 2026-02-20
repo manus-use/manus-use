@@ -115,7 +115,7 @@ class VulnerabilityIntelligenceAgent:
           7. **Handle `verify_exploit` results and retry (up to 3 additional attempts):**
              - If `verification_status` is `"build_error"`: The Dockerfile failed to build. Read the `build_log` carefully, identify the error (e.g., invalid base image, missing package, broken RUN command, incorrect syntax), fix the Dockerfile, and call `verify_exploit` again with the corrected `dockerfile_content`.
              - If `verification_status` is `"target_error"`: The image built but the service failed to start or become ready on the expected port. Read the `target_logs` and `build_log`, identify why (e.g., wrong CMD/ENTRYPOINT, service crash, wrong port, missing config), fix the Dockerfile, and retry.
-             - If `verification_status` is `"failed"`: The target ran but the exploit did not succeed. Review `exploit_output` and `target_logs`, adjust the exploit code (or the Dockerfile if the target is misconfigured), and retry.
+             - If `verification_status` is `"failed"`: The target ran but the exploit did not succeed. Review `exploit_output` and `target_logs`. First try adjusting the exploit code or Dockerfile and retry. If the exploit still fails after adjustment, consult alternative sources from Step 4 (other fix commit URLs, other PoC exploit URLs) to inform a different exploit approach, then retry with the revised exploit.
              - On each retry, clearly state what you changed and why before calling `verify_exploit` again.
 
         **Step 5B: FALLBACK PATH — Use Public PoC Exploits**
@@ -130,13 +130,16 @@ class VulnerabilityIntelligenceAgent:
         - Do NOT attempt every PoC link — pick the single best candidate.
         - **Analyze the PoC:** Classify it (RCE, DoS, info-leak, etc.) by looking for network calls, command execution, and memory corruption indicators.
         - Write a Dockerfile for the vulnerable version. Adapt the PoC to use TARGET_HOST and TARGET_PORT env vars.
-        - **Call `verify_exploit`** with all required parameters. If `verify_exploit` returns `build_error` or `target_error`, read the logs, fix the Dockerfile, and retry up to 3 additional times (same as Step 5A point 7).
+        - **Call `verify_exploit`** with all required parameters. Handle results and retry up to 3 additional times:
+          - If `build_error` or `target_error`: read the logs, fix the Dockerfile, and retry.
+          - If `failed`: review exploit output and target logs, adjust the exploit. If it still fails, try a different PoC source from Step 4 and adapt that instead.
 
         **Step 5 — Common (both paths):**
         - The tool returns: `verification_status`, `summary`, `exploit_output`, and `target_logs`. Include in report.
         - **Save the exact Dockerfile content and exploit code you wrote** — you will pass them to `create_lark_document` in Step 8. Also construct and save: (1) the equivalent Docker CLI command, and (2) the exploit execution command.
         - **In the final report, note which path was used** (fix-commit-derived vs. public PoC) and why.
         - **Only skip `verify_exploit` entirely if** the vulnerability targets a kernel, hardware, or hypervisor that cannot run in Docker. State the reason in the report.
+        - **Docker cleanup is automatic.** The `verify_exploit` tool removes all containers, networks, and images after each run. No manual cleanup is needed.
 
         **Step 6: Analyze Weakness**
         - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
