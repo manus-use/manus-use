@@ -77,7 +77,7 @@ TOOL_SPEC = {
                 },
                 "exploit_execution_command": {
                     "type": "string",
-                    "description": "The exact command used to execute the exploit code against the target. Example: 'TARGET_HOST=target TARGET_PORT=8080 python /tmp/exploit.py'. Optional — only include if exploit verification was performed.",
+                    "description": "The exact command used to execute the exploit code against the target. Example: 'TARGET_HOST='127.0.0.1' TARGET_PORT=8080 python x.py'. Optional — only include if exploit verification was performed.",
                 },
             },
             "required": [

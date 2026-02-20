@@ -106,7 +106,7 @@ class VulnerabilityIntelligenceAgent:
           4. **Write original exploit code from scratch** based on your analysis. The exploit must:
              - Target the specific pre-patch vulnerable behavior you identified.
              - Send the crafted malicious input/request that the patch now blocks.
-             - Connect to the target using environment variables `TARGET_HOST` (defaults to "target") and `TARGET_PORT`.
+             - Connect to the target using environment variables `TARGET_HOST` (defaults to "127.0.0.1") and `TARGET_PORT`.
              - Be written in Python (preferred), bash, or sh.
              - Print clear output indicating success (e.g., "EXPLOIT SUCCESSFUL: <evidence>") or failure.
              - Exit with code 0 on success, non-zero on failure.
