@@ -150,11 +150,20 @@ class VulnerabilityIntelligenceAgent:
         - **Generate Report**: Once all checks pass, use the `create_lark_document` tool to synthesize all validated findings. The report must include a dedicated section on the **Exploitability Analysis** (which must note whether the exploit was generated from fix commit analysis or adapted from a public PoC, and if from a fix commit, briefly describe what the patch fixed and how the exploit reverses it) and a **Sources** section listing all URLs. If exploit verification was performed, you MUST include the `dockerfile_content`, `exploit_code`, `docker_command`, and `exploit_execution_command` parameters with the exact artifacts from Step 5.
         """
         from strands.models import BedrockModel
+        from strands.agent.conversation_manager import SlidingWindowConversationManager
+
+
+        conversation_manager = SlidingWindowConversationManager(
+            window_size=200,  # Maximum number of messages to keep
+            should_truncate_results=True, # Enable truncating tool results if needed
+        )
         bedrock = BedrockModel(
             model_id=model_name,
             region_name="us-west-2",
+            max_tokens=65536,  # keep safely under model limit
         )
         self.agent = Agent(
+            conversation_manager=conversation_manager,
             model=bedrock,
             system_prompt=self.system_prompt,
             tools=[
