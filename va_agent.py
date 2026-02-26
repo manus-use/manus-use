@@ -34,7 +34,7 @@ import manus_use.tools.verify_exploit as verify_exploit
 class VulnerabilityIntelligenceAgent:
     """Agent that performs vulnerability analysis using a sequential, tool-based approach."""
 
-    def __init__(self, model_name: str):
+    def __init__(self, model_name: str, config: dict):
         """Initialize the agent."""
         self.system_prompt = """
         You are an expert cybersecurity analyst specializing in vulnerability intelligence and risk assessment. Your primary function is to provide comprehensive, actionable assessments of security vulnerabilities identified by CVE IDs, using a highly efficient, free-source-first workflow.
@@ -105,7 +105,7 @@ class VulnerabilityIntelligenceAgent:
              - **The attack vector:** Determine how an attacker would trigger the pre-patch behavior — what input, endpoint, parameter, or sequence of operations would exploit it.
           4. **Write original exploit code from scratch** based on your analysis. First, **determine the exploit mode**:
              - **Remote exploit** (`exploit_mode: "remote"`): The vulnerability is exploited by sending network traffic to a listening service (e.g., HTTP request to a web server, SQL injection against a database, SSRF, etc.). The exploit runs in a separate container and connects to the target using `TARGET_HOST` and `TARGET_PORT` env vars.
-             - **Local exploit** (`exploit_mode: "local"`): The vulnerability is triggered locally — privilege escalation, file parsing bugs, library vulnerabilities, command-line tool exploits, deserialization bugs, buffer overflows in local applications, etc. The exploit runs INSIDE the target container and directly invokes the vulnerable software. Do NOT use `TARGET_HOST` or `TARGET_PORT`.
+             - **Local exploit** (`exploit_mode: "local"`): The vulnerability is triggered locally — privilege escalation, file parsing bugs, library vulnerabilities, command-line tool exploits, deserialization bugs, buffer overflows in local applications, etc. The exploit runs INSIDE the target container and directly invokes the vulnerable software. Do NOT use `TARGET_HOST` or `TARGET_PORT`, use command in the format of `docker cp ./x.py cve-2026-26331-target:/tmp/ && docker exec cve-2026-26331-target /bin/bash -c 'python3 /tmp/exploit.py'`.
              The exploit must:
              - Target the specific pre-patch vulnerable behavior you identified.
              - Be written in Python (preferred), bash, or sh. For local mode, prefer bash/sh since the target container may not have Python installed.
@@ -115,7 +115,12 @@ class VulnerabilityIntelligenceAgent:
              - **Use the REAL vulnerable software.** If the CVE affects Apache httpd 2.4.49, install Apache httpd 2.4.49. If it affects a Java library, create a real Java environment. NEVER simulate or mock the vulnerable service with a Python Flask/FastAPI stub that "mimics" the behavior.
              - **Use official base images or build from source.** Prefer official Docker images pinned to the vulnerable version (e.g., `FROM httpd:2.4.49`, `FROM nginx:1.18.0`, `FROM php:7.4.21-apache`). If no official image exists, download and compile from the project's release archives or Git tags.
              - For **remote mode**: the Dockerfile must start the vulnerable service listening on a port.
-             - For **local mode**: the Dockerfile must install the vulnerable software and keep the container alive (e.g., `CMD ["sleep", "infinity"]`). No service needs to listen. If the exploit is written in Python, also install `python3` in the image.
+             - For local mode: the Dockerfile should install the vulnerable software and spawn a bash shell with `CMD ["/bin/bash"]`. No service needs to listening on a port. If the exploit is written in Python, install `python3` in the image; otherwise, do not add Python just for the exploit. Run the exploit directly against the vulnerable software whenever possible—for example, for a `yt-dlp` vulnerability, invoke `yt-dlp` directly rather than wrapping the exploit code in Python.
+
+             - Write a `Dockerfile` for the vulnerable version, following the CRITICAL Dockerfile rules from Step 5A (use real software—no Flask/stubs). Choose the exploit mode: use `"remote"` if the PoC targets a network service, or `"local"` if it triggers the vulnerability on the host/container directly. For remote mode, update the PoC to read `TARGET_HOST` and `TARGET_PORT` from environment variables. For local mode, run the exploit entirely inside the container—no network env vars are needed.
+             - When building Docker images for Node.js packages published as ES modules (such as `swiper` node package), add `"type": "module"` to `package.json`, and update the exploit code to use `import` instead of `require()`.
+             - Make sure that the dockerfile is valid and can be built successfully. If the dockerfile is invalid, fix the errors and call `verify_exploit` again with the corrected `dockerfile_content`.
+             - Make sure that dockerfile code is properly formatted and does not contain any syntax errors. if the dockerfile code contains quotes or other special characters, escape them properly, or use EOF (End of File) markers to handle multiline strings.
           6. **Call `verify_exploit`** with ALL required parameters: `dockerfile_content`, `exploit_code`, `exploit_language`, `cve_id`, `target_info` (with `affected_software`, `affected_versions`, `vulnerability_type`), `exploit_mode` (`"remote"` or `"local"`), and `target_port` (required for remote mode, ignored for local mode).
           7. **Handle `verify_exploit` results and retry (up to 3 additional attempts):**
              - If `verification_status` is `"build_error"`: The Dockerfile failed to build. Read the `build_log` carefully, identify the error (e.g., invalid base image, missing package, broken RUN command, incorrect syntax), fix the Dockerfile, and call `verify_exploit` again with the corrected `dockerfile_content`.
@@ -134,9 +139,9 @@ class VulnerabilityIntelligenceAgent:
           3. GitHub repository with most stars containing a PoC
         - Do NOT attempt every PoC link — pick the single best candidate.
         - **Analyze the PoC:** Classify it (RCE, DoS, info-leak, etc.) by looking for network calls, command execution, and memory corruption indicators.
-        - Write a Dockerfile for the vulnerable version following the **CRITICAL Dockerfile rules** from Step 5A (use REAL software, never simulate with Flask/stubs). Determine the exploit mode: use `"remote"` if the PoC attacks a network service, `"local"` if it triggers the vulnerability locally. For remote mode, adapt the PoC to use `TARGET_HOST` and `TARGET_PORT` env vars. For local mode, the exploit runs inside the container — no network env vars needed.
-        - **Call `verify_exploit`** with all required parameters. Handle results and retry up to 3 additional times:
-          - If `build_error` or `target_error`: read the logs, fix the Dockerfile, and retry.
+        - **Call `verify_exploit`** with all required parameters. Handle results and retry up to 5 additional times:
+          - If `build_error` or `target_error`: read the logs, fix the Dockerfile, and retry at least 5 times. If there is a public github proof of concept for the exploit, rebuild the docker image until it succeeds.
+          - If `build_error` persists, try to look at github advisory for more information, and if there is no precondition for the exploit, try to use the base image with the vulnerable package for local exploits.          
           - If `failed`: review exploit output and target logs, adjust the exploit. If it still fails, try a different PoC source from Step 4 and adapt that instead.
 
         **Step 5 — Common (both paths):**
@@ -163,7 +168,7 @@ class VulnerabilityIntelligenceAgent:
 
 
         conversation_manager = SlidingWindowConversationManager(
-            window_size=200,  # Maximum number of messages to keep
+            window_size=100,  # Maximum number of messages to keep
             should_truncate_results=True, # Enable truncating tool results if needed
         )
         bedrock = BedrockModel(
@@ -171,8 +176,16 @@ class VulnerabilityIntelligenceAgent:
             region_name="us-west-2",
             max_tokens=65536,  # keep safely under model limit
         )
+        openai_model = OpenAIModel(
+            client_args={
+                "api_key": config['llm']['api_key'],
+                "base_url": config['llm']['base_url'],
+            },
+            model_id=config['llm']['model'],  # use whatever model name your endpoint expects
+        )
         self.agent = Agent(
             conversation_manager=conversation_manager,
+            #model=openai_model,
             model=bedrock,
             system_prompt=self.system_prompt,
             tools=[
@@ -217,7 +230,7 @@ def main():
         print(f"Could not load config ({e}), using default model: {model_name}")
 
     # Create the agent
-    vi_agent = VulnerabilityIntelligenceAgent(model_name=model_name)
+    vi_agent = VulnerabilityIntelligenceAgent(model_name=model_name, config.model_dump())
 
     # Get CVE from command-line arguments or use an example for demonstration
     if len(sys.argv) > 1:
