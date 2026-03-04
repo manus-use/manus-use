@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from typing import Dict, Any, List
 from strands.types.tools import ToolResult, ToolUse
+from manus_use.tools.tool_output_logger import log_tool_output_size
 
 TOOL_SPEC = {
     "name": "check_cisa_kev",
@@ -60,19 +61,23 @@ def check_cisa_kev(tool: ToolUse, **kwargs: Any) -> ToolResult:
     cve_id = tool_input.get("cve_id")
 
     if not isinstance(cve_id, str) or not cve_id.strip():
-        return {
+        result = {
             "toolUseId": tool_use_id,
             "status": "error",
             "content": [{"text": "Invalid CVE ID. Must be a non-empty string."}]
         }
+        log_tool_output_size("check_cisa_kev", result)
+        return result
 
     kev_data = _get_kev_data()
     if not kev_data or "vulnerabilities" not in kev_data:
-        return {
+        result = {
             "toolUseId": tool_use_id,
             "status": "error",
             "content": [{"text": "Could not retrieve or parse CISA KEV data."}]
         }
+        log_tool_output_size("check_cisa_kev", result)
+        return result
 
     found = False
     vulnerability_details = {}
@@ -84,15 +89,19 @@ def check_cisa_kev(tool: ToolUse, **kwargs: Any) -> ToolResult:
 
     if found:
         summary = f"CRITICAL FINDING: {cve_id} is listed in the CISA KEV catalog, indicating active exploitation."
-        return {
+        result = {
             "toolUseId": tool_use_id,
             "status": "success",
             "content": [{"json": {"summary": summary, "exploited": True, "details": vulnerability_details}}]
         }
+        log_tool_output_size("check_cisa_kev", result)
+        return result
     else:
         summary = f"{cve_id} was not found in the CISA KEV catalog."
-        return {
+        result = {
             "toolUseId": tool_use_id,
             "status": "success",
             "content": [{"json": {"summary": summary, "exploited": False}}]
         }
+        log_tool_output_size("check_cisa_kev", result)
+        return result

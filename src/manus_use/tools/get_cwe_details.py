@@ -8,6 +8,7 @@ import requests
 import json
 from typing import Dict, Any
 from strands.types.tools import ToolResult, ToolUse
+from manus_use.tools.tool_output_logger import log_tool_output_size
 
 TOOL_SPEC = {
     "name": "get_cwe_details",
@@ -37,20 +38,24 @@ def get_cwe_details(tool: ToolUse, **kwargs: Any) -> ToolResult:
     cwe_id = tool_input.get("cwe_id")
 
     if not isinstance(cwe_id, str) or not cwe_id.upper().startswith("CWE-"):
-        return {
+        result = {
             "toolUseId": tool_use_id,
             "status": "error",
             "content": [{"text": "Invalid CWE ID format. Must be a string like 'CWE-NNN'."}],
         }
+        log_tool_output_size("get_cwe_details", result)
+        return result
 
     # Extract just the number from CWE-NNN
     cwe_number = cwe_id.upper().replace("CWE-", "")
     if not cwe_number.isdigit():
-        return {
+        result = {
             "toolUseId": tool_use_id,
             "status": "error",
             "content": [{"text": "Invalid CWE ID format. Number part is missing or invalid."}]
         }
+        log_tool_output_size("get_cwe_details", result)
+        return result
 
     url = f"https://cwe.mitre.org/data/definitions/{cwe_number}.html"
 
@@ -67,7 +72,9 @@ def get_cwe_details(tool: ToolUse, **kwargs: Any) -> ToolResult:
 
         start_index = html_content.find(description_start_marker)
         if start_index == -1:
-            return {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"Could not find description for {cwe_id} on the page."}]}
+            result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"Could not find description for {cwe_id} on the page."}]}
+            log_tool_output_size("get_cwe_details", result)
+            return result
 
         # Adjust start_index to point to the content after the marker
         start_index += len(description_start_marker)
@@ -84,7 +91,7 @@ def get_cwe_details(tool: ToolUse, **kwargs: Any) -> ToolResult:
         # Simple HTML tag stripping (very basic)
         clean_description = raw_description.replace('<p>', '').replace('</p>', '').replace('<ul>', '').replace('</ul>', '').replace('<li>', '').replace('</li>', '').replace('<br>', '').replace('<br/>', '').strip()
 
-        return {
+        result = {
             "toolUseId": tool_use_id,
             "status": "success",
             "content": [{"json": {
@@ -93,8 +100,14 @@ def get_cwe_details(tool: ToolUse, **kwargs: Any) -> ToolResult:
                 "url": url
             }}]
         }
+        log_tool_output_size("get_cwe_details", result)
+        return result
 
     except requests.exceptions.RequestException as e:
-        return {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"Request to CWE website failed: {e}"}]}
+        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"Request to CWE website failed: {e}"}]}
+        log_tool_output_size("get_cwe_details", result)
+        return result
     except Exception as e:
-        return {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"An unexpected error occurred during CWE details fetching: {e}"}]}
+        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"An unexpected error occurred during CWE details fetching: {e}"}]}
+        log_tool_output_size("get_cwe_details", result)
+        return result

@@ -6,9 +6,10 @@ from strands.types.tools import AgentTool
 
 from strands_tools import (
                 file_read, file_write, python_repl, shell,
-                http_request, editor, environment, retrieve,
+                editor, environment, retrieve,
                 generate_image, current_time, calculator
             )
+from manus_use.tools.http_request import http_request
 # Collect all tools
 ALL_TOOLS = {
     "file_read": file_read,

@@ -5,6 +5,7 @@ import requests
 from strands.tools import tool
 from typing import Dict, Any
 from src.manus_use.config import Config
+from manus_use.tools.tool_output_logger import log_tool_output_size
 
 @tool
 def get_github_advisory(cve_id: str) -> Dict[str, Any]:
@@ -20,7 +21,9 @@ def get_github_advisory(cve_id: str) -> Dict[str, Any]:
         A dictionary containing the advisory data from GitHub if found, otherwise a message indicating it was not found or an error.
     """
     if not cve_id or not isinstance(cve_id, str) or not cve_id.upper().startswith("CVE-"):
-        return {"error": "Invalid CVE ID format. It must be a string starting with 'CVE-'."}
+        result = {"error": "Invalid CVE ID format. It must be a string starting with 'CVE-'."}
+        log_tool_output_size("get_github_advisory", {"content": [{"json": result}]})
+        return result
 
     # Use the official GitHub REST API endpoint for getting advisories by CVE ID.
     url = f"https://api.github.com/advisories?cve_id={cve_id}"
@@ -44,16 +47,28 @@ def get_github_advisory(cve_id: str) -> Dict[str, Any]:
         data = response.json()
 
         if not data:
-            return {"message": f"No advisory found on GitHub for {cve_id}."}
+            result = {"message": f"No advisory found on GitHub for {cve_id}."}
+            log_tool_output_size("get_github_advisory", {"content": [{"json": result}]})
+            return result
         
         # The API returns a list of advisories; we will return the first and most relevant one.
-        return data[0]
+        result = data[0]
+        log_tool_output_size("get_github_advisory", {"content": [{"json": result}]})
+        return result
 
     except requests.exceptions.HTTPError as http_err:
         if http_err.response.status_code == 404:
-            return {"message": f"No advisory found on GitHub for {cve_id}."}
-        return {"error": f"HTTP error occurred while querying GitHub Advisory API: {http_err}"}
+            result = {"message": f"No advisory found on GitHub for {cve_id}."}
+            log_tool_output_size("get_github_advisory", {"content": [{"json": result}]})
+            return result
+        result = {"error": f"HTTP error occurred while querying GitHub Advisory API: {http_err}"}
+        log_tool_output_size("get_github_advisory", {"content": [{"json": result}]})
+        return result
     except requests.exceptions.RequestException as req_err:
-        return {"error": f"An error occurred while querying the GitHub Advisory API: {req_err}"}
+        result = {"error": f"An error occurred while querying the GitHub Advisory API: {req_err}"}
+        log_tool_output_size("get_github_advisory", {"content": [{"json": result}]})
+        return result
     except (KeyError, IndexError):
-        return {"error": "Received an unexpected response format from the GitHub Advisory API."}
+        result = {"error": "Received an unexpected response format from the GitHub Advisory API."}
+        log_tool_output_size("get_github_advisory", {"content": [{"json": result}]})
+        return result

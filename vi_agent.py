@@ -16,7 +16,8 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 # Import Strands SDK and required tools
 from strands import Agent
-from strands_tools import http_request, python_repl, current_time, use_browser
+from strands_tools import python_repl, current_time, use_browser
+from manus_use.tools.http_request import http_request
 # Import specific tool functions directly
 import manus_use.tools.get_nvd_data as get_nvd_data
 import manus_use.tools.search_for_exploits as search_for_exploits

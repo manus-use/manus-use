@@ -7,6 +7,7 @@ This module follows the Strands SDK's module-based tool specification.
 import requests
 from typing import Dict, Any, List
 from strands.types.tools import ToolResult, ToolUse
+from manus_use.tools.tool_output_logger import log_tool_output_size
 
 TOOL_SPEC = {
     "name": "search_packetstorm",
@@ -34,11 +35,13 @@ def search_packetstorm(tool: ToolUse, **kwargs: Any) -> ToolResult:
     query = tool_input.get("query")
 
     if not isinstance(query, str) or not query.strip():
-        return {
+        result = {
             "toolUseId": tool_use_id,
             "status": "error",
             "content": [{"text": "Invalid query. Must be a non-empty string."}]
         }
+        log_tool_output_size("search_packetstorm", result)
+        return result
 
     base_url = "https://packetstormsecurity.com/search/files/"
     url = f"{base_url}?q={requests.utils.quote(query)}"
@@ -72,20 +75,28 @@ def search_packetstorm(tool: ToolUse, **kwargs: Any) -> ToolResult:
                 break
 
         if not results:
-            return {
+            result = {
                 "toolUseId": tool_use_id,
                 "status": "success",
                 "content": [{"json": {"summary": f"No exploits found on Packet Storm for '{query}'.", "exploits": []}}]
             }
+            log_tool_output_size("search_packetstorm", result)
+            return result
 
         summary = f"Found {len(results)} potential exploits on Packet Storm for '{query}'."
-        return {
+        result = {
             "toolUseId": tool_use_id,
             "status": "success",
             "content": [{"json": {"summary": summary, "exploits": results}}]
         }
+        log_tool_output_size("search_packetstorm", result)
+        return result
 
     except requests.exceptions.RequestException as e:
-        return {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"Request to Packet Storm failed: {e}"}]}
+        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"Request to Packet Storm failed: {e}"}]}
+        log_tool_output_size("search_packetstorm", result)
+        return result
     except Exception as e:
-        return {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"An unexpected error occurred during Packet Storm search: {e}"}]}
+        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"An unexpected error occurred during Packet Storm search: {e}"}]}
+        log_tool_output_size("search_packetstorm", result)
+        return result

@@ -8,6 +8,7 @@ import requests
 import json
 from typing import Dict, Any, List
 from strands.types.tools import ToolResult, ToolUse
+from manus_use.tools.tool_output_logger import log_tool_output_size
 
 TOOL_SPEC = {
     "name": "query_threat_intelligence_feeds",
@@ -36,11 +37,13 @@ def query_threat_intelligence_feeds(tool: ToolUse, **kwargs: Any) -> ToolResult:
     cve_id = tool_input.get("cve_id")
 
     if not isinstance(cve_id, str) or not cve_id.strip():
-        return {
+        result = {
             "toolUseId": tool_use_id,
             "status": "error",
             "content": [{"text": "Invalid CVE ID. Must be a non-empty string."}]
         }
+        log_tool_output_size("query_threat_intelligence_feeds", result)
+        return result
 
     # Curated list of public threat intelligence feeds (example URLs)
     # In a real-world scenario, this list would be more extensive and potentially configurable.
@@ -80,15 +83,19 @@ def query_threat_intelligence_feeds(tool: ToolUse, **kwargs: Any) -> ToolResult:
             print(f"An unexpected error occurred with {feed['name']}: {e}")
 
     if not found_intelligence:
-        return {
+        result = {
             "toolUseId": tool_use_id,
             "status": "success",
             "content": [{"json": {"summary": f"No direct threat intelligence found for {cve_id} in curated feeds.", "intelligence": []}}]
         }
+        log_tool_output_size("query_threat_intelligence_feeds", result)
+        return result
 
     summary = f"Found relevant threat intelligence for {cve_id} in {len(found_intelligence)} feeds."
-    return {
+    result = {
         "toolUseId": tool_use_id,
         "status": "success",
         "content": [{"json": {"summary": summary, "intelligence": found_intelligence}}]
     }
+    log_tool_output_size("query_threat_intelligence_feeds", result)
+    return result

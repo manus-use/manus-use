@@ -8,6 +8,7 @@ import requests
 import json
 from typing import Dict, Any
 from strands.types.tools import ToolResult, ToolUse
+from manus_use.tools.tool_output_logger import log_tool_output_size
 
 TOOL_SPEC = { # Minor change to force re-evaluation
     "name": "get_nvd_data",
@@ -37,11 +38,13 @@ def get_nvd_data(tool: ToolUse, **kwargs: Any) -> ToolResult:
     cve_id = tool_input.get("cve_id")
 
     if not isinstance(cve_id, str) or not cve_id.upper().startswith("CVE-"):
-        return {
+        result = {
             "toolUseId": tool_use_id,
             "status": "error",
             "content": [{"text": "Invalid CVE ID format. Must be a string like 'CVE-YYYY-NNNN'."}],
         }
+        log_tool_output_size("get_nvd_data", result)
+        return result
 
     base_url = "https://services.nvd.nist.gov/rest/json/cves/2.0"
     url = f"{base_url}?cveId={cve_id.upper()}"
@@ -52,11 +55,13 @@ def get_nvd_data(tool: ToolUse, **kwargs: Any) -> ToolResult:
         data = response.json()
 
         if not data.get("vulnerabilities"):
-            return {
+            result = {
                 "toolUseId": tool_use_id,
                 "status": "error",
                 "content": [{"text": f"No vulnerability data found for {cve_id}. It may be an invalid or rejected CVE."}]
             }
+            log_tool_output_size("get_nvd_data", result)
+            return result
 
         vulnerability_data = data["vulnerabilities"][0]
 
@@ -72,15 +77,23 @@ def get_nvd_data(tool: ToolUse, **kwargs: Any) -> ToolResult:
         # Add CISA KEV info to the main vulnerability data
         vulnerability_data["cisa_kev_info"] = cisa_kev_info
 
-        return {
+        result = {
             "toolUseId": tool_use_id,
             "status": "success",
             "content": [{"json": vulnerability_data}]
         }
+        log_tool_output_size("get_nvd_data", result)
+        return result
 
     except requests.exceptions.RequestException as e:
-        return {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"Request to NVD API failed: {e}"}]}
+        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"Request to NVD API failed: {e}"}]}
+        log_tool_output_size("get_nvd_data", result)
+        return result
     except json.JSONDecodeError:
-        return {"toolUseId": tool_use_id, "status": "error", "content": [{"text": "Failed to parse JSON response from NVD API."}]}
+        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": "Failed to parse JSON response from NVD API."}]}
+        log_tool_output_size("get_nvd_data", result)
+        return result
     except Exception as e:
-        return {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"An unexpected error occurred: {e}"}]}
+        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"An unexpected error occurred: {e}"}]}
+        log_tool_output_size("get_nvd_data", result)
+        return result
