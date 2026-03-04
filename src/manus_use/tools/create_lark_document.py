@@ -41,7 +41,7 @@ TOOL_SPEC = {
                 },
                 "technical_details": {
                     "type": "string",
-                    "description": "Single plain-text paragraph summarizing the detailed technical explanation including Exploitation Scenarios, Evidence of active exploitation in the wild, and Detection, without any Markdown formatting, bullet points, or lists. Combine them into one cohesive paragraph suitable for inclusion in a professional report",
+                    "description": "Obtain the official technical details for the vulnerability from authoritative sources, such as a GitHub Security Advisory, the original author’s write-up, or an NVD entry. If no authoritative source is available, provide a detailed, multi-paragraph technical explanation in plain text that covers: 1. Exploitation scenarios 2. Evidence of active exploitation in the wild 3. Detection guidance Use clear bullet points and/or numbered lists where appropriate, and verify that the final output does not use Markdown formatting and do not use ** for bolding.",
                 },
                 "cwe_info": {
                     "type": "string",
@@ -77,7 +77,7 @@ TOOL_SPEC = {
                 },
                 "exploit_execution_command": {
                     "type": "string",
-                    "description": "The exact command used to execute the exploit code against the target. Example: 'TARGET_HOST=target TARGET_PORT=8080 python /tmp/exploit.py'. Optional — only include if exploit verification was performed.",
+                    "description": "The exact command used to execute the exploit code against the target. Example: 'TARGET_HOST='127.0.0.1' TARGET_PORT=8080 python x.py'. Optional — only include if exploit verification was performed.",
                 },
             },
             "required": [

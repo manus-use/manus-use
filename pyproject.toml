@@ -43,6 +43,7 @@ dependencies = [
     "plotly>=5.24.1",
     "kaleido>=0.2.1",
     "langchain-aws>=0.2.11",
+    "readabilipy==0.2.0",
 ]
 
 [project.urls]

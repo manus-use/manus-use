@@ -73,6 +73,9 @@ CLAUDE.md
 temp/
 tmp/
 
+# Manus observations
+.manus/observations/
+
 # Docker
 .dockerignore
 
@@ -85,4 +88,3 @@ tmp/
 fibonacci.py
 repl_state/
 repl_state/*
-

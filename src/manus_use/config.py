@@ -110,6 +110,11 @@ class OTXConfig(BaseModel):
     api_key: Optional[str] = None
 
 
+class GitHubConfig(BaseModel):
+    """GitHub API configuration."""
+    api_token: Optional[str] = None
+
+
 class MCPConfig(BaseModel):
     """MCP server configuration."""
     server_url: Optional[str] = None
@@ -134,6 +139,7 @@ class Config(BaseModel):
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
     browser_use: BrowserUseConfig = Field(default_factory=BrowserUseConfig)
     otx: OTXConfig = Field(default_factory=OTXConfig)
+    github: GitHubConfig = Field(default_factory=GitHubConfig)
     mcp: MCPConfig = Field(default_factory=MCPConfig)
     webhooks: WebhooksConfig = Field(default_factory=WebhooksConfig)
     lark: LarkConfig = Field(default_factory=LarkConfig)

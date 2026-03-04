@@ -11,6 +11,7 @@ from typing import Dict, Any
 from strands.types.tools import ToolResult, ToolUse
 
 from manus_use.config import Config
+from manus_use.tools.tool_output_logger import log_tool_output_size
 
 TOOL_SPEC = {
     "name": "get_otx_cve_details",
@@ -42,11 +43,13 @@ def get_otx_cve_details(tool: ToolUse, **kwargs: Any) -> ToolResult:
     cve_id = tool_input.get("cve_id")
 
     if not isinstance(cve_id, str) or not cve_id.upper().startswith("CVE-"):
-        return {
+        result = {
             "toolUseId": tool_use_id,
             "status": "error",
             "content": [{"text": "Invalid CVE ID format. Must be a string like 'CVE-YYYY-NNNN'."}],
         }
+        log_tool_output_size("get_otx_cve_details", result)
+        return result
 
     try:
         config = Config.from_file()
@@ -55,11 +58,13 @@ def get_otx_cve_details(tool: ToolUse, **kwargs: Any) -> ToolResult:
         api_key = os.environ.get("OTX_API_KEY")
 
     if not api_key:
-        return {
+        result = {
             "toolUseId": tool_use_id,
             "status": "error",
             "content": [{"text": "AlienVault OTX API key not found. Please set it in your config.toml or as an OTX_API_KEY environment variable."}]
         }
+        log_tool_output_size("get_otx_cve_details", result)
+        return result
 
     headers = {"X-OTX-API-KEY": api_key}
     url = f"https://otx.alienvault.com/api/v1/indicators/cve/{cve_id.upper()}"
@@ -67,33 +72,46 @@ def get_otx_cve_details(tool: ToolUse, **kwargs: Any) -> ToolResult:
     try:
         response = requests.get(url, headers=headers, timeout=20)
         response.raise_for_status()
-        print("8888888888: " + response.text)
         data = response.json()
 
         if not data or not data.get("pulse_info", {}).get("pulses"):
-            return {
+            result = {
                 "toolUseId": tool_use_id,
                 "status": "success",
                 "content": [{"text": f"No specific threat intelligence pulses found for {cve_id} in AlienVault OTX. This may indicate it is not currently part of a major tracked campaign."}]
             }
+            log_tool_output_size("get_otx_cve_details", result)
+            return result
 
-        return {
+        result = {
             "toolUseId": tool_use_id,
             "status": "success",
             "content": [{"json": data}]
         }
+        log_tool_output_size("get_otx_cve_details", result)
+        return result
 
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 404:
-            return {
+            result = {
                 "toolUseId": tool_use_id,
                 "status": "success",
                 "content": [{"text": f"No information found for {cve_id} in AlienVault OTX."}]
             }
-        return {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"Request to AlienVault OTX API failed with HTTP error: {e}"}]}
+            log_tool_output_size("get_otx_cve_details", result)
+            return result
+        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"Request to AlienVault OTX API failed with HTTP error: {e}"}]}
+        log_tool_output_size("get_otx_cve_details", result)
+        return result
     except requests.exceptions.RequestException as e:
-        return {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"Request to AlienVault OTX API failed: {e}"}]}
+        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"Request to AlienVault OTX API failed: {e}"}]}
+        log_tool_output_size("get_otx_cve_details", result)
+        return result
     except json.JSONDecodeError:
-        return {"toolUseId": tool_use_id, "status": "error", "content": [{"text": "Failed to parse JSON response from AlienVault OTX API."}]}
+        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": "Failed to parse JSON response from AlienVault OTX API."}]}
+        log_tool_output_size("get_otx_cve_details", result)
+        return result
     except Exception as e:
-        return {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"An unexpected error occurred: {e}"}]}
+        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"An unexpected error occurred: {e}"}]}
+        log_tool_output_size("get_otx_cve_details", result)
+        return result
