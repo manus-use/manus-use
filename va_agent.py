@@ -16,7 +16,8 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 # Import Strands SDK and required tools
 from strands import Agent
-from strands_tools import python_repl, current_time, use_browser
+from strands_tools import current_time, use_browser
+from manus_use.tools.python_repl import python_repl
 from manus_use.tools.http_request import http_request
 # Import specific tool functions directly
 import manus_use.tools.get_nvd_data as get_nvd_data
@@ -89,10 +90,9 @@ class VulnerabilityIntelligenceAgent:
              - Print clear output indicating success (e.g., "EXPLOIT SUCCESSFUL: <evidence>") or failure.
              - Exit with code 0 on success, non-zero on failure.
            5. **Write a Dockerfile** for the vulnerable environment. **CRITICAL Dockerfile rules:**
-              - **Official Source Preference:** Use official Docker images first (e.g., `langai/langflow`, `httpd:2.4.49`, `nginx:1.18.0`, `php:7.4.21-apache`). If an official image exists for the vulnerable version, use it directly. If not, build from the official upstream source repository or release archive. Never use a simplified stand‑in base image when an official source exists.
+              - **Official Source Preference:** Use official Docker images first (e.g., "langflowai/langflow", "httpd:2.4.49", "nginx:1.18.0", "php:7.4.21-apache"). If an official image exists for the vulnerable version, use it directly. If not, build from the official upstream source repository or release archive. Never use a simplified stand‑in base image when an official source exists.
               - **Use the REAL vulnerable software.** If the CVE affects Apache httpd 2.4.49, install Apache httpd 2.4.49. If it affects a Java library, create a real Java environment.
               - DO NOT simulate the vulnerable service with a Python Flask/FastAPI stub that mimics the behavior.
-              - **Build from source fallback:** If no official image exists, download and compile from the project's release archives or Git tags. Use a base OS that matches the software's install method (apt for Debian/Ubuntu, apk for Alpine). Pin package versions only when they exist in the repo; otherwise pin by commit hash or source archive.
               - **Dockerfile sanity checklist before calling verify_exploit:**
                 1. Base image tag exists (check Docker Hub or upstream registry).
                 2. All RUN commands install real dependencies; avoid missing packages.
@@ -101,7 +101,6 @@ class VulnerabilityIntelligenceAgent:
                 5. No syntax errors, proper quoting, and `set -eux` in RUN scripts.
               - For **remote mode**: the Dockerfile must start the vulnerable service listening on a port.
               - For local mode: the Dockerfile should install the vulnerable software and spawn a bash shell with `CMD ["/bin/bash"]`. No service needs to listening on a port. If the exploit is written in Python, install `python3` in the image; otherwise, do not add Python just for the exploit. Run the exploit directly against the vulnerable software whenever possible—for example, for a `yt-dlp` vulnerability, invoke `yt-dlp` directly rather than wrapping the exploit code in Python.
-
               - Write a `Dockerfile` for the vulnerable version, following the CRITICAL Dockerfile rules from Step 5A (use real software—no Flask/stubs). Choose the exploit mode: use `"remote"` if the PoC targets a network service, or `"local"` if it triggers the vulnerability on the host/container directly. For remote mode, update the PoC to read `TARGET_HOST` and `TARGET_PORT` from environment variables. For local mode, run the exploit entirely inside the container—no network env vars are needed.
               - When building Docker images for Node.js packages published as ES modules (such as `swiper` node package), add `"type": "module"` to `package.json`, and update the exploit code to use `import` instead of `require()`.
               - Make sure that the dockerfile is valid and can be built successfully. If the dockerfile is invalid, fix the errors and call `verify_exploit` again with the corrected `dockerfile_content`.
@@ -177,8 +176,8 @@ class VulnerabilityIntelligenceAgent:
         )
         self.agent = Agent(
             conversation_manager=conversation_manager,
-            model=openai_model,
-            # model=bedrock,
+            # model=openai_model,
+            model=bedrock,
             system_prompt=self.system_prompt,
             tools=[
                 http_request,
@@ -208,7 +207,7 @@ class VulnerabilityIntelligenceAgent:
 # --- Main Execution Block ---
 def main():
     """Example of using the simplified VulnerabilityIntelligenceAgent."""
-    print("=== Simplified Vulnerability Intelligence Agent ===")
+    print("=== Vulnerability Intelligence Assessment Agent ===")
 
     # Simplified and robust configuration handling
     try:
@@ -216,10 +215,10 @@ def main():
         config = Config.from_file()
         # Use a specific, powerful model suitable for orchestration
         model_name = "us.anthropic.claude-sonnet-4-20250514-v1:0"
-        print(f"Using configured model: {model_name}")
+        # print(f"Using configured model: {model_name}")
     except Exception as e:
         model_name = "us.anthropic.claude-sonnet-4-20250514-v1:0"  # A sensible default
-        print(f"Could not load config ({e}), using default model: {model_name}")
+        # print(f"Could not load config ({e}), using default model: {model_name}")
 
     # Create the agent
     config_dict = config.model_dump()

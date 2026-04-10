@@ -67,7 +67,7 @@ class ManusWorkflowManager(WorkflowManager):
         # Create new agent instance
         agent_class = self.agent_registry.get(agent_type)
         if not agent_class:
-            logger.warning(f"Unknown agent type: {agent_type}, using ManusAgent")
+            #logger.warning(f"Unknown agent type: {agent_type}, using ManusAgent")
             agent_class = ManusAgent
             
         # Create agent with system prompt if provided
