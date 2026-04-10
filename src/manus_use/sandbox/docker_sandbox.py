@@ -9,6 +9,8 @@ from typing import Optional, Tuple
 import docker
 from docker.errors import ContainerError, ImageNotFound
 
+from manus_use.utils.docker_client import get_docker_client
+
 
 class DockerSandbox:
     """Docker container sandbox for code execution."""
@@ -44,7 +46,7 @@ class DockerSandbox:
         
     def _start_sync(self):
         """Synchronous container start."""
-        self.client = docker.from_env()
+        self.client = get_docker_client()
         
         # Pull image if not available
         try:
