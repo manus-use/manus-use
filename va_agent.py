@@ -94,9 +94,10 @@ class VulnerabilityIntelligenceAgent:
              - Print clear output indicating success (e.g., "EXPLOIT SUCCESSFUL: <evidence>") or failure.
              - Exit with code 0 on success, non-zero on failure.
            5. **Write a Dockerfile** for the vulnerable environment. **CRITICAL Dockerfile rules:**
-              - **Official Source Preference:** Use official Docker images first (e.g., "langflowai/langflow", "httpd:2.4.49", "nginx:1.18.0", "php:7.4.21-apache"). If an official image exists for the vulnerable version, use it directly. If not, build from the official upstream source repository or release archive. Never use a simplified stand‑in base image when an official source exists.
+              - **Official Source Preference:** Use official Docker images first (e.g., `langai/langflow`, `httpd:2.4.49`, `nginx:1.18.0`, `php:7.4.21-apache`). If an official image exists for the vulnerable version, use it directly. If not, build from the official upstream source repository or release archive. Never use a simplified stand‑in base image when an official source exists.
               - **Use the REAL vulnerable software.** If the CVE affects Apache httpd 2.4.49, install Apache httpd 2.4.49. If it affects a Java library, create a real Java environment.
               - DO NOT simulate the vulnerable service with a Python Flask/FastAPI stub that mimics the behavior.
+              - **Build from source fallback:** If no official image exists, download and compile from the project's release archives or Git tags. Use a base OS that matches the software's install method (apt for Debian/Ubuntu, apk for Alpine). Pin package versions only when they exist in the repo; otherwise pin by commit hash or source archive.
               - **Dockerfile sanity checklist before calling verify_exploit:**
                 1. Base image tag exists (check Docker Hub or upstream registry).
                 2. All RUN commands install real dependencies; avoid missing packages.
@@ -180,8 +181,8 @@ class VulnerabilityIntelligenceAgent:
         )
         self.agent = Agent(
             conversation_manager=conversation_manager,
-            # model=openai_model,
-            model=bedrock,
+            model=openai_model,
+            # model=bedrock,
             system_prompt=self.system_prompt,
             tools=[
                 http_request,
