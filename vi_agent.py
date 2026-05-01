@@ -14,9 +14,15 @@ os.environ["BYPASS_TOOL_CONSENT"] = "True"
 # Add the src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+# Patch use_browser for better error handling (must be before importing use_browser)
+from manus_use.tools.patches.use_browser_patch import apply_comprehensive_patch
+
+apply_comprehensive_patch()
+
 # Import Strands SDK and required tools
 from strands import Agent
-from strands_tools import python_repl, current_time, use_browser
+from strands_tools import current_time, use_browser
+from manus_use.tools.python_repl import python_repl
 from manus_use.tools.http_request import http_request
 # Import specific tool functions directly
 import manus_use.tools.get_nvd_data as get_nvd_data

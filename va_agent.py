@@ -14,9 +14,14 @@ os.environ["BYPASS_TOOL_CONSENT"] = "True"
 # Add the src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+# Patch use_browser for better error handling (must be before importing use_browser)
+from manus_use.tools.patches.use_browser_patch import apply_comprehensive_patch
+apply_comprehensive_patch()
+
 # Import Strands SDK and required tools
 from strands import Agent
-from strands_tools import python_repl, current_time, use_browser
+from strands_tools import current_time, use_browser
+from manus_use.tools.python_repl import python_repl
 from manus_use.tools.http_request import http_request
 # Import specific tool functions directly
 import manus_use.tools.get_nvd_data as get_nvd_data
@@ -101,7 +106,6 @@ class VulnerabilityIntelligenceAgent:
                 5. No syntax errors, proper quoting, and `set -eux` in RUN scripts.
               - For **remote mode**: the Dockerfile must start the vulnerable service listening on a port.
               - For local mode: the Dockerfile should install the vulnerable software and spawn a bash shell with `CMD ["/bin/bash"]`. No service needs to listening on a port. If the exploit is written in Python, install `python3` in the image; otherwise, do not add Python just for the exploit. Run the exploit directly against the vulnerable software whenever possible—for example, for a `yt-dlp` vulnerability, invoke `yt-dlp` directly rather than wrapping the exploit code in Python.
-
               - Write a `Dockerfile` for the vulnerable version, following the CRITICAL Dockerfile rules from Step 5A (use real software—no Flask/stubs). Choose the exploit mode: use `"remote"` if the PoC targets a network service, or `"local"` if it triggers the vulnerability on the host/container directly. For remote mode, update the PoC to read `TARGET_HOST` and `TARGET_PORT` from environment variables. For local mode, run the exploit entirely inside the container—no network env vars are needed.
               - When building Docker images for Node.js packages published as ES modules (such as `swiper` node package), add `"type": "module"` to `package.json`, and update the exploit code to use `import` instead of `require()`.
               - Make sure that the dockerfile is valid and can be built successfully. If the dockerfile is invalid, fix the errors and call `verify_exploit` again with the corrected `dockerfile_content`.
@@ -208,7 +212,7 @@ class VulnerabilityIntelligenceAgent:
 # --- Main Execution Block ---
 def main():
     """Example of using the simplified VulnerabilityIntelligenceAgent."""
-    print("=== Simplified Vulnerability Intelligence Agent ===")
+    print("=== Vulnerability Intelligence Assessment Agent ===")
 
     # Simplified and robust configuration handling
     try:
@@ -216,10 +220,10 @@ def main():
         config = Config.from_file()
         # Use a specific, powerful model suitable for orchestration
         model_name = "us.anthropic.claude-sonnet-4-20250514-v1:0"
-        print(f"Using configured model: {model_name}")
+        # print(f"Using configured model: {model_name}")
     except Exception as e:
         model_name = "us.anthropic.claude-sonnet-4-20250514-v1:0"  # A sensible default
-        print(f"Could not load config ({e}), using default model: {model_name}")
+        # print(f"Could not load config ({e}), using default model: {model_name}")
 
     # Create the agent
     config_dict = config.model_dump()

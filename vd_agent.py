@@ -15,7 +15,8 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from strands import Agent
 from strands import tool
-from strands_tools import python_repl, current_time
+from strands_tools import current_time
+from manus_use.tools.python_repl import python_repl
 import manus_use.tools.obtain_cves as obtain_cves
 import manus_use.tools.submit_cves as submit_cves
 

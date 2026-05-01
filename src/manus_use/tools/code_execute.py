@@ -2,6 +2,7 @@
 
 import asyncio
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Dict, Optional, Tuple
@@ -54,7 +55,7 @@ class CodeExecutor:
                 
                 try:
                     result = subprocess.run(
-                        ["python", f.name],
+                        [sys.executable, f.name],
                         capture_output=True,
                         text=True,
                         timeout=timeout,

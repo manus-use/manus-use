@@ -5,10 +5,18 @@ from typing import Any, List, Optional
 from strands.types.tools import AgentTool
 
 from strands_tools import (
-                file_read, file_write, python_repl, shell,
-                editor, environment, retrieve,
-                generate_image, current_time, calculator
-            )
+    calculator,
+    current_time,
+    editor,
+    environment,
+    file_read,
+    file_write,
+    generate_image,
+    retrieve,
+    shell,
+)
+
+from manus_use.tools.python_repl import python_repl
 from manus_use.tools.http_request import http_request
 # Collect all tools
 ALL_TOOLS = {

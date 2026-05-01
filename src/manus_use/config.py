@@ -15,6 +15,7 @@ class LLMConfig(BaseModel):
     model: str = "gpt-4o"
     api_key: Optional[str] = None
     base_url: Optional[str] = None
+    aws_region: Optional[str] = None
     temperature: float = 0.0
     max_tokens: int = 4096
     
@@ -38,7 +39,10 @@ class LLMConfig(BaseModel):
             kwargs["model_id"] = self.model
         elif self.provider == "bedrock":
             kwargs["model_id"] = self.model
-            kwargs["region_name"] = os.getenv("AWS_DEFAULT_REGION", "us-west-2")
+            region = os.getenv("AWS_DEFAULT_REGION", self.aws_region or "us-west-2")
+            # Keep both keys for compatibility across callers/tests.
+            kwargs["region"] = region
+            kwargs["region_name"] = region
         elif self.provider == "ollama":
             kwargs["model_id"] = self.model
             kwargs["host"] = self.base_url or "http://localhost:11434"
@@ -161,7 +165,7 @@ class Config(BaseModel):
         
         if path and path.exists():
             data = toml.load(path)
-            print(data)
+            #print(data)
             return cls(**data)
         
         # Return default config if no file found
@@ -169,16 +173,32 @@ class Config(BaseModel):
     
     def get_model(self):
         """Get configured model instance."""
-        from strands.models import BedrockModel
-        
-        # For now, only Bedrock is available in the installed version
-        # TODO: Add other models when available
-        provider_map = {
-            "bedrock": BedrockModel,
-        }
-        
-        model_class = provider_map.get(self.llm.provider)
-        if not model_class:
-            raise ValueError(f"Unknown provider: {self.llm.provider}")
-            
-        return model_class(**self.llm.model_kwargs)
+        provider = (self.llm.provider or "").lower()
+
+        if provider == "bedrock":
+            from strands.models import BedrockModel
+
+            return BedrockModel(**self.llm.model_kwargs)
+
+        if provider == "openai":
+            try:
+                from strands.models.openai import OpenAIModel
+            except ImportError as exc:
+                raise ImportError(
+                    "OpenAI model support is not available. Install required dependencies (e.g. `openai`)."
+                ) from exc
+
+            client_args: Dict[str, Any] = {}
+            if self.llm.api_key:
+                client_args["api_key"] = self.llm.api_key
+            if self.llm.base_url:
+                client_args["base_url"] = self.llm.base_url
+
+            # Strands OpenAIModel uses `model_id` and `client_args`.
+            return OpenAIModel(
+                client_args=client_args,
+                model_id=self.llm.model,
+                max_tokens=self.llm.max_tokens,
+            )
+
+        raise ValueError(f"Unknown provider: {self.llm.provider}")
