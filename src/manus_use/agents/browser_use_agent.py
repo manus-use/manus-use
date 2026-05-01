@@ -17,6 +17,7 @@ from strands import Agent
 from strands.types.tools import AgentTool # Though not used directly, often part of agent modules
 
 from manus_use.config import Config
+from manus_use.tools.patches import apply_comprehensive_patch
 
 BROWSER_CLOSE_TIMEOUT = 10.0  # Seconds
 
@@ -130,10 +131,6 @@ class BrowserUseAgent(Agent):
         # Get browser_use specific config
         browser_config = self.config.browser_use
 
-        print("==================================")
-
-        print(browser_config)
-        
         # Use parameters if provided, otherwise fall back to browser_use config
         self.headless = (
             headless
@@ -162,6 +159,8 @@ class BrowserUseAgent(Agent):
         self.debug = browser_config.debug
         self.save_screenshots = browser_config.save_screenshots
         self.screenshot_path = browser_config.screenshot_path
+
+        self._apply_browser_patch_config()
         
         # Initialize Strands Agent with a dummy model and no tools,
         # as browser-use handles its own LLM and actions.
@@ -170,6 +169,14 @@ class BrowserUseAgent(Agent):
             tools=[], # No Strands tools for this agent
             system_prompt="", # browser-use handles its own prompting
             **kwargs,
+        )
+
+    def _apply_browser_patch_config(self) -> None:
+        """Keep the low-level browser patch aligned with agent runtime config."""
+        timeout_ms = max(1, int(self.timeout * 1000))
+        apply_comprehensive_patch(
+            default_timeout_ms=timeout_ms,
+            max_retries=self.retry_count,
         )
 
     def _get_dummy_model(self) -> Any:
@@ -238,6 +245,7 @@ class BrowserUseAgent(Agent):
         """
         browser_use_agent_instance: Optional[BrowserUse] = None
         try:
+            self._apply_browser_patch_config()
             browser_profile = BrowserProfile(
                 headless=self.headless,
                 disable_security=self.disable_security,
@@ -424,6 +432,7 @@ class BrowserUseAgent(Agent):
                 await queue.put(None)  # End of stream marker
 
         try:
+            self._apply_browser_patch_config()
             browser_profile = BrowserProfile(
                 headless=self.headless,
                 disable_security=self.disable_security,

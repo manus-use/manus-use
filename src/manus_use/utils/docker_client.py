@@ -10,12 +10,16 @@ Handles various Docker daemon configurations including:
 
 import os
 import platform
+import random
 import socket
+import time
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple, TypeVar
 
 import docker
-from docker.errors import DockerException
+from docker.errors import APIError, DockerException, NotFound
+
+T = TypeVar("T")
 
 
 class DockerConnectionError(Exception):
@@ -230,3 +234,185 @@ def check_docker_available() -> Tuple[bool, Optional[str]]:
         return False, str(e)
     except Exception as e:
         return False, f"Unexpected error checking Docker availability: {e}"
+
+
+# -----------------------------------------------------------------------------
+# Resilience helpers (retry/polling/idempotent cleanup)
+# -----------------------------------------------------------------------------
+
+
+def is_transient_docker_error(exc: BaseException) -> bool:
+    """Best-effort classification of Docker errors that are usually retryable.
+
+    This is intentionally conservative: only obvious daemon/API/transport failures
+    are treated as transient.
+    """
+
+    if isinstance(exc, (DockerException, APIError)):
+        msg = str(exc).lower()
+        # Some API errors are deterministic; treat conflict as non-transient.
+        if "conflict" in msg or "already in use" in msg:
+            return False
+        return True
+
+    # Avoid importing requests/urllib3 directly; classify by type name and message.
+    tname = type(exc).__name__.lower()
+    msg = str(exc).lower()
+    transient_signatures = (
+        "connection aborted",
+        "connection reset",
+        "connection refused",
+        "broken pipe",
+        "bad response from docker engine",
+        "read timed out",
+        "timed out",
+        "timeout",
+        "tls handshake timeout",
+        "i/o timeout",
+        "temporarily unavailable",
+        "unexpected eof",
+        "eof",
+        "server error",
+        "service unavailable",
+        "too many requests",
+    )
+    if any(s in msg for s in transient_signatures):
+        return True
+    if tname in {"readtimeout", "connecttimeout", "connectionerror", "protocolerror"}:
+        return True
+    return False
+
+
+def docker_retry(
+    op_name: str,
+    fn: Callable[[], T],
+    *,
+    attempts: int = 4,
+    base_delay: float = 0.25,
+    max_delay: float = 2.5,
+    jitter: float = 0.20,
+    deadline: float | None = None,
+) -> T:
+    """Retry an operation on transient Docker/transport errors.
+
+    - Conservative retries by default.
+    - Deadline-aware: if `deadline` is provided, stops retrying when exceeded.
+    """
+
+    last_exc: BaseException | None = None
+    for attempt in range(1, max(attempts, 1) + 1):
+        if deadline is not None and time.time() >= deadline:
+            break
+        try:
+            return fn()
+        except BaseException as e:
+            last_exc = e
+            if attempt >= attempts or not is_transient_docker_error(e):
+                raise
+
+            delay = min(max_delay, base_delay * (2 ** (attempt - 1)))
+            delay = max(0.0, delay + random.uniform(-jitter, jitter) * delay)
+            if deadline is not None:
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    break
+                delay = min(delay, max(0.0, remaining))
+            print(f"[docker_retry] {op_name} transient failure (attempt {attempt}/{attempts}): {e}")
+            time.sleep(delay)
+    assert last_exc is not None
+    raise last_exc
+
+
+def wait_for_container_running(container, *, timeout: int = 20) -> None:
+    """Wait until Docker reports the container is running, or raise."""
+
+    deadline = time.time() + timeout
+
+    def _reload() -> None:
+        container.reload()
+
+    while time.time() < deadline:
+        docker_retry("container.reload", _reload, deadline=deadline)
+        state = (container.attrs or {}).get("State", {})
+        if state.get("Running") is True:
+            return
+        # If container exited, stop waiting early.
+        if state.get("Status") in {"exited", "dead"}:
+            raise RuntimeError(
+                f"Container is not running (status={state.get('Status')}, exit_code={state.get('ExitCode')})"
+            )
+        time.sleep(0.25)
+    raise TimeoutError("Timed out waiting for container to be running")
+
+
+def wait_for_container_healthy(container, *, timeout: int = 30) -> None:
+    """Wait until a healthcheck reports healthy.
+
+    If no healthcheck is configured, returns immediately.
+    """
+
+    deadline = time.time() + timeout
+
+    def _reload() -> None:
+        container.reload()
+
+    docker_retry("container.reload", _reload, deadline=deadline)
+    health = ((container.attrs or {}).get("State", {}) or {}).get("Health")
+    if not isinstance(health, dict):
+        return
+
+    while time.time() < deadline:
+        docker_retry("container.reload", _reload, deadline=deadline)
+        health = ((container.attrs or {}).get("State", {}) or {}).get("Health") or {}
+        status = health.get("Status")
+        if status == "healthy":
+            return
+        if status == "unhealthy":
+            raise RuntimeError("Container became unhealthy")
+        time.sleep(0.5)
+    raise TimeoutError("Timed out waiting for container to become healthy")
+
+
+def safe_kill_remove_container(container, *, force: bool = True) -> None:
+    """Best-effort kill+remove. Idempotent against NotFound."""
+
+    if container is None:
+        return
+    try:
+        docker_retry("container.kill", lambda: container.kill())
+    except NotFound:
+        return
+    except Exception:
+        pass
+    try:
+        docker_retry("container.remove", lambda: container.remove(force=force))
+    except NotFound:
+        return
+    except Exception:
+        pass
+
+
+def safe_remove_network(network) -> None:
+    """Best-effort remove network. Idempotent against NotFound."""
+
+    if network is None:
+        return
+    try:
+        docker_retry("network.remove", lambda: network.remove())
+    except NotFound:
+        return
+    except Exception:
+        pass
+
+
+def safe_remove_image(client: docker.DockerClient | None, image_id: str | None) -> None:
+    """Best-effort image removal. Idempotent against NotFound."""
+
+    if client is None or not image_id:
+        return
+    try:
+        docker_retry("image.remove", lambda: client.images.remove(image_id, force=True))
+    except NotFound:
+        return
+    except Exception:
+        pass

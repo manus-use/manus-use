@@ -9,7 +9,12 @@ from typing import Optional, Tuple
 import docker
 from docker.errors import ContainerError, ImageNotFound
 
-from manus_use.utils.docker_client import get_docker_client
+from manus_use.utils.docker_client import (
+    docker_retry,
+    get_docker_client,
+    safe_kill_remove_container,
+    wait_for_container_running,
+)
 
 
 class DockerSandbox:
@@ -50,25 +55,35 @@ class DockerSandbox:
         
         # Pull image if not available
         try:
-            self.client.images.get(self.image)
+            docker_retry("images.get", lambda: self.client.images.get(self.image))
         except ImageNotFound:
             print(f"Pulling Docker image: {self.image}")
-            self.client.images.pull(self.image)
+            docker_retry("images.pull", lambda: self.client.images.pull(self.image))
             
         # Create and start container
-        self.container = self.client.containers.run(
-            self.image,
-            name=self.container_name,
-            detach=True,
-            tty=True,
-            stdin_open=True,
-            mem_limit=self.memory_limit,
-            cpu_quota=int(self.cpu_limit * 100000),
-            cpu_period=100000,
-            network_disabled=self.network_disabled,
-            remove=False,  # We'll remove it manually
-            command="/bin/bash",
+        self.container = docker_retry(
+            "containers.run(sandbox)",
+            lambda: self.client.containers.run(
+                self.image,
+                name=self.container_name,
+                detach=True,
+                tty=True,
+                stdin_open=True,
+                mem_limit=self.memory_limit,
+                cpu_quota=int(self.cpu_limit * 100000),
+                cpu_period=100000,
+                network_disabled=self.network_disabled,
+                remove=False,  # We'll remove it manually
+                # Do not assume `/bin/bash` exists in the image.
+                command="sleep infinity",
+                labels={
+                    "manus_use.component": "docker_sandbox",
+                    "manus_use.sandbox_uid": self.container_name,
+                },
+            ),
         )
+
+        wait_for_container_running(self.container, timeout=20)
         
     async def stop(self):
         """Stop and remove the sandbox container."""
@@ -78,17 +93,15 @@ class DockerSandbox:
             
     def _stop_sync(self):
         """Synchronous container stop."""
-        try:
-            self.container.kill()
-        except:
-            pass  # Container might already be stopped
-            
-        try:
-            self.container.remove(force=True)
-        except:
-            pass  # Container might already be removed
-            
+        safe_kill_remove_container(self.container)
         self.container = None
+
+        if self.client is not None:
+            try:
+                self.client.close()
+            except Exception:
+                pass
+        self.client = None
         
     async def execute_code(
         self,
@@ -177,11 +190,14 @@ class DockerSandbox:
             
     def _execute_sync(self, command: str) -> Tuple[str, str, int]:
         """Synchronous command execution."""
-        exec_result = self.container.exec_run(
-            command,
-            stdout=True,
-            stderr=True,
-            demux=True,
+        exec_result = docker_retry(
+            "container.exec_run(sandbox)",
+            lambda: self.container.exec_run(
+                command,
+                stdout=True,
+                stderr=True,
+                demux=True,
+            ),
         )
         
         stdout = exec_result.output[0] if exec_result.output[0] else b""
@@ -232,7 +248,10 @@ class DockerSandbox:
     def _get_execution_command(self, language: str, file_path: str) -> str:
         """Get command to execute file based on language."""
         commands = {
-            "python": f"python {file_path}",
+            # Prefer python3, fall back to python.
+            "python": (
+                f"sh -lc \"command -v python3 >/dev/null 2>&1 && exec python3 {file_path} || exec python {file_path}\""
+            ),
             "javascript": f"node {file_path}",
             "bash": f"bash {file_path}",
             "shell": f"sh {file_path}",

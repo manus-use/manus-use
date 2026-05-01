@@ -5,16 +5,31 @@ This module provides a patched version of browser operations with better
 error handling, fallback behavior, and diagnostics for missing elements.
 """
 
-import asyncio
 import logging
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
 
 logger = logging.getLogger(__name__)
 
+_JS_FUNCTION_PREFIX = re.compile(
+    r"^\s*(?:async\s+)?(?:function\b|(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>)"
+)
+_JS_STATEMENT_PREFIX = re.compile(
+    r"^\s*(?:return\b|const\b|let\b|var\b|if\b|for\b|while\b|switch\b|try\b|throw\b)"
+)
+_QUERY_SELECTOR_PROPERTY_PATTERNS = [
+    (re.compile(r"document\.querySelector\(([^\n]+?)\)\.textContent"), r"(document.querySelector(\1)?.textContent ?? null)"),
+    (re.compile(r"document\.querySelector\(([^\n]+?)\)\.innerText"), r"(document.querySelector(\1)?.innerText ?? null)"),
+    (re.compile(r"document\.querySelector\(([^\n]+?)\)\.innerHTML"), r"(document.querySelector(\1)?.innerHTML ?? null)"),
+    (re.compile(r"document\.querySelector\(([^\n]+?)\)\.value"), r"(document.querySelector(\1)?.value ?? null)"),
+    (re.compile(r"document\.querySelector\(([^\n]+?)\)\.href"), r"(document.querySelector(\1)?.href ?? null)"),
+]
+
 
 DEFAULT_TIMEOUT = 10000
+RAW_TEXT_URL_HINTS = (".patch", ".diff")
 FALLBACK_SELECTORS = {
     "article": ["article", "main", ".article", ".post", ".content", "#content", "body"],
     "main": ["main", "#main", ".main", "article", ".content", "body"],
@@ -51,6 +66,138 @@ class BrowserTimeoutError(Exception):
         super().__init__(msg)
 
 
+def make_dom_read_script_null_safe(script: str) -> str:
+    """Add null-safety to common DOM read patterns in evaluate scripts."""
+    if not script:
+        return script
+
+    updated_script = script
+    for pattern, replacement in _QUERY_SELECTOR_PROPERTY_PATTERNS:
+        updated_script = pattern.sub(replacement, updated_script)
+    return updated_script
+
+
+def normalize_evaluate_script(script: str) -> str:
+    """Normalize raw JavaScript into a Playwright-friendly evaluate function."""
+    if not isinstance(script, str):
+        return script
+
+    stripped = script.strip()
+    if not stripped:
+        return "() => null"
+
+    if _JS_FUNCTION_PREFIX.match(stripped):
+        return stripped
+
+    if stripped.startswith("{") and stripped.endswith("}"):
+        return f"() => ({stripped})"
+
+    if _JS_STATEMENT_PREFIX.match(stripped) or ";" in stripped or "\n" in stripped:
+        return f"() => {{ {stripped} }}"
+
+    return f"() => ({stripped})"
+
+
+def prepare_evaluate_script(script: str) -> str:
+    """Apply general safety/normalization before running page.evaluate."""
+    if not isinstance(script, str):
+        return script
+
+    return normalize_evaluate_script(make_dom_read_script_null_safe(script))
+
+
+def normalize_browser_selector(selector: Optional[str]) -> Optional[str]:
+    """Normalize browser selectors while preserving valid attribute selectors."""
+    if selector is None or not isinstance(selector, str):
+        return selector
+
+    normalized = selector.strip()
+    if not normalized:
+        return None
+
+    if len(normalized) >= 2 and normalized[0] == normalized[-1] and normalized[0] in {"'", '"'}:
+        inner = normalized[1:-1].strip()
+        if inner:
+            normalized = inner
+
+    return normalized
+
+
+def is_selector_syntax_error(error: Exception) -> bool:
+    """Return True when the browser rejected a selector as syntactically invalid."""
+    text = str(error).lower()
+    return any(
+        marker in text
+        for marker in [
+            "while parsing css selector",
+            "failed to parse selector",
+            "unexpected token",
+            "unsupported token",
+            "unknown engine",
+            "invalid selector",
+        ]
+    )
+
+
+def _looks_like_raw_text_url(url: Optional[str]) -> bool:
+    if not url:
+        return False
+    lowered = url.lower()
+    return any(hint in lowered for hint in RAW_TEXT_URL_HINTS)
+
+
+async def is_probably_raw_text_page(page: Page, url: Optional[str] = None) -> bool:
+    """Heuristically detect raw/plaintext patch-like pages."""
+    if _looks_like_raw_text_url(url):
+        return True
+
+    try:
+        page_info = await page.evaluate(
+            """() => ({
+                contentType: document.contentType || '',
+                hasPre: !!document.querySelector('pre'),
+                preCount: document.querySelectorAll('pre').length,
+                bodyChildCount: document.body?.children?.length ?? 0,
+                bodyTextLength: (document.body?.innerText || '').trim().length,
+                hasMainContent: !!document.querySelector('main, article, #content, .content, .post, .article'),
+            })"""
+        )
+    except Exception:
+        return False
+
+    if not isinstance(page_info, dict):
+        return False
+
+    content_type = str(page_info.get("contentType") or "").lower()
+    if content_type.startswith("text/plain") or "patch" in content_type or "diff" in content_type:
+        return True
+
+    if page_info.get("hasPre") and not page_info.get("hasMainContent"):
+        if int(page_info.get("preCount") or 0) <= 1 and int(page_info.get("bodyChildCount") or 0) <= 2:
+            return True
+
+    return False
+
+
+async def extract_raw_page_text(page: Page) -> str:
+    """Extract text from raw/plaintext pages without depending on CSS selectors."""
+    scripts = [
+        "() => document.querySelector('pre')?.innerText ?? null",
+        "() => document.body?.innerText ?? null",
+        "() => document.documentElement?.innerText ?? null",
+    ]
+
+    for script in scripts:
+        try:
+            text = await page.evaluate(script)
+        except Exception:
+            continue
+        if isinstance(text, str) and text.strip():
+            return text
+
+    return ""
+
+
 async def get_text_with_fallback(
     page: Page,
     selector: str,
@@ -72,6 +219,10 @@ async def get_text_with_fallback(
     Raises:
         BrowserTimeoutError: If element not found after timeout and fallbacks
     """
+    selector = normalize_browser_selector(selector)
+    if not selector:
+        raise ValueError("Selector cannot be empty")
+
     selectors_to_try = [selector]
     
     if use_fallbacks:
@@ -97,11 +248,23 @@ async def get_text_with_fallback(
                     logger.info(f"Used fallback selector '{sel}' instead of '{selector}'")
                 return text, sel
             else:
+                if await is_probably_raw_text_page(page, url=url):
+                    raw_text = await extract_raw_page_text(page)
+                    if raw_text:
+                        logger.info("Falling back to raw page text extraction for selector '%s'", selector)
+                        return raw_text, "raw_text_page"
                 errors.append(f"'{sel}': element found but no text content")
         except PlaywrightTimeoutError:
+            if await is_probably_raw_text_page(page, url=url):
+                raw_text = await extract_raw_page_text(page)
+                if raw_text:
+                    logger.info("Falling back to raw page text extraction after timeout for '%s'", selector)
+                    return raw_text, "raw_text_page"
             errors.append(f"'{sel}': timeout after {timeout_ms}ms")
             continue
         except Exception as e:
+            if is_selector_syntax_error(e):
+                raise ValueError(f"Invalid CSS selector '{sel}': {e}") from e
             errors.append(f"'{sel}': {type(e).__name__}: {str(e)[:50]}")
             continue
     
@@ -139,21 +302,35 @@ async def get_html_with_fallback(
         pass
     
     try:
+        selector = normalize_browser_selector(selector)
+
         if not selector:
             result = await page.content()
             return result
+
+        if await is_probably_raw_text_page(page, url=url):
+            logger.info("Raw text page detected for selector '%s'; returning full page content", selector)
+            return await page.content()
         
-        await page.wait_for_selector(selector, timeout=timeout_ms)
+        # Playwright's default wait_for_selector state is "visible".
+        # For HTML extraction, visibility is not a requirement (e.g., <title> lives in <head>
+        # and is never visible). Waiting for "visible" causes false timeouts.
+        await page.wait_for_selector(selector, timeout=timeout_ms, state="attached")
         result = await page.inner_html(selector)
         return result
         
     except PlaywrightTimeoutError:
+        if await is_probably_raw_text_page(page, url=url):
+            logger.info("Selector '%s' timed out on raw text page; returning full page content", selector)
+            return await page.content()
         raise BrowserTimeoutError(
             selector=selector or "full page",
             timeout_ms=timeout_ms,
             url=url,
         )
     except Exception as e:
+        if is_selector_syntax_error(e):
+            raise ValueError(f"Invalid CSS selector '{selector}': {e}") from e
         logger.error(f"Error getting HTML: {e}")
         raise
 
