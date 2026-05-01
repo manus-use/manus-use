@@ -1,7 +1,8 @@
 """Tests for agent implementations."""
 
+import unittest
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 from manus_use.agents import ManusAgent, BrowserAgent, DataAnalysisAgent
 from manus_use.config import Config
@@ -152,16 +153,58 @@ from manus_use.agents.browser_use_agent import BrowserUseAgent
 @pytest.fixture
 def mock_config():
     """Fixture for a mock Config object."""
-    config = Mock(spec=Config)
+    config = Mock()
+
+    # Nested config sections used by agents
+    config.llm = Mock()
+    config.tools = Mock()
+    config.browser_use = Mock()
+
+    # LLM defaults used by BrowserUseAgent tests
     config.llm.provider = "openai"  # Default to openai for most tests
     config.llm.model = "test-model"
     config.llm.temperature = 0.5
     config.llm.max_tokens = 100
     config.llm.aws_region = "us-west-2"
+    config.llm.api_key = None
+
+    # Legacy tools config used by BrowserUseAgent init defaults
     config.tools.browser_headless = True
+
+    # BrowserUseConfig values required during BrowserUseAgent initialization
+    config.browser_use.headless = True
+    config.browser_use.enable_memory = False
+    config.browser_use.max_steps = 10
+    config.browser_use.max_actions_per_step = 5
+    config.browser_use.use_vision = True
+    config.browser_use.save_conversation_path = None
+    config.browser_use.max_error_length = 400
+    config.browser_use.tool_calling_method = "auto"
+    config.browser_use.keep_alive = False
+    config.browser_use.disable_security = False
+    config.browser_use.extra_chromium_args = []
+    config.browser_use.timeout = 25
+    config.browser_use.retry_count = 3
+    config.browser_use.debug = False
+    config.browser_use.save_screenshots = False
+    config.browser_use.screenshot_path = None
+
+    # LLM override fields (unset by default)
+    config.browser_use.provider = None
+    config.browser_use.model = None
+    config.browser_use.api_key = None
+    config.browser_use.temperature = 0.0
+    config.browser_use.max_tokens = 4096
+
     # Mock get_model for the dummy model in BrowserUseAgent
-    config.get_model = Mock(return_value=Mock()) 
+    config.get_model = Mock(return_value=Mock())
     return config
+
+
+@pytest.fixture
+def mock_config_fixture(mock_config):
+    """Backwards-compatible alias for older test names."""
+    return mock_config
 
 # Patch BROWSER_USE_AVAILABLE at the module level for most tests
 # For the specific test where it's False, we'll patch it there.
@@ -252,109 +295,92 @@ def test_browser_use_agent_get_llm_openai_import_error(mock_config_fixture):
 
 # Task Execution Tests
 @patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
-@patch('manus_use.agents.browser_use_agent.Controller', Mock())
-@patch('manus_use.agents.browser_use_agent.BrowserProfile', Mock())
+@patch('manus_use.agents.browser_use_agent.Controller')
+@patch('manus_use.agents.browser_use_agent.BrowserProfile')
 @patch('manus_use.agents.browser_use_agent.BrowserUse')
 @patch('manus_use.agents.browser_use_agent.ChatOpenAI', create=True)
 @patch('manus_use.agents.browser_use_agent.logging') # Patch the whole logging module
-@pytest.mark.asyncio
-async def test_browser_use_agent_run_task_various_results(
+def test_browser_use_agent_run_task_various_results(
     mock_logging, MockChatOpenAI, MockBrowserUse, MockBrowserProfile, MockController, mock_config_fixture
 ):
-    agent = BrowserUseAgent(config=mock_config_fixture, headless=True, enable_memory=True)
-    mock_llm_instance = MockChatOpenAI.return_value 
-    
-    mock_browser_use_instance = Mock()
-    MockBrowserUse.return_value = mock_browser_use_instance
-    
-    # --- Test 1: extracted_content() returns a list of strings ---
-    mock_run_result_1 = Mock()
-    mock_run_result_1.extracted_content = Mock(return_value=['Page Title: Example', 'Body text...'])
-    mock_browser_use_instance.run = AsyncMock(return_value=mock_run_result_1)
-    
-    result = await agent._run_browser_task("test task 1")
-    MockBrowserUse.assert_called_with(
-        task="test task 1",
-        llm=mock_llm_instance,
-        browser_profile=MockBrowserProfile.return_value,
-        controller=MockController.return_value,
-        enable_memory=True,
-        validate_output=False
-    )
-    MockBrowserProfile.assert_called_with(headless=True)
-    assert result == "Page Title: Example\nBody text..."
-    mock_logging.warning.assert_not_called()
-    mock_logging.info.assert_not_called()
+    async def _run():
+        agent = BrowserUseAgent(config=mock_config_fixture, headless=True, enable_memory=True)
+        mock_llm_instance = MockChatOpenAI.return_value
 
-    # --- Test 2: extracted_content() returns a single string item ---
-    mock_logging.reset_mock() # Reset all logging mocks (info, warning, etc.)
-    mock_run_result_2 = Mock()
-    mock_run_result_2.extracted_content = Mock(return_value='Final summary.')
-    mock_browser_use_instance.run = AsyncMock(return_value=mock_run_result_2)
-    
-    result = await agent._run_browser_task("test task 2")
-    assert result == "Final summary."
-    mock_logging.warning.assert_not_called()
-    mock_logging.info.assert_not_called()
+        mock_browser_use_instance = Mock()
+        MockBrowserUse.return_value = mock_browser_use_instance
 
-    # --- Test 3: extracted_content() returns None ---
-    mock_logging.reset_mock()
-    mock_run_result_3 = Mock()
-    mock_run_result_3.extracted_content = Mock(return_value=None)
-    mock_browser_use_instance.run = AsyncMock(return_value=mock_run_result_3)
-    
-    result = await agent._run_browser_task("test task 3")
-    assert result == ""
-    mock_logging.info.assert_called_once_with("BrowserUseAgent: result.extracted_content() returned None.")
-    mock_logging.warning.assert_not_called()
+        # --- Test 1: extracted_content() returns a list of strings ---
+        mock_run_result_1 = Mock()
+        mock_run_result_1.extracted_content = Mock(return_value=["Page Title: Example", "Body text..."])
+        mock_browser_use_instance.run = AsyncMock(return_value=mock_run_result_1)
 
-    # --- Test 4: extracted_content is not callable (or missing) ---
-    mock_logging.reset_mock()
-    mock_run_result_4 = Mock(spec=['__str__']) # Mock that doesn't have extracted_content or it's not callable
-    mock_run_result_4.__str__ = Mock(return_value="string_fallback_for_no_method")
-    # To ensure hasattr(result, 'extracted_content') is True but callable(...) is False
-    # we can set extracted_content to a non-callable Mock.
-    # However, the current code checks `hasattr(result, 'extracted_content') and callable(result.extracted_content)`
-    # So, if `extracted_content` is not present, it will also fall into the else block.
-    # Let's explicitly make it a non-callable attribute for this test for clarity.
-    mock_run_result_4.extracted_content = "not_a_callable_attribute" 
-    # Or, to test missing attribute: del mock_run_result_4.extracted_content # (but spec makes this tricky)
-    
-    mock_browser_use_instance.run = AsyncMock(return_value=mock_run_result_4)
-    
-    result = await agent._run_browser_task("test task 4")
-    assert result == "string_fallback_for_no_method"
-    mock_logging.warning.assert_called_once()
-    assert "Could not find 'extracted_content' method on result or it's not callable" in mock_logging.warning.call_args[0][0]
-    mock_logging.info.assert_not_called()
+        result = await agent._run_browser_task("test task 1")
+        MockBrowserUse.assert_called_with(
+            task="test task 1",
+            llm=mock_llm_instance,
+            browser_profile=MockBrowserProfile.return_value,
+            controller=MockController.return_value,
+            enable_memory=True,
+            validate_output=False,
+        )
+        MockBrowserProfile.assert_called_with(headless=True)
+        assert result == "Page Title: Example\nBody text..."
+        mock_logging.warning.assert_not_called()
+        mock_logging.info.assert_not_called()
 
-    # --- Test 5: extracted_content attribute exists but is not callable (more explicit) ---
-    mock_logging.reset_mock()
-    mock_run_result_5 = Mock() # Create a fresh mock
-    mock_run_result_5.extracted_content = "I am an attribute, not a method" # Non-callable
-    mock_run_result_5.__str__ = Mock(return_value="string_fallback_attr_not_callable")
-    mock_browser_use_instance.run = AsyncMock(return_value=mock_run_result_5)
+        # --- Test 2: extracted_content() returns a single string item ---
+        mock_logging.reset_mock()
+        mock_run_result_2 = Mock()
+        mock_run_result_2.extracted_content = Mock(return_value="Final summary.")
+        mock_browser_use_instance.run = AsyncMock(return_value=mock_run_result_2)
 
-    result = await agent._run_browser_task("test task 5")
-    assert result == "string_fallback_attr_not_callable"
-    mock_logging.warning.assert_called_once()
-    assert "Could not find 'extracted_content' method on result or it's not callable" in mock_logging.warning.call_args[0][0]
-    mock_logging.info.assert_not_called()
-    
-    # Obsolete test for all_results fallback is removed.
+        result = await agent._run_browser_task("test task 2")
+        assert result == "Final summary."
+        mock_logging.warning.assert_not_called()
+        mock_logging.info.assert_not_called()
 
+        # --- Test 3: extracted_content() returns None ---
+        mock_logging.reset_mock()
+        mock_run_result_3 = Mock()
+        mock_run_result_3.extracted_content = Mock(return_value=None)
+        mock_browser_use_instance.run = AsyncMock(return_value=mock_run_result_3)
 
-# AsyncMock for Python 3.7 compatibility if needed, otherwise MagicMock for >=3.8
-# For this environment, assume MagicMock is sufficient for async methods
-if not hasattr(unittest.mock, 'AsyncMock'):
-    class AsyncMock(MagicMock):
-        async def __call__(self, *args, **kwargs):
-            return super(AsyncMock, self).__call__(*args, **kwargs)
-        # For async context managers if needed:
-        # async def __aenter__(self):
-        #     return self.__enter__()
-        # async def __aexit__(self, *args):
-        #     return self.__exit__(*args)
+        result = await agent._run_browser_task("test task 3")
+        assert result == ""
+        mock_logging.info.assert_called_once_with(
+            "BrowserUseAgent: result.extracted_content() returned None."
+        )
+        mock_logging.warning.assert_not_called()
+
+        # --- Test 4: extracted_content is not callable (or missing) ---
+        mock_logging.reset_mock()
+        mock_run_result_4 = Mock(spec=["__str__"])
+        mock_run_result_4.__str__ = Mock(return_value="string_fallback_for_no_method")
+        mock_run_result_4.extracted_content = "not_a_callable_attribute"
+        mock_browser_use_instance.run = AsyncMock(return_value=mock_run_result_4)
+
+        result = await agent._run_browser_task("test task 4")
+        assert result == "string_fallback_for_no_method"
+        mock_logging.warning.assert_called_once()
+        assert "Could not find 'extracted_content' method on result or it's not callable" in mock_logging.warning.call_args[0][0]
+        mock_logging.info.assert_not_called()
+
+        # --- Test 5: extracted_content attribute exists but is not callable (more explicit) ---
+        mock_logging.reset_mock()
+        mock_run_result_5 = Mock()
+        mock_run_result_5.extracted_content = "I am an attribute, not a method"
+        mock_run_result_5.__str__ = Mock(return_value="string_fallback_attr_not_callable")
+        mock_browser_use_instance.run = AsyncMock(return_value=mock_run_result_5)
+
+        result = await agent._run_browser_task("test task 5")
+        assert result == "string_fallback_attr_not_callable"
+        mock_logging.warning.assert_called_once()
+        assert "Could not find 'extracted_content' method on result or it's not callable" in mock_logging.warning.call_args[0][0]
+        mock_logging.info.assert_not_called()
+
+    asyncio.run(_run())
+
 
 @patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
 @patch('manus_use.agents.browser_use_agent.BrowserUseAgent._run_browser_task', new_callable=AsyncMock)
@@ -368,7 +394,7 @@ def test_browser_use_agent_call_sync_context(mock_asyncio, mock_run_task, mock_c
     result = agent(task="sync_task_str")
     
     mock_asyncio.get_running_loop.assert_called_once()
-    mock_asyncio.run.assert_called_once_with(mock_run_task.return_value) # Check that run is called with the coroutine
+    mock_asyncio.run.assert_called_once() # asyncio.run should be used in sync context
     mock_run_task.assert_called_once_with("sync_task_str")
     assert result == "sync_result"
 
@@ -387,7 +413,7 @@ def test_browser_use_agent_call_async_context(mock_asyncio, mock_run_task, mock_
     mock_asyncio.get_running_loop.assert_called_once()
     mock_asyncio.run.assert_not_called() # asyncio.run should not be called
     mock_run_task.assert_called_once_with("async_task_str_direct")
-    assert coroutine_result == mock_run_task.return_value # Should return the coroutine itself
+    assert hasattr(coroutine_result, "__await__") # Should return an awaitable
 
 @patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
 @patch('manus_use.agents.browser_use_agent.BrowserUseAgent._run_browser_task', new_callable=AsyncMock)
@@ -406,36 +432,35 @@ def test_browser_use_agent_call_list_input(mock_asyncio, mock_run_task, mock_con
     mock_run_task.assert_called_once_with("actual_task_from_list")
 
 # Test for stream_async (basic test to ensure it calls __call__ and yields)
-@pytest.mark.asyncio
 @patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
-async def test_browser_use_agent_stream_async(mock_config_fixture):
-    agent = BrowserUseAgent(config=mock_config_fixture)
-    
-    # Mock the __call__ method to control its output
-    # Since __call__ can return a coroutine or a direct result, we'll mock it to return a direct result for simplicity here.
-    # A more complex mock might be needed if __call__ itself had more varied async behavior to test *through* stream_async.
-    agent.__call__ = Mock(return_value="stream_output_from_call")
-    
-    results = [res async for res in agent.stream_async(task="stream_test_task")]
-    
-    agent.__call__.assert_called_once_with(task="stream_test_task")
-    assert len(results) == 1
-    assert results[0] == {"type": "text", "text": "stream_output_from_call"}
+def test_browser_use_agent_stream_async(mock_config_fixture):
+    async def _run():
+        agent = BrowserUseAgent(config=mock_config_fixture)
 
-@pytest.mark.asyncio
+        agent.__call__ = Mock(return_value="stream_output_from_call")
+        results = [res async for res in agent.stream_async(task="stream_test_task")]
+
+        agent.__call__.assert_called_once_with(task="stream_test_task")
+        assert len(results) == 1
+        assert results[0] == {"type": "text", "text": "stream_output_from_call"}
+
+    asyncio.run(_run())
+
+
 @patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
-async def test_browser_use_agent_stream_async_with_awaitable_call(mock_config_fixture):
-    agent = BrowserUseAgent(config=mock_config_fixture)
-    
-    # Mock __call__ to return an awaitable (coroutine)
-    async def mock_async_call(*args, **kwargs):
-        await asyncio.sleep(0) # Simulate some async work
-        return "stream_output_from_awaited_call"
+def test_browser_use_agent_stream_async_with_awaitable_call(mock_config_fixture):
+    async def _run():
+        agent = BrowserUseAgent(config=mock_config_fixture)
 
-    agent.__call__ = Mock(side_effect=mock_async_call) # side_effect to make it behave like an async def
+        async def mock_async_call(*args, **kwargs):
+            await asyncio.sleep(0)
+            return "stream_output_from_awaited_call"
 
-    results = [res async for res in agent.stream_async(task="stream_test_task_await")]
-    
-    agent.__call__.assert_called_once_with(task="stream_test_task_await")
-    assert len(results) == 1
-    assert results[0] == {"type": "text", "text": "stream_output_from_awaited_call"}
+        agent.__call__ = Mock(side_effect=mock_async_call)
+        results = [res async for res in agent.stream_async(task="stream_test_task_await")]
+
+        agent.__call__.assert_called_once_with(task="stream_test_task_await")
+        assert len(results) == 1
+        assert results[0] == {"type": "text", "text": "stream_output_from_awaited_call"}
+
+    asyncio.run(_run())

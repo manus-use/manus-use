@@ -29,6 +29,10 @@ class BaseManusAgent(Agent):
             **kwargs: Additional arguments for Agent
         """
         self.config = config or Config.from_file()
+        # Keep an explicit, stable reference for unit tests and callers.
+        # The upstream `strands.Agent` does not guarantee a public `tools` attribute.
+        self.tools: List[AgentTool] = list(tools or [])
+        self._tools: List[AgentTool] = self.tools
         
         # Use provided model or create from config
         if model is None:
@@ -37,9 +41,9 @@ class BaseManusAgent(Agent):
         # Initialize base agent
         super().__init__(
             model=model,
-            tools=tools or [],
+            tools=self.tools,
             system_prompt=system_prompt or self._get_default_system_prompt(),
-            **kwargs
+            **kwargs,
         )
     def __del__(self):
         """Ensure proper cleanup."""
