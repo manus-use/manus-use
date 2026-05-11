@@ -80,10 +80,6 @@ class VulnerabilityIntelligenceAgent:
             - Based on your analysis, classify the PoC. Is it a confirmed RCE? A DoS? A simple vulnerability checker?
             - In your final report, create a dedicated section for this analysis, clearly stating your confidence in the PoC's functionality and impact.
 
-        **Step 5.5: Exploit Verification (Optional)**
-        - If you identified a functional PoC or have fix/patch commit URLs, activate the `verify-exploit` skill to develop and verify exploit code in an isolated Docker environment.
-        - This step is optional and depends on Docker being available.
-
         **Step 6: Analyze Weakness**
         - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -140,7 +136,7 @@ class VulnerabilityIntelligenceAgent:
                 get_github_advisory,
                 "manus_use.tools.verify_exploit",
                 use_browser,
-            ]
+            ],
         )
 
     def handle_request(self, request: str) -> str:
@@ -154,32 +150,40 @@ def main():
     """Example of using the simplified VulnerabilityIntelligenceAgent."""
     print("=== Vulnerability Intelligence Assessment Agent ===")
 
+    args = sys.argv[1:]
+    verify = "--verify" in args
+    args = [a for a in args if a != "--verify"]
+
     # Simplified and robust configuration handling
     try:
         from manus_use.config import Config
         config = Config.from_file()
-        # Use a specific, powerful model suitable for orchestration
         model_name = "us.anthropic.claude-sonnet-4-20250514-v1:0"
-        # print(f"Using configured model: {model_name}")
     except Exception as e:
-        model_name = "us.anthropic.claude-sonnet-4-20250514-v1:0"  # A sensible default
-        # print(f"Could not load config ({e}), using default model: {model_name}")
+        model_name = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 
     # Create the agent
     config_dict = config.model_dump()
     vi_agent = VulnerabilityIntelligenceAgent(model_name=model_name, config=config_dict)
 
     # Get CVE from command-line arguments or use an example for demonstration
-    if len(sys.argv) > 1:
-        cve_id = sys.argv[1]
-    else:
-        cve_id = "CVE-2025-6554"
+    cve_id = args[0] if args else "CVE-2025-6554"
+    if not args:
         print(f"No CVE provided. Using example: {cve_id}")
 
-    # The request is a high-level instruction to the agent.
-    analysis_request = f"""
+    # The request drives whether exploit verification runs
+    if verify:
+        print(f"Exploit verification: ENABLED")
+        analysis_request = f"""
     Please perform a comprehensive vulnerability intelligence analysis for {cve_id}.
     Follow your sequential process and create a Lark document with the final report.
+    Additionally, activate the `verify-exploit` skill to develop and verify exploit code in Docker.
+    """
+    else:
+        analysis_request = f"""
+    Please perform a comprehensive vulnerability intelligence analysis for {cve_id}.
+    Follow your sequential process and create a Lark document with the final report.
+    Do NOT perform exploit verification.
     """
 
     print(f"\n--- Sending analysis request to agent for: {cve_id} ---")
