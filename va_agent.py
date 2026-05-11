@@ -14,28 +14,14 @@ os.environ["BYPASS_TOOL_CONSENT"] = "True"
 # Add the src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-# Patch use_browser for better error handling (must be before importing use_browser)
-from manus_use.tools.patches.use_browser_patch import apply_comprehensive_patch
-apply_comprehensive_patch()
-
 # Import Strands SDK and required tools
 from strands import Agent
-from strands_tools import current_time, use_browser
-from manus_use.tools.python_repl import python_repl
-from manus_use.tools.http_request import http_request
-# Import specific tool functions directly
-import manus_use.tools.get_nvd_data as get_nvd_data
-import manus_use.tools.search_for_exploits as search_for_exploits
-import manus_use.tools.get_cwe_details as get_cwe_details
-import manus_use.tools.search_exploit_db as search_exploit_db
-import manus_use.tools.search_packetstorm as search_packetstorm
-import manus_use.tools.create_lark_document as create_lark_document
-import manus_use.tools.query_threat_intelligence_feeds as query_threat_intelligence_feeds
-import manus_use.tools.get_github_advisory as get_github_advisory
-import manus_use.tools.check_cisa_kev as check_cisa_kev
-import manus_use.tools.get_otx_cve_details as get_otx_cve_details
-import manus_use.tools.verify_exploit as verify_exploit
-#import manus_use.tools.browser_agent_tool as browser_agent_tool
+from strands_tools import current_time
+from strands_tools.browser import LocalChromiumBrowser
+from manus_use.tools.get_github_advisory import get_github_advisory
+
+use_browser = LocalChromiumBrowser().browser
+
 
 class VulnerabilityIntelligenceAgent:
     """Agent that performs vulnerability analysis using a sequential, tool-based approach."""
@@ -185,20 +171,20 @@ class VulnerabilityIntelligenceAgent:
             # model=bedrock,
             system_prompt=self.system_prompt,
             tools=[
-                http_request,
-                python_repl,
+                "strands_tools.http_request",
+                "manus_use.tools.python_repl",
                 current_time,
-                create_lark_document,
-                get_nvd_data,
-                search_for_exploits,
-                get_cwe_details,
-                search_exploit_db,
-                search_packetstorm,
-                check_cisa_kev,
-                get_otx_cve_details,
-                query_threat_intelligence_feeds,
+                "manus_use.tools.create_lark_document",
+                "manus_use.tools.get_nvd_data",
+                "manus_use.tools.search_for_exploits",
+                "manus_use.tools.get_cwe_details",
+                "manus_use.tools.search_exploit_db",
+                "manus_use.tools.search_packetstorm",
+                "manus_use.tools.check_cisa_kev",
+                "manus_use.tools.get_otx_cve_details",
+                "manus_use.tools.query_threat_intelligence_feeds",
                 get_github_advisory,
-                verify_exploit,
+                "manus_use.tools.verify_exploit",
                 use_browser,
             ]
         )
