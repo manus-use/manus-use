@@ -295,4 +295,5 @@ def apply_comprehensive_patch(
     return True
 
 
-apply_comprehensive_patch()
+if __name__ == "__main__":
+    apply_comprehensive_patch()
