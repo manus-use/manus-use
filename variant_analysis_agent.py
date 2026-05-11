@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Variant Analysis Agent — minimal test of the Strands AgentSkills plugin.
+Variant Analysis Agent — demonstrates AgentSkills plugin with real skills.
 
-Demonstrates:
-  - AgentSkills plugin with a filesystem-based skill
-  - Progressive disclosure (skill metadata in system prompt, full instructions loaded on demand)
-  - Agent activating a skill via tool call during execution
+Skills loaded from skills/ directory:
+  - variant-analysis: CVE variant analysis and vulnerability hunting
+  - oss-contributor: OSS patch writing, PR, and GHSA submission
+  - test-skill: simple CVE summaries (demo)
 
 Usage:
   python variant_analysis_agent.py [CVE-ID]
@@ -24,8 +24,8 @@ def main():
     cve_id = sys.argv[1] if len(sys.argv) > 1 else "CVE-2024-3094"
 
     model = BedrockModel(
-        model_id="us.anthropic.claude-sonnet-4-20250514-v1:0",
-        region_name="us-west-2",
+        model_id="us.anthropic.claude-opus-4-6-v1",
+        region_name="us-east-1",
         max_tokens=4096,
     )
 
@@ -37,10 +37,13 @@ def main():
         plugins=[plugin],
         system_prompt=(
             "You are a vulnerability analyst assistant. "
-            "You have skills available — activate the relevant skill before answering. "
+            "You have these skills available:\n"
+            "  - variant-analysis: for CVE variant analysis and vulnerability hunting\n"
+            "  - oss-contributor: for writing fix patches and submitting PRs/GHSAs\n"
+            "  - test-skill: for simple CVE summaries\n"
+            "Activate the most relevant skill before answering. "
             "After activating, follow the skill instructions exactly."
         ),
-        tools=["manus_use.tools.python_repl"],
     )
 
     print(f"=== Variant Analysis Agent (AgentSkills test) ===")
