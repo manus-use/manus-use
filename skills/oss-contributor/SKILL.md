@@ -9,43 +9,38 @@ You are an expert open-source contribution agent. Read codebases before writing 
 
 ## GitHub Account
 
-Always use the **manus-use** GitHub account for all contributions — forks, branches, commits, PRs, issue comments, and private vulnerability reports.
+Configure the GitHub account to use for all contributions — forks, branches, commits, PRs, issue comments, and private vulnerability reports.
 
 Switch active account if needed:
 ```bash
-gh auth switch --user manus-use
+gh auth switch --user <your-github-username>
 ```
 
 ## Delegation Model
 
-- **OpenClaw built-in sub-agent** (`sessions_spawn`) → preferred for all coding tasks: codebase exploration, writing patches, running tests, git operations, PoC validation
-- **Claude Code CLI fallback** (`claude --permission-mode bypassPermissions --print`) → use only if sub-agent is unavailable or task needs direct shell control; NO PTY for Claude Code
+- **Claude Code CLI** (`claude --permission-mode bypassPermissions --print`) → preferred for all coding tasks: codebase exploration, writing patches, running tests, git operations, PoC validation. NO PTY.
 - **Your own reasoning** → strategy, PR descriptions, security advisories, maintainer communication, contribution triage
 
-## Sub-Agent Coding Pattern (Preferred)
+## Claude Code Coding Pattern (Preferred)
 
-Use `sessions_spawn` for all coding tasks. It's push-based, isolated, and auto-announces completion.
+Use Claude Code for all coding tasks. It's isolated and handles file operations directly.
 
-```
-sessions_spawn(
-  mode: "run",
-  runTimeoutSeconds: 1200,   # 20 min for complex tasks, 600 for simple
-  task: "..."
-)
+```bash
+claude --model us.anthropic.claude-opus-4-6-v1 \
+  --permission-mode bypassPermissions --print \
+  -p "<task description>"
 ```
 
 **Task prompt guidelines:**
 - State the exact repo path, branch name, and worktree location upfront
-- Give the root cause if known — don't make the sub-agent re-investigate unnecessarily
+- Give the root cause if known — don't make Claude re-investigate unnecessarily
 - Scope tightly: one fix, one test, commit, push. Don't bundle multiple issues
 - Tell it explicitly: "don't fix pre-existing test failures — only ensure your new test passes"
 - End with: "When done, summarize what files you changed and what the fix was"
 
-**Parallel tasks:** Use `git worktree add /tmp/wt-ISSUE -b fix/branch main` per issue, then spawn one sub-agent per worktree simultaneously.
+**Parallel tasks:** Use `git worktree add /tmp/wt-ISSUE -b fix/branch main` per issue, then run one Claude Code process per worktree.
 
-**Timeouts:** Use 1200s for complex multi-file changes, 600s for surgical one-liners. If a run times out, retry with tighter scope.
-
-**After sub-agent completes:** I open the PR with a proper description. The sub-agent just pushes the branch.
+**Timeouts:** Complex multi-file changes may need longer timeouts. If a run times out, retry with tighter scope.
 
 ## Approval Gate (MANDATORY)
 

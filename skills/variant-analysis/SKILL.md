@@ -42,15 +42,15 @@ Present findings first → get approval → then execute.
 ### Phase 1: Setup & Clone
 
 ```bash
-mkdir -p /tmp/<project>-analysis && cd /tmp/<project>-analysis && git init
+mkdir -p /tmp/<project>-analysis && cd /tmp/<project>-analysis
 git clone --depth=500 https://github.com/<org>/<project>.git
 ```
 
 If analyzing a specific CVE, fetch the research writeup and save locally — Claude Code may not have network access:
 
 ```bash
-# Save research/advisory details to a local file
-write research.md  # with CVE details, root cause, affected versions, fix commits
+# Save research/advisory details to a local file before launching Claude Code
+# research.md: CVE details, root cause, affected versions, fix commits
 ```
 
 ### Phase 2: Variant Analysis (for a known CVE)
@@ -59,8 +59,6 @@ write research.md  # with CVE details, root cause, affected versions, fix commit
 - Holding large codebases in context while tracing patterns
 - Catching subtle auth bypass variants that Sonnet misses
 - Following complex call chains across multiple files
-
-Do NOT use `sessions_spawn` subagents for this phase — they use Sonnet by default and lack the depth needed.
 
 Launch Claude Code:
 
@@ -92,10 +90,10 @@ See `references/vuln-hunting-prompt.md` for the full prompt covering:
 
 ### Phase 4: PoC Development & Verification
 
-PoC writing can use **Sonnet 4.6** (cheaper, fast enough for focused tasks with clear scope):
+PoC writing can use a lighter model (cheaper, fast enough for focused tasks with clear scope):
 
 ```bash
-claude --model us.anthropic.claude-sonnet-4-6 \
+claude --model us.anthropic.claude-sonnet-4-5 \
   --permission-mode bypassPermissions --print \
   --allowedTools "Bash(*),Read,Write" \
   -p "<prompt referencing findings.md>"
@@ -190,27 +188,22 @@ Check the project's `SECURITY.md` first — some projects prefer email or dedica
 
 **If private vulnerability reporting is not enabled**, open a lightweight GitHub issue asking the maintainer to enable it (Settings → Security → Code security → Private vulnerability reporting). Do NOT include vulnerability details or CVE references in the issue.
 
-### Phase 7: Archive to Private Repo
+### Phase 7: Archive Findings
 
-After submission, push all reports, PoCs, variant analyses, and review files to a private GitHub repo for record-keeping:
+After submission, archive all reports, PoCs, variant analyses, and review files to a private repository for record-keeping:
 
 ```bash
-# Clone the repo (already created)
-git clone https://github.com/manusjs/vulnerability-reports.git /tmp/vuln-reports-repo
+git clone https://github.com/<your-org>/vulnerability-reports.git /tmp/vuln-reports-repo
 
-# Organize by project
 mkdir -p /tmp/vuln-reports-repo/<project>/{reports,pocs}
 cp reports/*.md /tmp/vuln-reports-repo/<project>/reports/
 cp pocs/*.py /tmp/vuln-reports-repo/<project>/pocs/
 cp variant-analysis-report.md /tmp/vuln-reports-repo/<project>/
 cp final-review.md /tmp/vuln-reports-repo/<project>/
 
-# Push
 cd /tmp/vuln-reports-repo
 git add -A && git commit -m "Add <project> vulnerability reports" && git push
 ```
-
-**Archive repo:** https://github.com/manusjs/vulnerability-reports (private)
 
 Update `README.md` with a summary table of all advisories (GHSA IDs, severity, status).
 
@@ -220,7 +213,7 @@ Update `README.md` with a summary table of all advisories (GHSA IDs, severity, s
 - **Do NOT mention "incomplete fix"** — describe the vulnerability independently
 - **DO include full PoC code** in a `<details>` section within the report — maintainers need everything in one place
 - **DO verify CVSS math** with a separate Claude Code review pass before submission
-- **DO credit consistently**: "Reported by **zx (Jace)**" (or your chosen credit line)
+- **DO credit consistently** in all advisories
 
 ## Common Pitfalls
 
@@ -229,5 +222,5 @@ Update `README.md` with a summary table of all advisories (GHSA IDs, severity, s
 3. **Network blocked in sandbox** — Clone repos and save research locally BEFORE launching Claude Code
 4. **CVSS score/vector mismatch** — Always verify the math; use an online CVSS calculator
 5. **False positives** — Always verify code references against actual source before submitting
-6. **Model marketplace access** — Check `aws bedrock list-inference-profiles` for available models; use cross-region prefix (`us.anthropic.claude-*`)
-7. **Submitting with nonexistent versions** — Always check the package registry (npm/PyPI) for the real latest version. Git tags on main may be ahead of published releases. Submitting `<=2.9.0` when latest is `2.8.3` looks sloppy and undermines credibility.
+6. **Model availability** — Check available inference profiles before launching; use cross-region prefix (`us.anthropic.claude-*`) where supported
+7. **Submitting with nonexistent versions** — Always check the package registry (npm/PyPI) for the real latest version. Git tags on main may be ahead of published releases.
