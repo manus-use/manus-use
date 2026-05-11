@@ -15,7 +15,7 @@ os.environ["BYPASS_TOOL_CONSENT"] = "True"
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 # Import Strands SDK and required tools
-from strands import Agent
+from strands import Agent, AgentSkills
 from strands_tools import current_time
 from strands_tools.browser import LocalChromiumBrowser
 from manus_use.tools.get_github_advisory import get_github_advisory
@@ -80,6 +80,10 @@ class VulnerabilityIntelligenceAgent:
             - Based on your analysis, classify the PoC. Is it a confirmed RCE? A DoS? A simple vulnerability checker?
             - In your final report, create a dedicated section for this analysis, clearly stating your confidence in the PoC's functionality and impact.
 
+        **Step 5.5: Exploit Verification (Optional)**
+        - If you identified a functional PoC or have fix/patch commit URLs, activate the `verify-exploit` skill to develop and verify exploit code in an isolated Docker environment.
+        - This step is optional and depends on Docker being available.
+
         **Step 6: Analyze Weakness**
         - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -111,10 +115,14 @@ class VulnerabilityIntelligenceAgent:
             },
             model_id=config['llm']['model'], max_tokens=config['llm']['max_tokens'],  # use whatever model name your endpoint expects
         )
+        skills_dir = str(Path(__file__).parent / "skills" / "verify-exploit")
+        plugin = AgentSkills(skills=[skills_dir])
+
         self.agent = Agent(
             conversation_manager=conversation_manager,
             model=openai_model,
             # model=bedrock,
+            plugins=[plugin],
             system_prompt=self.system_prompt,
             tools=[
                 "strands_tools.http_request",
