@@ -66,7 +66,7 @@ dev = [
 ]
 browser = [
     "playwright>=1.49.1",
-    "browser-use>=1.0.27",
+    "browser-use>=0.12.0",
     "markdownify>=0.12.1",
     "langchain-aws>=0.2.11",
 ]
