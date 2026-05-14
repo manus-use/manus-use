@@ -245,6 +245,113 @@ def test_verify_exploit_classifies_missing_interpreter_in_target_as_target_error
     assert payload["error"]["retryable"] is False
 
 
+def test_exploit_sandbox_start_target_uses_create_connect_start(monkeypatch):
+    """start_target should use create+connect+start, not run+disconnect+reconnect."""
+    from manus_use.sandbox.exploit_sandbox import ExploitSandbox
+
+    call_log = []
+
+    class FakeContainer:
+        def __init__(self):
+            self.id = "fake-container-id"
+
+        def start(self):
+            call_log.append("container.start")
+
+    class FakeNetwork:
+        name = "exploit-net-test"
+        def connect(self, container, aliases=None):
+            call_log.append(("network.connect", aliases))
+        def disconnect(self, container):
+            call_log.append("network.disconnect")
+
+    class FakeContainers:
+        def create(self, image, **kwargs):
+            call_log.append(("containers.create", kwargs.get("network_mode"), kwargs.get("network")))
+            return FakeContainer()
+        def run(self, *args, **kwargs):
+            call_log.append("containers.run")
+            return FakeContainer()
+
+    class FakeNetworks:
+        def create(self, **kwargs):
+            call_log.append("networks.create")
+            return FakeNetwork()
+
+    class FakeClient:
+        containers = FakeContainers()
+        networks = FakeNetworks()
+
+    monkeypatch.setattr(
+        "manus_use.sandbox.exploit_sandbox.get_docker_client",
+        lambda: FakeClient(),
+    )
+    monkeypatch.setattr(
+        "manus_use.sandbox.exploit_sandbox.wait_for_container_running",
+        lambda container, timeout=20: None,
+    )
+
+    sandbox = ExploitSandbox()
+    sandbox.client = FakeClient()
+    sandbox.start_target("test-image")
+
+    # Verify create was called (not run)
+    assert any(isinstance(c, tuple) and c[0] == "containers.create" for c in call_log), \
+        f"containers.create not called: {call_log}"
+    assert not any(c == "containers.run" for c in call_log), \
+        f"containers.run should not be called: {call_log}"
+
+    # Verify network_mode="none" was used (no default bridge)
+    create_calls = [c for c in call_log if isinstance(c, tuple) and c[0] == "containers.create"]
+    assert create_calls[0][1] == "none", f"Expected network_mode='none', got: {create_calls[0]}"
+
+    # Verify connect was called with alias
+    connect_calls = [c for c in call_log if isinstance(c, tuple) and c[0] == "network.connect"]
+    assert len(connect_calls) == 1, f"Expected 1 connect call, got: {connect_calls}"
+    assert connect_calls[0][1] == ["target"], f"Expected alias ['target'], got: {connect_calls[0]}"
+
+    # Verify disconnect was NOT called
+    assert not any(c == "network.disconnect" for c in call_log), \
+        f"disconnect should not be called: {call_log}"
+
+    # Verify start was called after connect
+    start_idx = next(i for i, c in enumerate(call_log) if c == "container.start")
+    connect_idx = next(i for i, c in enumerate(call_log) if isinstance(c, tuple) and c[0] == "network.connect")
+    assert start_idx > connect_idx, "container.start should be called after network.connect"
+
+
+def test_exploit_sandbox_run_local_exploit_returns_interpreter_metadata(monkeypatch):
+    """run_local_exploit should return interpreter metadata (first definition, not shadow)."""
+    from manus_use.sandbox.exploit_sandbox import ExploitSandbox
+
+    class FakeContainer:
+        def __init__(self):
+            self.id = "fake-id"
+        def exec_run(self, cmd, **kwargs):
+            class Result:
+                exit_code = 0
+                output = (b"python3\n", b"")
+            return Result()
+
+    sandbox = ExploitSandbox()
+    sandbox.target_container = FakeContainer()
+
+    monkeypatch.setattr(
+        "manus_use.sandbox.exploit_sandbox._copy_to_container",
+        lambda container, data, path: None,
+    )
+    monkeypatch.setattr(
+        "manus_use.sandbox.exploit_sandbox.wait_for_container_running",
+        lambda container, timeout=20: None,
+    )
+
+    result = sandbox.run_local_exploit("print('hello')", language="python")
+
+    assert "interpreter" in result, f"Missing 'interpreter' key: {result.keys()}"
+    assert "interpreter_candidates" in result, f"Missing 'interpreter_candidates' key: {result.keys()}"
+    assert "interpreter_fallback_used" in result, f"Missing 'interpreter_fallback_used' key: {result.keys()}"
+
+
 def test_file_read_write(tmp_path):
     """Test file read and write operations."""
     # Write a file
@@ -732,3 +839,97 @@ def test_browser_use_agent_applies_patch_config(mock_apply_patch, _mock_openai, 
     BrowserUseAgent(config=config)
 
     mock_apply_patch.assert_called_with(default_timeout_ms=25000, max_retries=7)
+
+
+def test_create_lark_document_is_openclaw_defaults_false_when_not_set(monkeypatch):
+    """is_openclaw should default to False when OPENCLAW env var is not set."""
+    from manus_use.tools import create_lark_document as cld_module
+
+    monkeypatch.delenv("OPENCLAW", raising=False)
+
+    tool_use = {
+        "toolUseId": "t1",
+        "input": {
+            "title": "[VI-001] CVE-2025-3248 Test",
+            "disclosure": "test",
+            "public_disclosure": "2025-01-01",
+            "sources": "https://example.com",
+            "proof_of_concept_links": "",
+            "cpe": "cpe:2.3:a:test:test:*",
+            "affected_versions": "1.0",
+            "technical_details": "test details",
+            "cwe_info": "CWE-79",
+            "cvss_score": "Critical(9.8),CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+            "recommendations": "* patch immediately\n",
+            "background": "test background",
+        },
+    }
+
+    import requests
+    monkeypatch.setattr(requests, "post", lambda *a, **kw: type("R", (), {"raise_for_status": lambda s: None, "text": "ok"})())
+
+    cld_module.create_lark_document(tool_use)
+    assert tool_use["input"]["is_openclaw"] is False
+
+
+def test_create_lark_document_is_openclaw_defaults_true_when_openclaw_env(monkeypatch):
+    """is_openclaw should default to True when OPENCLAW=true env var is set."""
+    from manus_use.tools import create_lark_document as cld_module
+
+    monkeypatch.setenv("OPENCLAW", "true")
+
+    tool_use = {
+        "toolUseId": "t2",
+        "input": {
+            "title": "[VI-001] CVE-2025-3248 Test",
+            "disclosure": "test",
+            "public_disclosure": "2025-01-01",
+            "sources": "https://example.com",
+            "proof_of_concept_links": "",
+            "cpe": "cpe:2.3:a:test:test:*",
+            "affected_versions": "1.0",
+            "technical_details": "test details",
+            "cwe_info": "CWE-79",
+            "cvss_score": "Critical(9.8),CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+            "recommendations": "* patch immediately\n",
+            "background": "test background",
+        },
+    }
+
+    import requests
+    monkeypatch.setattr(requests, "post", lambda *a, **kw: type("R", (), {"raise_for_status": lambda s: None, "text": "ok"})())
+
+    cld_module.create_lark_document(tool_use)
+    assert tool_use["input"]["is_openclaw"] is True
+
+
+def test_create_lark_document_is_openclaw_explicit_override(monkeypatch):
+    """Explicit is_openclaw in tool input should override the environment-based default."""
+    from manus_use.tools import create_lark_document as cld_module
+
+    monkeypatch.delenv("OPENCLAW", raising=False)  # default would be False
+
+    tool_use = {
+        "toolUseId": "t3",
+        "input": {
+            "title": "[VI-001] CVE-2025-3248 Test",
+            "disclosure": "test",
+            "public_disclosure": "2025-01-01",
+            "sources": "https://example.com",
+            "proof_of_concept_links": "",
+            "cpe": "cpe:2.3:a:test:test:*",
+            "affected_versions": "1.0",
+            "technical_details": "test details",
+            "cwe_info": "CWE-79",
+            "cvss_score": "Critical(9.8),CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+            "recommendations": "* patch immediately\n",
+            "background": "test background",
+            "is_openclaw": True,  # Explicit override
+        },
+    }
+
+    import requests
+    monkeypatch.setattr(requests, "post", lambda *a, **kw: type("R", (), {"raise_for_status": lambda s: None, "text": "ok"})())
+
+    cld_module.create_lark_document(tool_use)
+    assert tool_use["input"]["is_openclaw"] is True

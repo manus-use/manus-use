@@ -79,6 +79,10 @@ TOOL_SPEC = {
                     "type": "string",
                     "description": "The exact command used to execute the exploit code against the target. Example: 'TARGET_HOST='127.0.0.1' TARGET_PORT=8080 python x.py'. Optional — only include if exploit verification was performed.",
                 },
+                "is_openclaw": {
+                    "type": "boolean",
+                    "description": "Whether the document is an OpenClaw document. Defaults to true when OPENCLAW=true env var is set, otherwise false.",
+                },
             },
             "required": [
                 "title",
@@ -102,6 +106,8 @@ def create_lark_document(tool: ToolUse, **kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
     title = tool["input"]["title"]
     print(f"Creating lark document with title: {tool['input']}")
+    default_is_openclaw = os.environ.get("OPENCLAW", "").lower() == "true"
+    tool["input"]["is_openclaw"] = tool["input"].get("is_openclaw", default_is_openclaw)
     import requests
     config = Config.from_file()
     url = getattr(getattr(config, 'lark', None), 'document_url', None)
