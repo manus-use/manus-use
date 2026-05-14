@@ -5,10 +5,50 @@ Strands Agent that performs vulnerability analysis using a sequential, tool-base
 
 import os
 import sys
+import asyncio
+import threading
 from pathlib import Path
 import warnings
 warnings.filterwarnings("ignore")
 os.environ["BYPASS_TOOL_CONSENT"] = "True"
+
+
+# Patch asyncio.SelectorEventLoop.shutdown_default_executor to avoid
+# "RuntimeError: Timeout should be used inside a task" on Python 3.14+.
+# Python 3.14 changed shutdown_default_executor to use timeouts.timeout(),
+# which requires current_task() to be non-None. When nest_asyncio (used by
+# the browser tool) patches the event loop, its _run_once clobbers the
+# current task during handle execution, causing timeouts.timeout() to fail.
+# asyncio.wait_for() also uses timeouts.timeout() internally in 3.14, so
+# we must use manual timeout handling via loop.call_later() instead.
+async def _patched_shutdown_default_executor(self, timeout=None):
+    self._executor_shutdown_called = True
+    if self._default_executor is None:
+        return
+    future = self.create_future()
+    thread = threading.Thread(target=self._do_shutdown, args=(future,))
+    thread.start()
+    timeout_handle = None
+    if timeout is not None:
+        timeout_handle = self.call_later(timeout, future.cancel)
+    try:
+        await future
+    except asyncio.CancelledError:
+        warnings.warn(
+            "The executor did not finish joining its threads "
+            f"within {timeout} seconds.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        self._default_executor.shutdown(wait=False)
+    else:
+        thread.join()
+    finally:
+        if timeout_handle is not None:
+            timeout_handle.cancel()
+
+
+asyncio.SelectorEventLoop.shutdown_default_executor = _patched_shutdown_default_executor
 
 
 # Add the src directory to Python path
@@ -96,8 +136,9 @@ class VulnerabilityIntelligenceAgent:
         from strands.agent.conversation_manager import SlidingWindowConversationManager
 
         conversation_manager = SlidingWindowConversationManager(
-            window_size=100,  # Maximum number of messages to keep
-            should_truncate_results=True, # Enable truncating tool results if needed
+            window_size=40,  # Maximum number of messages to keep
+            should_truncate_results=True,  # Enable truncating tool results if needed
+            per_turn=True,  # Proactively manage context before every model call
         )
         bedrock = BedrockModel(
             model_id=model_name,
@@ -116,12 +157,12 @@ class VulnerabilityIntelligenceAgent:
 
         self.agent = Agent(
             conversation_manager=conversation_manager,
-            model=openai_model,
-            # model=bedrock,
+            # model=openai_model,
+            model=bedrock,
             plugins=[plugin],
             system_prompt=self.system_prompt,
             tools=[
-                "strands_tools.http_request",
+                "manus_use.tools.http_request",
                 "manus_use.tools.python_repl",
                 current_time,
                 "manus_use.tools.create_lark_document",
