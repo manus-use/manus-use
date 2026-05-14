@@ -1,14 +1,16 @@
 """
-Fixed python_repl wrapper that addresses PTY cleanup and status handling bugs.
+Fixed python_repl wrapper that addresses PTY cleanup, status handling, and fork-safety bugs.
 
 This module wraps strands_tools.python_repl with fixes for:
 1. Proper exit status checking using WIFEXITED/WEXITSTATUS instead of raw status comparison
 2. Safe PTY cleanup that avoids sending signals to already-reaped processes
+3. Fork-safe execution using subprocess.Popen instead of os.fork() (avoids crashes on macOS)
 """
 
 import os
-import signal
+import subprocess
 import sys
+import tempfile
 import time
 import traceback
 from typing import Any, Callable, List, Optional
@@ -39,17 +41,19 @@ except ImportError:
 
 
 class FixedPtyManager:
-    """PTY manager with proper process lifecycle handling."""
+    """PTY manager using subprocess.Popen for fork-safe process lifecycle handling.
+
+    Uses subprocess.Popen (which calls posix_spawn on macOS) instead of os.fork()
+    to avoid crashes when forking in a multithreaded process on macOS.
+    """
 
     def __init__(self, callback: Optional[Callable] = None):
+        self.process: Optional[subprocess.Popen] = None
         self.supervisor_fd = -1
-        self.worker_fd = -1
-        self.pid = -1
         self.output_buffer: List[str] = []
-        self.input_buffer: List[str] = []
-        self.stop_event = False
         self.callback = callback
         self._child_exited = False
+        self._code_file: Optional[str] = None
 
     def start(self, code: str) -> None:
         import fcntl
@@ -57,46 +61,42 @@ class FixedPtyManager:
         import struct
         import termios
         import threading
-        
-        self.supervisor_fd, self.worker_fd = pty.openpty()
+
+        master_fd, slave_fd = pty.openpty()
         term_size = struct.pack("HHHH", 24, 80, 0, 0)
-        fcntl.ioctl(self.worker_fd, termios.TIOCSWINSZ, term_size)
+        fcntl.ioctl(slave_fd, termios.TIOCSWINSZ, term_size)
 
-        self.pid = os.fork()
+        # Write code to a temp file so subprocess can execute it
+        fd, code_path = tempfile.mkstemp(suffix=".py", prefix="repl_")
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write(code)
+        except Exception:
+            os.close(fd)
+            raise
+        self._code_file = code_path
 
-        if self.pid == 0:
-            try:
-                os.close(self.supervisor_fd)
-                os.dup2(self.worker_fd, 0)
-                os.dup2(self.worker_fd, 1)
-                os.dup2(self.worker_fd, 2)
-                os.close(self.worker_fd)
-                
-                namespace = repl_state.get_namespace()
-                exec(code, namespace)
-                os._exit(0)
-            except Exception:
-                traceback.print_exc(file=sys.stderr)
-                os._exit(1)
-        else:
-            os.close(self.worker_fd)
-            
-            reader = threading.Thread(target=self._read_output)
-            reader.daemon = True
-            reader.start()
+        self.process = subprocess.Popen(
+            [sys.executable, "-u", code_path],
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            close_fds=True,
+        )
+        os.close(slave_fd)
+        self.supervisor_fd = master_fd
 
-            input_handler = threading.Thread(target=self._handle_input)
-            input_handler.daemon = True
-            input_handler.start()
+        reader = threading.Thread(target=self._read_output)
+        reader.daemon = True
+        reader.start()
 
     def _read_output(self) -> None:
         import select
-        import sys
-        
+
         buffer = ""
         incomplete_bytes = b""
 
-        while not self.stop_event:
+        while not self._child_exited:
             try:
                 if self.supervisor_fd < 0:
                     break
@@ -167,34 +167,6 @@ class FixedPtyManager:
             except Exception:
                 pass
 
-    def _handle_input(self) -> None:
-        import select
-        import sys
-        
-        while not self.stop_event:
-            try:
-                r, _, _ = select.select([sys.stdin], [], [], 0.1)
-                if sys.stdin in r:
-                    input_data = ""
-                    while True:
-                        char = sys.stdin.read(1)
-                        if not char or char == "\n":
-                            input_data += "\n"
-                            break
-                        input_data += char
-
-                    if input_data:
-                        if input_data not in self.input_buffer:
-                            self.input_buffer.append(input_data)
-                            if self.supervisor_fd >= 0:
-                                try:
-                                    os.write(self.supervisor_fd, input_data.encode())
-                                except (OSError, ValueError):
-                                    break
-
-            except (OSError, IOError):
-                break
-
     def get_output(self) -> str:
         raw = "".join(self.output_buffer)
         clean = clean_ansi(raw)
@@ -205,25 +177,19 @@ class FixedPtyManager:
         return clean
 
     def stop(self) -> None:
-        self.stop_event = True
-
-        if self.pid > 0 and not self._child_exited:
+        if self.process is not None and not self._child_exited:
             try:
-                pid, _ = os.waitpid(self.pid, os.WNOHANG)
-                if pid == 0:
-                    os.kill(self.pid, signal.SIGTERM)
-                    time.sleep(0.1)
+                if self.process.poll() is None:
+                    self.process.terminate()
                     try:
-                        pid, _ = os.waitpid(self.pid, os.WNOHANG)
-                        if pid == 0:
-                            os.kill(self.pid, signal.SIGKILL)
-                            os.waitpid(self.pid, 0)
-                    except OSError:
-                        pass
+                        self.process.wait(timeout=0.5)
+                    except subprocess.TimeoutExpired:
+                        self.process.kill()
+                        self.process.wait(timeout=1)
             except (OSError, ProcessLookupError):
                 pass
             finally:
-                self.pid = -1
+                self._child_exited = True
 
         if self.supervisor_fd >= 0:
             try:
@@ -232,6 +198,14 @@ class FixedPtyManager:
                 pass
             finally:
                 self.supervisor_fd = -1
+
+        if self._code_file and os.path.exists(self._code_file):
+            try:
+                os.unlink(self._code_file)
+            except OSError:
+                pass
+            finally:
+                self._code_file = None
 
 
 def python_repl(tool: ToolUse, **kwargs: Any) -> ToolResult:
@@ -324,19 +298,12 @@ def python_repl(tool: ToolUse, **kwargs: Any) -> ToolResult:
 
                 exit_code = None
                 while True:
-                    try:
-                        pid, status = os.waitpid(pty_mgr.pid, os.WNOHANG)
-                        if pid != 0:
-                            if os.WIFEXITED(status):
-                                exit_code = os.WEXITSTATUS(status)
-                            elif os.WIFSIGNALED(status):
-                                exit_code = 128 + os.WTERMSIG(status)
-                            else:
-                                exit_code = status
-                            pty_mgr._child_exited = True
-                            break
-                    except OSError:
+                    ret = pty_mgr.process.poll()
+                    if ret is not None:
+                        exit_code = ret
+                        pty_mgr._child_exited = True
                         break
+                    time.sleep(0.05)
 
                 output = pty_mgr.get_output()
                 pty_mgr.stop()
