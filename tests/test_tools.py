@@ -1171,7 +1171,6 @@ def test_create_lark_document_is_openclaw_defaults_false_when_not_set(monkeypatc
     cld_module.create_lark_document(tool_use)
     assert tool_use["input"]["is_openclaw"] is False
 
-
 def test_create_lark_document_technical_details_schema_wording():
     """technical_details schema should require concise Markdown sections with exact headings."""
     from manus_use.tools import create_lark_document as cld_module
