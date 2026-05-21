@@ -2,6 +2,7 @@
 
 import pytest
 import asyncio
+import importlib
 import sys
 import types
 from pathlib import Path
@@ -10,6 +11,7 @@ from unittest.mock import Mock, patch
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from manus_use.tools import get_tools_by_names
+from manus_use.tools.python_repl import python_repl
 from manus_use.tools.file_operations import (
     file_delete,
     file_list,
@@ -22,6 +24,35 @@ from manus_use.tools.patches.use_browser_patch import apply_comprehensive_patch
 from manus_use.tools.patches import use_browser_patch as use_browser_patch_module
 from manus_use.agents.browser_use_agent import BrowserUseAgent
 from manus_use.sandbox.exploit_sandbox import InterpreterNotFoundError
+
+
+def test_python_repl_interactive_does_not_reexecute_code_when_saving_state(monkeypatch, tmp_path):
+    """Interactive REPL code should stay isolated to the subprocess execution path."""
+
+    marker = tmp_path / "marker.txt"
+    code = "\n".join(
+        [
+            "from pathlib import Path",
+            f"marker = Path({str(marker)!r})",
+            "marker.write_text(marker.read_text() + 'x' if marker.exists() else 'x')",
+            "print('done')",
+        ]
+    )
+    tool_use = {
+        "toolUseId": "python-repl-test",
+        "input": {
+            "code": code,
+            "interactive": True,
+            "timeout": 10,
+        },
+    }
+
+    monkeypatch.setenv("BYPASS_TOOL_CONSENT", "true")
+
+    result = python_repl(tool_use)
+
+    assert result["status"] == "success"
+    assert marker.read_text() == "x"
 
 
 def test_verify_exploit_returns_structured_infra_error_on_transient_run_failure(monkeypatch):
@@ -548,6 +579,275 @@ def _install_fake_use_browser_module(monkeypatch, page_factory=None):
     return module
 
 
+_HTTPCORE_SHIELD_MODULES = (
+    "httpcore._synchronization",
+    "httpcore._async.http11",
+    "httpcore._async.http2",
+    "httpcore._async.connection_pool",
+)
+
+
+def _capture_httpcore_shields():
+    shields = {}
+    for module_name in _HTTPCORE_SHIELD_MODULES:
+        try:
+            module = importlib.import_module(module_name)
+        except ImportError:
+            continue
+        if hasattr(module, "AsyncShieldCancellation"):
+            shields[module_name] = module.AsyncShieldCancellation
+    return shields
+
+
+def _restore_httpcore_shields(shields):
+    for module_name, shield in shields.items():
+        module = importlib.import_module(module_name)
+        module.AsyncShieldCancellation = shield
+
+
+def test_apply_asyncio_compat_patch_is_idempotent_and_avoids_wait_for():
+    """Asyncio compatibility patch should replace executor shutdown once."""
+    import sniffio
+    import sniffio._impl as sniffio_impl
+
+    original_state = dict(use_browser_patch_module._PATCH_STATE)
+    original_shutdowns = dict(
+        use_browser_patch_module._PATCH_STATE.get("original_shutdown_default_executor", {})
+    )
+    original_httpcore_shields = _capture_httpcore_shields()
+    original_sniffio_current = sniffio.current_async_library
+    original_sniffio_impl_current = sniffio_impl.current_async_library
+    original_selector_shutdown = asyncio.SelectorEventLoop.shutdown_default_executor
+    original_proactor_shutdown = None
+    proactor_loop = getattr(asyncio, "ProactorEventLoop", None)
+    if proactor_loop is not None:
+        original_proactor_shutdown = proactor_loop.shutdown_default_executor
+
+    use_browser_patch_module._PATCH_STATE.update(
+        {
+            "asyncio_compat_applied": False,
+            "original_shutdown_default_executor": {},
+            "original_sniffio_current_async_library": None,
+            "original_sniffio_impl_current_async_library": None,
+            "original_httpcore_async_shield_cancellation": {},
+        }
+    )
+    asyncio.SelectorEventLoop.shutdown_default_executor = original_selector_shutdown
+    if proactor_loop is not None:
+        proactor_loop.shutdown_default_executor = original_proactor_shutdown
+
+    def broken_current_async_library():
+        raise sniffio.AsyncLibraryNotFoundError("unknown async library, or not in async context")
+
+    sniffio.current_async_library = broken_current_async_library
+    sniffio_impl.current_async_library = broken_current_async_library
+
+    try:
+        assert use_browser_patch_module.apply_asyncio_compat_patch() is True
+        assert use_browser_patch_module.apply_asyncio_compat_patch() is False
+
+        patched = asyncio.SelectorEventLoop.shutdown_default_executor
+        assert patched is use_browser_patch_module._shutdown_default_executor_without_wait_for
+        assert "wait_for" not in patched.__code__.co_names
+        assert (
+            use_browser_patch_module._PATCH_STATE["original_shutdown_default_executor"][
+                asyncio.SelectorEventLoop
+            ]
+            is original_selector_shutdown
+        )
+
+        async def detect_async_library():
+            return sniffio.current_async_library()
+
+        assert asyncio.run(detect_async_library()) == "asyncio"
+    finally:
+        asyncio.SelectorEventLoop.shutdown_default_executor = original_selector_shutdown
+        if proactor_loop is not None:
+            proactor_loop.shutdown_default_executor = original_proactor_shutdown
+        _restore_httpcore_shields(original_httpcore_shields)
+        sniffio.current_async_library = original_sniffio_current
+        sniffio_impl.current_async_library = original_sniffio_impl_current
+        use_browser_patch_module._PATCH_STATE.clear()
+        use_browser_patch_module._PATCH_STATE.update(original_state)
+        use_browser_patch_module._PATCH_STATE[
+            "original_shutdown_default_executor"
+        ] = original_shutdowns
+
+
+def test_asyncio_compat_sniffio_fallback_requires_current_task():
+    """A loop callback without a current task should not be reported as asyncio."""
+    import sniffio
+    import sniffio._impl as sniffio_impl
+
+    original_state = dict(use_browser_patch_module._PATCH_STATE)
+    original_shutdowns = dict(
+        use_browser_patch_module._PATCH_STATE.get("original_shutdown_default_executor", {})
+    )
+    original_httpcore_shields = _capture_httpcore_shields()
+    original_sniffio_current = sniffio.current_async_library
+    original_sniffio_impl_current = sniffio_impl.current_async_library
+    original_selector_shutdown = asyncio.SelectorEventLoop.shutdown_default_executor
+
+    use_browser_patch_module._PATCH_STATE.update(
+        {
+            "asyncio_compat_applied": False,
+            "original_shutdown_default_executor": {},
+            "original_sniffio_current_async_library": None,
+            "original_sniffio_impl_current_async_library": None,
+            "original_httpcore_async_shield_cancellation": {},
+        }
+    )
+
+    def broken_current_async_library():
+        raise sniffio.AsyncLibraryNotFoundError("unknown async library, or not in async context")
+
+    sniffio.current_async_library = broken_current_async_library
+    sniffio_impl.current_async_library = broken_current_async_library
+
+    try:
+        assert use_browser_patch_module.apply_asyncio_compat_patch() is True
+
+        results = []
+        loop = asyncio.new_event_loop()
+        previous_loop = None
+        try:
+            try:
+                previous_loop = asyncio.get_event_loop()
+            except RuntimeError:
+                previous_loop = None
+            asyncio.set_event_loop(loop)
+
+            def callback_without_task():
+                try:
+                    results.append(sniffio.current_async_library())
+                except Exception as exc:
+                    results.append(type(exc))
+
+            loop.call_soon(callback_without_task)
+            loop.run_until_complete(asyncio.sleep(0))
+        finally:
+            loop.close()
+            asyncio.set_event_loop(previous_loop)
+
+        assert results == [sniffio.AsyncLibraryNotFoundError]
+    finally:
+        asyncio.SelectorEventLoop.shutdown_default_executor = original_selector_shutdown
+        _restore_httpcore_shields(original_httpcore_shields)
+        sniffio.current_async_library = original_sniffio_current
+        sniffio_impl.current_async_library = original_sniffio_impl_current
+        use_browser_patch_module._PATCH_STATE.clear()
+        use_browser_patch_module._PATCH_STATE.update(original_state)
+        use_browser_patch_module._PATCH_STATE[
+            "original_shutdown_default_executor"
+        ] = original_shutdowns
+
+
+def test_httpcore_async_shield_noops_without_current_task():
+    """httpcore cleanup shield should not enter AnyIO CancelScope without a task."""
+    import httpcore._synchronization as httpcore_sync
+    import sniffio
+    import sniffio._impl as sniffio_impl
+
+    original_state = dict(use_browser_patch_module._PATCH_STATE)
+    original_shutdowns = dict(
+        use_browser_patch_module._PATCH_STATE.get("original_shutdown_default_executor", {})
+    )
+    original_httpcore_shields = _capture_httpcore_shields()
+    original_sniffio_current = sniffio.current_async_library
+    original_sniffio_impl_current = sniffio_impl.current_async_library
+    original_selector_shutdown = asyncio.SelectorEventLoop.shutdown_default_executor
+
+    use_browser_patch_module._PATCH_STATE.update(
+        {
+            "asyncio_compat_applied": False,
+            "original_shutdown_default_executor": {},
+            "original_httpcore_async_shield_cancellation": {},
+        }
+    )
+
+    try:
+        assert use_browser_patch_module.apply_asyncio_compat_patch() is True
+
+        results = []
+        loop = asyncio.new_event_loop()
+        previous_loop = None
+        try:
+            try:
+                previous_loop = asyncio.get_event_loop()
+            except RuntimeError:
+                previous_loop = None
+            asyncio.set_event_loop(loop)
+
+            def callback_without_task():
+                try:
+                    with httpcore_sync.AsyncShieldCancellation():
+                        results.append("entered")
+                except Exception as exc:
+                    results.append(repr(exc))
+
+            loop.call_soon(callback_without_task)
+            loop.run_until_complete(asyncio.sleep(0))
+        finally:
+            loop.close()
+            asyncio.set_event_loop(previous_loop)
+
+        assert results == ["entered"]
+    finally:
+        asyncio.SelectorEventLoop.shutdown_default_executor = original_selector_shutdown
+        _restore_httpcore_shields(original_httpcore_shields)
+        sniffio.current_async_library = original_sniffio_current
+        sniffio_impl.current_async_library = original_sniffio_impl_current
+        use_browser_patch_module._PATCH_STATE.clear()
+        use_browser_patch_module._PATCH_STATE.update(original_state)
+        use_browser_patch_module._PATCH_STATE[
+            "original_shutdown_default_executor"
+        ] = original_shutdowns
+
+
+def test_httpcore_async_shield_preserves_task_context_behavior():
+    """Inside a real asyncio task, httpcore shield should keep normal behavior."""
+    import httpcore._synchronization as httpcore_sync
+    import sniffio
+    import sniffio._impl as sniffio_impl
+
+    original_state = dict(use_browser_patch_module._PATCH_STATE)
+    original_shutdowns = dict(
+        use_browser_patch_module._PATCH_STATE.get("original_shutdown_default_executor", {})
+    )
+    original_httpcore_shields = _capture_httpcore_shields()
+    original_sniffio_current = sniffio.current_async_library
+    original_sniffio_impl_current = sniffio_impl.current_async_library
+    original_selector_shutdown = asyncio.SelectorEventLoop.shutdown_default_executor
+
+    use_browser_patch_module._PATCH_STATE.update(
+        {
+            "asyncio_compat_applied": False,
+            "original_shutdown_default_executor": {},
+            "original_httpcore_async_shield_cancellation": {},
+        }
+    )
+
+    try:
+        assert use_browser_patch_module.apply_asyncio_compat_patch() is True
+
+        async def run_with_shield():
+            assert asyncio.current_task() is not None
+            with httpcore_sync.AsyncShieldCancellation():
+                return "ok"
+
+        assert asyncio.run(run_with_shield()) == "ok"
+    finally:
+        asyncio.SelectorEventLoop.shutdown_default_executor = original_selector_shutdown
+        _restore_httpcore_shields(original_httpcore_shields)
+        sniffio.current_async_library = original_sniffio_current
+        sniffio_impl.current_async_library = original_sniffio_impl_current
+        use_browser_patch_module._PATCH_STATE.clear()
+        use_browser_patch_module._PATCH_STATE.update(original_state)
+        use_browser_patch_module._PATCH_STATE[
+            "original_shutdown_default_executor"
+        ] = original_shutdowns
+
+
 def test_apply_comprehensive_patch_filters_timeout_args_for_compatible_actions(monkeypatch):
     """Patch should rebind stale actions and only inject supported kwargs."""
     fake_module = _install_fake_use_browser_module(monkeypatch)
@@ -870,6 +1170,28 @@ def test_create_lark_document_is_openclaw_defaults_false_when_not_set(monkeypatc
 
     cld_module.create_lark_document(tool_use)
     assert tool_use["input"]["is_openclaw"] is False
+
+def test_create_lark_document_technical_details_schema_wording():
+    """technical_details schema should require concise Markdown sections with exact headings."""
+    from manus_use.tools import create_lark_document as cld_module
+
+    schema = cld_module.TOOL_SPEC["inputSchema"]["json"]
+    description = schema["properties"]["technical_details"]["description"]
+
+    assert "active exploitation" not in description.lower()
+    assert "Use Markdown syntax only when needed" in description
+    assert "Avoid one large paragraph" in description
+    assert "short paragraphs separated by blank lines" in description
+    assert "bullet points" in description
+    assert "inline code" in description
+    assert "`### Detection guidance`" in description
+    assert "`### Exploitability Analysis`" in description
+    assert "`### Expected impact`" in description
+    assert "`### Affected conditions`" in description
+    assert "Prefix those subsection headers with `### ` exactly" in description
+    assert "plain text or bold-only labels" in description
+    assert "unnecessary headings" not in description
+    assert "technical_details" in schema["required"]
 
 
 def test_create_lark_document_is_openclaw_defaults_true_when_openclaw_env(monkeypatch):

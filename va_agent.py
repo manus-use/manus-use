@@ -5,8 +5,6 @@ Strands Agent that performs vulnerability analysis using a sequential, tool-base
 
 import os
 import sys
-import asyncio
-import threading
 from pathlib import Path
 import warnings
 warnings.filterwarnings("ignore")
@@ -14,130 +12,26 @@ os.environ["BYPASS_TOOL_CONSENT"] = "True"
 os.environ["OPENCLAW"] = os.environ.get("OPENCLAW", "false")
 
 
-# Patch asyncio.SelectorEventLoop.shutdown_default_executor to avoid
-# "RuntimeError: Timeout should be used inside a task" on Python 3.14+.
-# Python 3.14 changed shutdown_default_executor to use timeouts.timeout(),
-# which requires current_task() to be non-None. When nest_asyncio (used by
-# the browser tool) patches the event loop, its _run_once clobbers the
-# current task during handle execution, causing timeouts.timeout() to fail.
-# asyncio.wait_for() also uses timeouts.timeout() internally in 3.14, so
-# we must use manual timeout handling via loop.call_later() instead.
-async def _patched_shutdown_default_executor(self, timeout=None):
-    self._executor_shutdown_called = True
-    if self._default_executor is None:
-        return
-    future = self.create_future()
-    thread = threading.Thread(target=self._do_shutdown, args=(future,))
-    thread.start()
-    timeout_handle = None
-    if timeout is not None:
-        timeout_handle = self.call_later(timeout, future.cancel)
-    try:
-        await future
-    except asyncio.CancelledError:
-        warnings.warn(
-            "The executor did not finish joining its threads "
-            f"within {timeout} seconds.",
-            RuntimeWarning,
-            stacklevel=2,
-        )
-        self._default_executor.shutdown(wait=False)
-    else:
-        thread.join()
-    finally:
-        if timeout_handle is not None:
-            timeout_handle.cancel()
-
-
-asyncio.SelectorEventLoop.shutdown_default_executor = _patched_shutdown_default_executor
-
-
-# Patch asyncio.SelectorEventLoop.shutdown_default_executor to avoid
-# "RuntimeError: Timeout should be used inside a task" on Python 3.14+.
-# Python 3.14 changed shutdown_default_executor to use timeouts.timeout(),
-# which requires current_task() to be non-None. When nest_asyncio (used by
-# the browser tool) patches the event loop, its _run_once clobbers the
-# current task during handle execution, causing timeouts.timeout() to fail.
-# asyncio.wait_for() also uses timeouts.timeout() internally in 3.14, so
-# we must use manual timeout handling via loop.call_later() instead.
-async def _patched_shutdown_default_executor(self, timeout=None):
-    self._executor_shutdown_called = True
-    if self._default_executor is None:
-        return
-    future = self.create_future()
-    thread = threading.Thread(target=self._do_shutdown, args=(future,))
-    thread.start()
-    timeout_handle = None
-    if timeout is not None:
-        timeout_handle = self.call_later(timeout, future.cancel)
-    try:
-        await future
-    except asyncio.CancelledError:
-        warnings.warn(
-            "The executor did not finish joining its threads "
-            f"within {timeout} seconds.",
-            RuntimeWarning,
-            stacklevel=2,
-        )
-        self._default_executor.shutdown(wait=False)
-    else:
-        thread.join()
-    finally:
-        if timeout_handle is not None:
-            timeout_handle.cancel()
-
-
-asyncio.SelectorEventLoop.shutdown_default_executor = _patched_shutdown_default_executor
-
-
-# Patch asyncio.SelectorEventLoop.shutdown_default_executor to avoid
-# "RuntimeError: Timeout should be used inside a task" on Python 3.14+.
-# Python 3.14 changed shutdown_default_executor to use timeouts.timeout(),
-# which requires current_task() to be non-None. When nest_asyncio (used by
-# the browser tool) patches the event loop, its _run_once clobbers the
-# current task during handle execution, causing timeouts.timeout() to fail.
-# asyncio.wait_for() also uses timeouts.timeout() internally in 3.14, so
-# we must use manual timeout handling via loop.call_later() instead.
-async def _patched_shutdown_default_executor(self, timeout=None):
-    self._executor_shutdown_called = True
-    if self._default_executor is None:
-        return
-    future = self.create_future()
-    thread = threading.Thread(target=self._do_shutdown, args=(future,))
-    thread.start()
-    timeout_handle = None
-    if timeout is not None:
-        timeout_handle = self.call_later(timeout, future.cancel)
-    try:
-        await future
-    except asyncio.CancelledError:
-        warnings.warn(
-            "The executor did not finish joining its threads "
-            f"within {timeout} seconds.",
-            RuntimeWarning,
-            stacklevel=2,
-        )
-        self._default_executor.shutdown(wait=False)
-    else:
-        thread.join()
-    finally:
-        if timeout_handle is not None:
-            timeout_handle.cancel()
-
-
-asyncio.SelectorEventLoop.shutdown_default_executor = _patched_shutdown_default_executor
-
-
 # Add the src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
+
+from manus_use.tools.patches.use_browser_patch import apply_comprehensive_patch
+
+apply_comprehensive_patch()
 
 # Import Strands SDK and required tools
 from strands import Agent, AgentSkills
 from strands_tools import current_time
-from strands_tools.browser import LocalChromiumBrowser
 from manus_use.tools.get_github_advisory import get_github_advisory
 
-use_browser = LocalChromiumBrowser().browser
+_local_chromium_browser = None
+try:
+    from strands_tools import use_browser
+except Exception:
+    from strands_tools.browser import LocalChromiumBrowser
+
+    _local_chromium_browser = LocalChromiumBrowser()
+    use_browser = _local_chromium_browser.browser
 
 
 class VulnerabilityIntelligenceAgent:
@@ -206,7 +100,7 @@ class VulnerabilityIntelligenceAgent:
         **Step 8: Final Quality Assurance and Report Generation**
         - **Data Completeness Check**: Verify all critical fields are populated.
         - **Information Consistency**: Ensure the technical description, CVSS vector, and exploitability analysis are consistent.
-        - **Generate Report**: Once all checks pass, use the `create_lark_document` tool to synthesize all validated findings. The report must include a dedicated section on the **Exploitability Analysis** and a **Sources** section listing all URL. **Recommendations** section must consist of concise, actionable, and purely proactive technical steps for remediation or mitigation. Each step should be a bullet point starting with an asterisk "*" and ending with a new line character "\n", without using full sentences or terminal punctuation. **Recommendations** section should exclude all non-technical actions, such as policy reviews, procedural updates, or post-implementation verification and validation steps. Do not include any passive recommendations.
+        - **Generate Report**: Once all checks pass, use the `create_lark_document` tool to synthesize all validated findings. Keep `technical_details` concise and focused on vulnerability mechanics, affected components, exploitation prerequisites or scenarios, impact, and detection guidance. Structure `technical_details` with these exact Markdown subsection headers where the corresponding content is present: `### Detection guidance`, `### Exploitability Analysis`, `### Expected impact`, and `### Affected conditions`. Prefix those subsection headers with `### ` exactly, and do not render those labels as plain text or bold-only labels. Avoid one large paragraph; use short paragraphs separated by blank lines, and use bullet points when listing components, prerequisites, impacts, or detection indicators. Use Markdown syntax only when needed, especially the required `### ` subsection headers and inline code for files, functions, variables, commands, CVE/CWE identifiers, or other technical names; avoid decorative formatting such as bold-only section labels. The report must include a dedicated section on Exploitability Analysis and a Sources section listing all URLs. Recommendations section must consist of concise, actionable, and purely proactive technical steps for remediation or mitigation. Each step should be a bullet point starting with an asterisk "*" and ending with a new line character "\n", without using full sentences or terminal punctuation. Recommendations section should exclude all non-technical actions, such as policy reviews, procedural updates, or post-implementation verification and validation steps. Do not include any passive recommendations.
         """
         from strands.models import BedrockModel
         from strands.models.openai import OpenAIModel
@@ -234,8 +128,8 @@ class VulnerabilityIntelligenceAgent:
 
         self.agent = Agent(
             conversation_manager=conversation_manager,
-            # model=openai_model,
-            model=bedrock,
+            model=openai_model,
+            #model=bedrock,
             plugins=[plugin],
             system_prompt=self.system_prompt,
             tools=[
@@ -260,8 +154,17 @@ class VulnerabilityIntelligenceAgent:
     def handle_request(self, request: str) -> str:
         """Handles a user request by invoking the agent."""
         print("INFO: Agent received request. It will now execute the analysis sequentially...")
-        response = self.agent(request, timeout=600)
-        return response
+        try:
+            response = self.agent(request, timeout=600)
+            return response
+        finally:
+            if _local_chromium_browser is not None:
+                cleanup = getattr(_local_chromium_browser, "_cleanup", None)
+                if callable(cleanup):
+                    try:
+                        cleanup()
+                    except Exception as exc:
+                        print(f"WARNING: Browser cleanup failed: {exc}")
 
 # --- Main Execution Block ---
 def main():
