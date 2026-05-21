@@ -7,9 +7,12 @@ This patch focuses on three general browser execution issues:
 """
 
 import asyncio
+import importlib
 import inspect
 import logging
 import os
+import threading
+import warnings
 from typing import Any, Callable, Dict, Optional
 
 from manus_use.tools.browser_utils import (
@@ -33,7 +36,206 @@ _PATCH_STATE: Dict[str, Any] = {
     "applied": False,
     "original_init": None,
     "original_handle_action": None,
+    "asyncio_compat_applied": False,
+    "original_shutdown_default_executor": {},
+    "original_sniffio_current_async_library": None,
+    "original_sniffio_impl_current_async_library": None,
+    "original_httpcore_async_shield_cancellation": {},
 }
+
+
+async def _shutdown_default_executor_without_wait_for(self, timeout=None):
+    """Shutdown the default executor without ``asyncio.wait_for``.
+
+    Python 3.14 changed ``shutdown_default_executor`` to use timeout helpers
+    that require ``asyncio.current_task()``. Browser integrations that apply
+    ``nest_asyncio`` can run loop cleanup handles without a current task, which
+    turns otherwise harmless shutdown/cleanup into noisy background exceptions.
+    Use manual ``call_later`` timeout handling instead.
+    """
+    self._executor_shutdown_called = True
+    if self._default_executor is None:
+        return
+
+    future = self.create_future()
+    thread = threading.Thread(target=self._do_shutdown, args=(future,))
+    thread.start()
+    timeout_handle = None
+
+    if timeout is not None:
+        timeout_handle = self.call_later(timeout, future.cancel)
+
+    try:
+        await future
+    except asyncio.CancelledError:
+        warnings.warn(
+            "The executor did not finish joining its threads "
+            f"within {timeout} seconds.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        self._default_executor.shutdown(wait=False)
+    else:
+        thread.join()
+    finally:
+        if timeout_handle is not None:
+            timeout_handle.cancel()
+
+
+def _current_asyncio_task_or_none():
+    """Return the current asyncio task, or None outside a real task context."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return None
+
+    try:
+        return asyncio.current_task()
+    except RuntimeError:
+        return None
+
+
+def apply_asyncio_compat_patch() -> bool:
+    """Apply process-wide asyncio compatibility patches used by browser tools.
+
+    Returns ``True`` when the patch was applied during this call, otherwise
+    ``False`` when it had already been applied. The patch is intentionally
+    idempotent because entrypoints and browser agents may both call it.
+    """
+    if _PATCH_STATE["asyncio_compat_applied"]:
+        return False
+
+    loop_classes = [asyncio.SelectorEventLoop]
+    proactor_loop = getattr(asyncio, "ProactorEventLoop", None)
+    if proactor_loop is not None:
+        loop_classes.append(proactor_loop)
+
+    for loop_class in loop_classes:
+        _PATCH_STATE["original_shutdown_default_executor"][loop_class] = getattr(
+            loop_class, "shutdown_default_executor", None
+        )
+        loop_class.shutdown_default_executor = _shutdown_default_executor_without_wait_for
+
+    try:
+        import sniffio
+        import sniffio._impl as sniffio_impl
+    except ImportError:
+        sniffio = None
+        sniffio_impl = None
+
+    if sniffio is not None and sniffio_impl is not None:
+        original_current_async_library = sniffio.current_async_library
+        original_impl_current_async_library = sniffio_impl.current_async_library
+
+        def current_async_library_with_asyncio_fallback():
+            try:
+                return original_impl_current_async_library()
+            except sniffio.AsyncLibraryNotFoundError:
+                if _current_asyncio_task_or_none() is None:
+                    raise
+                return "asyncio"
+
+        _PATCH_STATE["original_sniffio_current_async_library"] = original_current_async_library
+        _PATCH_STATE[
+            "original_sniffio_impl_current_async_library"
+        ] = original_impl_current_async_library
+        sniffio.current_async_library = current_async_library_with_asyncio_fallback
+        sniffio_impl.current_async_library = current_async_library_with_asyncio_fallback
+
+    try:
+        import sniffio as sniffio_for_httpcore
+    except ImportError:
+        sniffio_for_httpcore = None
+
+    httpcore_module_names = (
+        "httpcore._synchronization",
+        "httpcore._async.http11",
+        "httpcore._async.http2",
+        "httpcore._async.connection_pool",
+    )
+    original_shields = _PATCH_STATE["original_httpcore_async_shield_cancellation"]
+
+    for module_name in httpcore_module_names:
+        try:
+            module = importlib.import_module(module_name)
+        except ImportError:
+            continue
+
+        original_async_shield = getattr(module, "AsyncShieldCancellation", None)
+        if original_async_shield is None:
+            continue
+        original_shields[module_name] = original_async_shield
+
+    if original_shields:
+        canonical_original_async_shield = original_shields.get("httpcore._synchronization") or next(
+            iter(original_shields.values())
+        )
+
+        class AsyncShieldCancellationCompat:
+            """httpcore cleanup shield that no-ops outside an asyncio task.
+
+            httpcore shields async stream cleanup with AnyIO ``CancelScope``. On
+            Python 3.14/nested-loop cleanup paths, there can be a running loop
+            but no current task, and AnyIO cannot enter a cancel scope there.
+            """
+
+            def __init__(self, *args, **kwargs):
+                self._backend = None
+                self._entered = False
+                self._inner = None
+                self._noop = False
+
+                if sniffio_for_httpcore is None:
+                    self._noop = True
+                    return
+
+                try:
+                    self._backend = sniffio_for_httpcore.current_async_library()
+                except sniffio_for_httpcore.AsyncLibraryNotFoundError:
+                    self._noop = True
+                    return
+
+                if self._backend == "asyncio" and _current_asyncio_task_or_none() is None:
+                    self._noop = True
+                    return
+
+                self._inner = canonical_original_async_shield(*args, **kwargs)
+
+            def __enter__(self):
+                if self._noop or self._inner is None:
+                    return self
+
+                if self._backend == "asyncio" and _current_asyncio_task_or_none() is None:
+                    self._noop = True
+                    self._inner = None
+                    return self
+
+                try:
+                    self._inner.__enter__()
+                except TypeError as exc:
+                    if "cannot create weak reference to 'NoneType' object" not in str(exc):
+                        raise
+                    self._noop = True
+                    self._inner = None
+                    return self
+
+                self._entered = True
+                return self
+
+            def __exit__(self, exc_type=None, exc_value=None, traceback=None):
+                if self._entered and self._inner is not None:
+                    return self._inner.__exit__(exc_type, exc_value, traceback)
+                return None
+
+        for module_name in original_shields:
+            try:
+                module = importlib.import_module(module_name)
+            except ImportError:
+                continue
+            module.AsyncShieldCancellation = AsyncShieldCancellationCompat
+
+    _PATCH_STATE["asyncio_compat_applied"] = True
+    return True
 
 
 def _coerce_int(value: Any, fallback: int) -> int:
@@ -159,6 +361,7 @@ def apply_comprehensive_patch(
     enable_fallbacks: Optional[bool] = None,
 ) -> bool:
     """Apply a compatibility patch to ``strands_tools.use_browser`` if available."""
+    apply_asyncio_compat_patch()
     configure_browser_patch(
         default_timeout_ms=default_timeout_ms,
         max_retries=max_retries,

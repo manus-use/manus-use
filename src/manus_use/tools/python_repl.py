@@ -11,6 +11,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import traceback
 from typing import Any, Callable, List, Optional
@@ -54,14 +55,13 @@ class FixedPtyManager:
         self.callback = callback
         self._child_exited = False
         self._code_file: Optional[str] = None
+        self._reader: Optional[threading.Thread] = None
 
     def start(self, code: str) -> None:
         import fcntl
         import pty
         import struct
         import termios
-        import threading
-
         master_fd, slave_fd = pty.openpty()
         term_size = struct.pack("HHHH", 24, 80, 0, 0)
         fcntl.ioctl(slave_fd, termios.TIOCSWINSZ, term_size)
@@ -86,9 +86,8 @@ class FixedPtyManager:
         os.close(slave_fd)
         self.supervisor_fd = master_fd
 
-        reader = threading.Thread(target=self._read_output)
-        reader.daemon = True
-        reader.start()
+        self._reader = threading.Thread(target=self._read_output, daemon=True)
+        self._reader.start()
 
     def _read_output(self) -> None:
         import select
@@ -199,6 +198,9 @@ class FixedPtyManager:
             finally:
                 self.supervisor_fd = -1
 
+        if self._reader is not None and self._reader.is_alive():
+            self._reader.join(timeout=0.5)
+
         if self._code_file and os.path.exists(self._code_file):
             try:
                 os.unlink(self._code_file)
@@ -222,6 +224,7 @@ def python_repl(tool: ToolUse, **kwargs: Any) -> ToolResult:
     code = tool_input["code"]
     interactive = os.environ.get("PYTHON_REPL_INTERACTIVE", str(tool_input.get("interactive", True))).lower() == "true"
     reset_state = os.environ.get("PYTHON_REPL_RESET_STATE", str(tool_input.get("reset_state", False))).lower() == "true"
+    timeout_seconds = float(os.environ.get("PYTHON_REPL_TIMEOUT", str(tool_input.get("timeout", 120))))
 
     strands_dev = os.environ.get("BYPASS_TOOL_CONSENT", "").lower() == "true"
     non_interactive_mode = kwargs.get("non_interactive_mode", False)
@@ -297,19 +300,36 @@ def python_repl(tool: ToolUse, **kwargs: Any) -> ToolResult:
                 pty_mgr.start(code)
 
                 exit_code = None
+                deadline = time.monotonic() + timeout_seconds if timeout_seconds > 0 else None
                 while True:
                     ret = pty_mgr.process.poll()
                     if ret is not None:
                         exit_code = ret
                         pty_mgr._child_exited = True
                         break
+                    if deadline is not None and time.monotonic() >= deadline:
+                        pty_mgr.stop()
+                        raise TimeoutError(f"Python REPL execution exceeded {timeout_seconds:.1f}s timeout")
                     time.sleep(0.05)
 
+                # Give the reader thread a brief chance to drain trailing stderr/stdout
+                # from process shutdown before closing the PTY.
+                if pty_mgr._reader is not None:
+                    pty_mgr._reader.join(timeout=0.5)
                 output = pty_mgr.get_output()
                 pty_mgr.stop()
 
                 if exit_code == 0:
-                    repl_state.save_state(code)
+                    # Do not pass ``code`` here.  The upstream helper executes the
+                    # supplied code again while saving state, which defeats the
+                    # subprocess isolation used by this fork-safe wrapper.  That
+                    # second in-process execution can duplicate side effects and
+                    # leave async HTTP clients/streams (for example httpx/httpcore)
+                    # to be finalized later in the agent process, producing noisy
+                    # ``AsyncLibraryNotFoundError`` shutdown tracebacks unrelated
+                    # to the current CVE.  Persist only the already-existing parent
+                    # REPL state instead.
+                    repl_state.save_state()
             else:
                 console.print("[blue]Running in standard mode...[/]")
                 captured = OutputCapture()
