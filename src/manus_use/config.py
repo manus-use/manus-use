@@ -165,7 +165,6 @@ class Config(BaseModel):
         
         if path and path.exists():
             data = toml.load(path)
-            #print(data)
             return cls(**data)
         
         # Return default config if no file found
@@ -201,4 +200,36 @@ class Config(BaseModel):
                 max_tokens=self.llm.max_tokens,
             )
 
-        raise ValueError(f"Unknown provider: {self.llm.provider}")
+        if provider == "anthropic":
+            try:
+                from strands.models.anthropic import AnthropicModel
+            except ImportError as exc:
+                raise ImportError(
+                    "Anthropic model support is not available. Install required dependencies (e.g. `anthropic`)."
+                ) from exc
+
+            kwargs: Dict[str, Any] = {
+                "model_id": self.llm.model,
+                "max_tokens": self.llm.max_tokens,
+            }
+            if self.llm.api_key:
+                kwargs["api_key"] = self.llm.api_key
+            return AnthropicModel(**kwargs)
+
+        if provider == "ollama":
+            try:
+                from strands.models.ollama import OllamaModel
+            except ImportError as exc:
+                raise ImportError(
+                    "Ollama model support is not available. Install required dependencies (e.g. `ollama`)."
+                ) from exc
+
+            return OllamaModel(
+                model_id=self.llm.model,
+                host=self.llm.base_url or "http://localhost:11434",
+            )
+
+        raise ValueError(
+            f"Unknown provider: {self.llm.provider!r}. "
+            "Supported values are: 'openai', 'anthropic', 'bedrock', 'ollama'."
+        )
