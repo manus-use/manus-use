@@ -5,8 +5,9 @@ Strands Agent that performs vulnerability analysis using a sequential, tool-base
 
 import os
 import sys
-from pathlib import Path
 import warnings
+from pathlib import Path
+
 warnings.filterwarnings("ignore")
 os.environ["BYPASS_TOOL_CONSENT"] = "True"
 os.environ["OPENCLAW"] = os.environ.get("OPENCLAW", "false")
@@ -22,7 +23,9 @@ apply_comprehensive_patch()
 # Import Strands SDK and required tools
 from strands import Agent, AgentSkills
 from strands_tools import current_time
+
 from manus_use.tools.get_github_advisory import get_github_advisory
+from manus_use.tools.get_trickest_pocs import get_trickest_pocs
 
 _local_chromium_browser = None
 try:
@@ -64,7 +67,9 @@ class VulnerabilityIntelligenceAgent:
         - Call `get_otx_cve_details` to check for threat intelligence information from AlienVault OTX, such as associated pulses and IoCs.
 
         **Step 3: Gather Public Exploits and Advisories**
-        - Call `search_for_exploits` (GitHub), `search_exploit_db`, and `search_packetstorm` to find public proof-of-concept (PoC) exploits.
+        - First, call `get_trickest_pocs` with the CVE ID. This is a fast pre-flight lookup against the trickest/cve index (250k+ CVEs, updated daily) — it returns known PoC links in milliseconds with no rate limits.
+        - Then call `search_for_exploits` (GitHub), `search_exploit_db`, and `search_packetstorm` to find additional PoCs not yet indexed by trickest.
+        - Merge all results, deduplicating URLs.
 
         **Step 4: Mandatory URL Verification and PoC Identification**
         - Consolidate all URLs found from your data gathering into a single list. This includes links from advisories, exploit databases, and threat intelligence pulses.
@@ -102,9 +107,9 @@ class VulnerabilityIntelligenceAgent:
         - **Information Consistency**: Ensure the technical description, CVSS vector, and exploitability analysis are consistent.
         - **Generate Report**: Once all checks pass, use the `create_lark_document` tool to synthesize all validated findings. Keep `technical_details` concise and focused on vulnerability mechanics, affected components, exploitation prerequisites or scenarios, impact, and detection guidance. Structure `technical_details` with these exact Markdown subsection headers where the corresponding content is present: `### Detection guidance`, `### Exploitability Analysis`, `### Expected impact`, and `### Affected conditions`. Prefix those subsection headers with `### ` exactly, and do not render those labels as plain text or bold-only labels. Avoid one large paragraph; use short paragraphs separated by blank lines, and use bullet points when listing components, prerequisites, impacts, or detection indicators. Use Markdown syntax only when needed, especially the required `### ` subsection headers and inline code for files, functions, variables, commands, CVE/CWE identifiers, or other technical names; avoid decorative formatting such as bold-only section labels. The report must include a dedicated section on Exploitability Analysis and a Sources section listing all URLs. Recommendations section must consist of concise, actionable, and purely proactive technical steps for remediation or mitigation. Each step should be a bullet point starting with an asterisk "*" and ending with a new line character "\n", without using full sentences or terminal punctuation. Recommendations section should exclude all non-technical actions, such as policy reviews, procedural updates, or post-implementation verification and validation steps. Do not include any passive recommendations.
         """
+        from strands.agent.conversation_manager import SlidingWindowConversationManager
         from strands.models import BedrockModel
         from strands.models.openai import OpenAIModel
-        from strands.agent.conversation_manager import SlidingWindowConversationManager
 
         conversation_manager = SlidingWindowConversationManager(
             window_size=40,  # Maximum number of messages to keep
@@ -138,6 +143,7 @@ class VulnerabilityIntelligenceAgent:
                 current_time,
                 "manus_use.tools.create_lark_document",
                 "manus_use.tools.get_nvd_data",
+                get_trickest_pocs,
                 "manus_use.tools.search_for_exploits",
                 "manus_use.tools.get_cwe_details",
                 "manus_use.tools.search_exploit_db",
@@ -185,7 +191,7 @@ def main():
         from manus_use.config import Config
         config = Config.from_file()
         model_name = "us.anthropic.claude-sonnet-4-20250514-v1:0"
-    except Exception as e:
+    except Exception:
         model_name = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 
     # Create the agent
