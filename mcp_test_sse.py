@@ -1,11 +1,10 @@
-from strands import Agent
-from strands.tools.mcp.mcp_client import MCPClient
 from mcp.client.sse import sse_client
-from mcp.client.stdio import StdioServerParameters, stdio_client
 from pydantic import BaseModel, Field
+from strands.tools.mcp.mcp_client import MCPClient
+
+
 class AssetMatch(BaseModel):
     result: str = Field(description="Result data, or error messages from the tasks.")
-
 
 
 # Create the MCP client that wraps the stdio client

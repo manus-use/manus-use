@@ -73,6 +73,7 @@ def test_parse_pocs_no_pocs():
 
 # --- Integration-style tests for get_trickest_pocs (mocked HTTP) ---
 
+
 def _make_mock_response(content: str):
     mock_resp = MagicMock()
     mock_resp.read.return_value = content.encode("utf-8")

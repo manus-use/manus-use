@@ -9,19 +9,20 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.manus_use.multi_agents.task_planning_agent import PlanningAgent
+
 from src.manus_use.config import Config
 
 
 async def browser_orchestration_demo():
     """Demonstrate browser automation through orchestrator."""
-    
+
     # Initialize configuration
     config = Config.from_file()
-    
+
     # Create PlanningAgent (orchestrator)
     print("Creating Planning/Orchestrator Agent...")
     orchestrator = PlanningAgent(config=config)
-    
+
     # Complex task requiring browser automation
     task = """
     I need to research the latest developments in AI and create a summary report:
@@ -31,13 +32,13 @@ async def browser_orchestration_demo():
     4. Take screenshots of important pages
     5. Create a markdown report summarizing the findings
     """
-    
+
     print(f"\nTask: {task}")
     print("\nOrchestrator is planning and delegating to specialized agents...\n")
-    
+
     # Run the task
     result = await orchestrator.run(task)
-    
+
     print("\n✅ Task completed!")
     print(f"\nResult: {result}")
 

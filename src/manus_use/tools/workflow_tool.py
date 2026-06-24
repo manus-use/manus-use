@@ -1,18 +1,17 @@
 """Custom workflow tool that supports ManusUse agent types."""
 
 import asyncio
-import json
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any
 
 from strands.types.tools import ToolResult, ToolUse
 from strands_tools.workflow import (
-    WorkflowManager,WORKFLOW_DIR #, TOOL_SPEC as BASE_TOOL_SPEC
+    WorkflowManager,  # , TOOL_SPEC as BASE_TOOL_SPEC
 )
 
-from manus_use.agents import ManusAgent, BrowserUseAgent, DataAnalysisAgent, MCPAgent
+from manus_use.agents import BrowserUseAgent, DataAnalysisAgent, ManusAgent, MCPAgent
 from manus_use.config import Config
 
 logger = logging.getLogger(__name__)
@@ -24,7 +23,7 @@ TOOL_SPEC["name"] = "workflow_tool"
 # TOOL_SPEC["description"] = TOOL_SPEC["description"] + """
 TOOL_SPEC["description"] = """
 This version supports ManusUse agent types:
-- manus: General computation, http request for real-time api search in the future, file operations, and python code execution. 
+- manus: General computation, http request for real-time api search in the future, file operations, and python code execution.
 - browser: Web browsing and scraping when you need a browser to obtain real-time information, like poc, in the future
 - data_analysis: Data analysis and visualization
 - mcp: Model Context Protocol tools
@@ -32,60 +31,61 @@ This version supports ManusUse agent types:
 
 # Add agent_type to the task schema
 # TOOL_SPEC["inputSchema"]["json"]["properties"]["tasks"]["items"]["properties"]["agent_type"] = {
-TOOL_SPEC["inputSchema"] ={
+TOOL_SPEC["inputSchema"] = {
     "type": "string",
     "enum": ["manus", "browser", "data_analysis", "mcp"],
     "description": "Agent type to use for executing this task (defaults to 'manus')",
-    "default": "manus"
+    "default": "manus",
 }
+
 
 class ManusWorkflowManager(WorkflowManager):
     """Extended workflow manager that supports ManusUse agent types."""
-    
-    def __init__(self, tool_context: Dict[str, Any]):
+
+    def __init__(self, tool_context: dict[str, Any]):
         """Initialize with agent registry."""
         super().__init__(tool_context)
-        
+
         # Get config from tool context
         self.config = Config.from_file()
-        
+
         # Initialize agent registry
         self.agent_registry = {
             "manus": ManusAgent,
             "browser": BrowserUseAgent,
             "data_analysis": DataAnalysisAgent,
-            "mcp": MCPAgent
+            "mcp": MCPAgent,
         }
-        
+
         # Cache for agent instances
         self.agent_instances = {}
-        
-    def get_agent_for_task(self, task: Dict) -> Any:
+
+    def get_agent_for_task(self, task: dict) -> Any:
         """Get the appropriate agent for a task based on agent_type."""
         agent_type = task.get("agent_type", "manus")
-        
+
         # Check cache first
         if agent_type in self.agent_instances:
             return self.agent_instances[agent_type]
-            
+
         # Create new agent instance
         agent_class = self.agent_registry.get(agent_type)
         if not agent_class:
             logger.warning(f"Unknown agent type: {agent_type}, using ManusAgent")
             agent_class = ManusAgent
-            
+
         # Create agent with system prompt if provided
         system_prompt = task.get("system_prompt")
         if system_prompt:
             agent = agent_class(config=self.config, system_prompt=system_prompt)
         else:
             agent = agent_class(config=self.config)
-            
+
         # Cache the instance
         self.agent_instances[agent_type] = agent
         return agent
-        
-    def execute_task(self, task: Dict, workflow: Dict, tool_use_id: str) -> Dict:
+
+    def execute_task(self, task: dict, workflow: dict, tool_use_id: str) -> dict:
         """Execute a single task using the appropriate agent."""
         try:
             # Build context from dependent tasks
@@ -105,11 +105,11 @@ class ManusWorkflowManager(WorkflowManager):
 
             # Get the appropriate agent for this task
             agent = self.get_agent_for_task(task)
-            
-            # Execute task using the agent
-            potential_coroutine = agent(task_prompt) # This might be a coroutine or a direct result
 
-            actual_result: Any # Define type for clarity
+            # Execute task using the agent
+            potential_coroutine = agent(task_prompt)  # This might be a coroutine or a direct result
+
+            actual_result: Any  # Define type for clarity
             if asyncio.iscoroutine(potential_coroutine):
                 logger.info(f"Task {task.get('task_id', 'unknown')} returned a coroutine, running it to completion.")
                 try:
@@ -139,13 +139,13 @@ class ManusWorkflowManager(WorkflowManager):
                 logger.info(f"Task {task.get('task_id', 'unknown')} returned a dict-like result.")
                 # Attempt to get 'content' which might be a list of message dicts, or a string, or other
                 raw_content = actual_result.get("content")
-                if isinstance(raw_content, list): # Expecting list of message dicts e.g. [{"text": "..."}]
+                if isinstance(raw_content, list):  # Expecting list of message dicts e.g. [{"text": "..."}]
                     processed_content = raw_content
-                elif isinstance(raw_content, str): # If content itself is a string
-                     processed_content = [{"text": raw_content if raw_content is not None else ""}]
+                elif isinstance(raw_content, str):  # If content itself is a string
+                    processed_content = [{"text": raw_content if raw_content is not None else ""}]
                 elif raw_content is None:
                     processed_content = []
-                else: # Some other type, wrap its string representation
+                else:  # Some other type, wrap its string representation
                     processed_content = [{"text": str(raw_content)}]
 
                 stop_reason_str = actual_result.get("stop_reason", "completed")
@@ -168,7 +168,9 @@ class ManusWorkflowManager(WorkflowManager):
                 processed_content = []
             else:
                 # Fallback for other unexpected result types
-                logger.warning(f"Task {task.get('task_id', 'unknown')} returned an unexpected result type: {type(actual_result)}. Converting to string.")
+                logger.warning(
+                    f"Task {task.get('task_id', 'unknown')} returned an unexpected result type: {type(actual_result)}. Converting to string."
+                )
                 processed_content = [{"text": str(actual_result)}]
 
             # Determine status based on stop_reason_str or presence of error indicators
@@ -179,7 +181,7 @@ class ManusWorkflowManager(WorkflowManager):
             #     status = "error"
 
             return {
-                "toolUseId": tool_use_id, # Assuming tool_use_id is defined earlier in the method
+                "toolUseId": tool_use_id,  # Assuming tool_use_id is defined earlier in the method
                 "status": status,
                 "content": processed_content,
             }
@@ -188,7 +190,8 @@ class ManusWorkflowManager(WorkflowManager):
             error_msg = f"Error executing task {task['task_id']}: {str(e)}"
             logger.error(f"\nError: {error_msg}")
             return {"status": "error", "content": [{"text": error_msg}]}
-    def create_workflow(self, workflow_id: str, tasks: List[Dict], tool_use_id: str) -> Dict:
+
+    def create_workflow(self, workflow_id: str, tasks: list[dict], tool_use_id: str) -> dict:
         """Create a new workflow with the given tasks."""
         try:
             if not workflow_id:
@@ -232,15 +235,16 @@ class ManusWorkflowManager(WorkflowManager):
             logger.error(f"\nError: {error_msg}")
             return {"status": "error", "content": [{"text": error_msg}]}
 
+
 def workflow_tool(tool: ToolUse, **kwargs: Any) -> ToolResult:
     """ManusUse-aware workflow tool implementation.
-    
+
     This tool extends the base workflow tool with support for ManusUse agent types:
     - manus: General computation and file operations
     - browser: Web browsing using browser-use
     - data_analysis: Data analysis and visualization
     - mcp: Model Context Protocol tools
-    
+
     Each task can specify an agent_type to route to the appropriate agent.
     """
     system_prompt = kwargs.get("system_prompt")
@@ -325,6 +329,7 @@ def workflow_tool(tool: ToolUse, **kwargs: Any) -> ToolResult:
 
     except Exception as e:
         import traceback
+
         error_trace = traceback.format_exc()
         error_msg = f"Error: {str(e)}\n\nTraceback:\n{error_trace}"
         logger.error(f"\nError in workflow tool: {error_msg}")

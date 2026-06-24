@@ -6,7 +6,8 @@ This follows the Agents as Tools pattern.
 
 import asyncio
 import json
-from typing import Dict, Any
+from typing import Any
+
 from strands.types.tools import ToolResult, ToolUse
 
 # Import the core logic from the browser agent
@@ -31,6 +32,7 @@ TOOL_SPEC = {
     },
 }
 
+
 def browser_agent_tool(tool: ToolUse, **kwargs: Any) -> ToolResult:
     """
     Executes the browser agent with a given task.
@@ -43,22 +45,14 @@ def browser_agent_tool(tool: ToolUse, **kwargs: Any) -> ToolResult:
         return {
             "toolUseId": tool_use_id,
             "status": "error",
-            "content": [{"text": "The 'task' input is required for the browser_agent_tool."}]
+            "content": [{"text": "The 'task' input is required for the browser_agent_tool."}],
         }
 
     try:
         # Use asyncio.run() to execute the async function from this synchronous tool
         result_json_str = asyncio.run(run_browser_task(task))
-        return {
-            "toolUseId": tool_use_id,
-            "status": "success",
-            "content": [{"json": json.loads(result_json_str)}]
-        }
+        return {"toolUseId": tool_use_id, "status": "success", "content": [{"json": json.loads(result_json_str)}]}
     except Exception as e:
         error_message = f"An error occurred while running the browser agent: {e}"
         print(error_message)
-        return {
-            "toolUseId": tool_use_id,
-            "status": "error",
-            "content": [{"text": error_message}]
-        }
+        return {"toolUseId": tool_use_id, "status": "error", "content": [{"text": error_message}]}

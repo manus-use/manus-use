@@ -38,7 +38,7 @@ def main():
         ),
     )
 
-    print(f"=== Remediation Agent (single skill test) ===")
+    print("=== Remediation Agent (single skill test) ===")
     print(f"Query: {cve_id}\n")
 
     result = agent(f"Analyze {cve_id}")

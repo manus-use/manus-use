@@ -121,11 +121,7 @@ def _report_complete_validator(
     On failure returns a dict with ``passed=False`` and ``feedback`` listing
     the missing sections so the agent can complete them in the next attempt.
     """
-    text = " ".join(
-        block.get("text", "")
-        for block in response.get("content", [])
-        if isinstance(block, dict)
-    )
+    text = " ".join(block.get("text", "") for block in response.get("content", []) if isinstance(block, dict))
     missing = [s for s in _REQUIRED_REPORT_SECTIONS if s.lower() not in text.lower()]
     if not missing:
         return True

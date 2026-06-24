@@ -1,9 +1,8 @@
 """Tests for configuration module."""
 
 import pytest
-from pathlib import Path
 
-from manus_use.config import Config, LLMConfig, SandboxConfig, ToolsConfig
+from manus_use.config import Config, LLMConfig
 
 
 def test_default_config():
@@ -24,12 +23,7 @@ def test_default_config():
 def test_llm_config_model_kwargs():
     """Test LLM config model kwargs generation."""
     # OpenAI
-    config = LLMConfig(
-        provider="openai",
-        model="gpt-4",
-        api_key="test-key",
-        temperature=0.5
-    )
+    config = LLMConfig(provider="openai", model="gpt-4", api_key="test-key", temperature=0.5)
     kwargs = config.model_kwargs
     assert kwargs["model_id"] == "gpt-4"
     assert kwargs["api_key"] == "test-key"

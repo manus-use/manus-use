@@ -4,9 +4,11 @@ Custom tool for searching Packet Storm Security for exploits.
 This module follows the Strands SDK's module-based tool specification.
 """
 
+from typing import Any
+
 import requests
-from typing import Dict, Any, List
 from strands.types.tools import ToolResult, ToolUse
+
 from manus_use.tools.tool_output_logger import log_tool_output_size
 
 TOOL_SPEC = {
@@ -29,6 +31,7 @@ TOOL_SPEC = {
     },
 }
 
+
 def search_packetstorm(tool: ToolUse, **kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
     tool_input = tool["input"]
@@ -38,7 +41,7 @@ def search_packetstorm(tool: ToolUse, **kwargs: Any) -> ToolResult:
         result = {
             "toolUseId": tool_use_id,
             "status": "error",
-            "content": [{"text": "Invalid query. Must be a non-empty string."}]
+            "content": [{"text": "Invalid query. Must be a non-empty string."}],
         }
         log_tool_output_size("search_packetstorm", result)
         return result
@@ -51,34 +54,37 @@ def search_packetstorm(tool: ToolUse, **kwargs: Any) -> ToolResult:
         response.raise_for_status()
 
         html_content = response.text
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
 
         # Basic parsing to find exploit links
         exploit_entries = html_content.split('<dl class="file">')
-        
+
         for entry in exploit_entries[1:]:
             title_start = entry.find('<dt><a href="')
-            if title_start == -1: continue
-            
-            link_start = entry.find('">', title_start) + 2
-            link_end = entry.find('</a></dt>', link_start)
-            
-            title = entry[link_start:link_end].strip()
-            link = "https://packetstormsecurity.com" + entry[title_start + len('<dt><a href="'):link_start-2]
+            if title_start == -1:
+                continue
 
-            results.append({
-                "title": title,
-                "link": link,
-            })
-            
-            if len(results) >= 5: # Limit to top 5 results
+            link_start = entry.find('">', title_start) + 2
+            link_end = entry.find("</a></dt>", link_start)
+
+            title = entry[link_start:link_end].strip()
+            link = "https://packetstormsecurity.com" + entry[title_start + len('<dt><a href="') : link_start - 2]
+
+            results.append(
+                {
+                    "title": title,
+                    "link": link,
+                }
+            )
+
+            if len(results) >= 5:  # Limit to top 5 results
                 break
 
         if not results:
             result = {
                 "toolUseId": tool_use_id,
                 "status": "success",
-                "content": [{"json": {"summary": f"No exploits found on Packet Storm for '{query}'.", "exploits": []}}]
+                "content": [{"json": {"summary": f"No exploits found on Packet Storm for '{query}'.", "exploits": []}}],
             }
             log_tool_output_size("search_packetstorm", result)
             return result
@@ -87,16 +93,24 @@ def search_packetstorm(tool: ToolUse, **kwargs: Any) -> ToolResult:
         result = {
             "toolUseId": tool_use_id,
             "status": "success",
-            "content": [{"json": {"summary": summary, "exploits": results}}]
+            "content": [{"json": {"summary": summary, "exploits": results}}],
         }
         log_tool_output_size("search_packetstorm", result)
         return result
 
     except requests.exceptions.RequestException as e:
-        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"Request to Packet Storm failed: {e}"}]}
+        result = {
+            "toolUseId": tool_use_id,
+            "status": "error",
+            "content": [{"text": f"Request to Packet Storm failed: {e}"}],
+        }
         log_tool_output_size("search_packetstorm", result)
         return result
     except Exception as e:
-        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"An unexpected error occurred during Packet Storm search: {e}"}]}
+        result = {
+            "toolUseId": tool_use_id,
+            "status": "error",
+            "content": [{"text": f"An unexpected error occurred during Packet Storm search: {e}"}],
+        }
         log_tool_output_size("search_packetstorm", result)
         return result

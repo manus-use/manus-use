@@ -14,7 +14,8 @@ import tempfile
 import threading
 import time
 import traceback
-from typing import Any, Callable, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 from strands.types.tools import ToolResult, ToolUse
 
@@ -28,10 +29,9 @@ try:
         get_user_input,
         repl_state,
     )
-    from strands_tools.utils import console_util
-    from strands_tools.utils.user_input import get_user_input
 except ImportError:
     from strands_tools import python_repl as _original
+
     TOOL_SPEC = _original.TOOL_SPEC
     OutputCapture = _original.OutputCapture
     ReplState = _original.ReplState
@@ -48,20 +48,21 @@ class FixedPtyManager:
     to avoid crashes when forking in a multithreaded process on macOS.
     """
 
-    def __init__(self, callback: Optional[Callable] = None):
-        self.process: Optional[subprocess.Popen] = None
+    def __init__(self, callback: Callable | None = None):
+        self.process: subprocess.Popen | None = None
         self.supervisor_fd = -1
-        self.output_buffer: List[str] = []
+        self.output_buffer: list[str] = []
         self.callback = callback
         self._child_exited = False
-        self._code_file: Optional[str] = None
-        self._reader: Optional[threading.Thread] = None
+        self._code_file: str | None = None
+        self._reader: threading.Thread | None = None
 
     def start(self, code: str) -> None:
         import fcntl
         import pty
         import struct
         import termios
+
         master_fd, slave_fd = pty.openpty()
         term_size = struct.pack("HHHH", 24, 80, 0, 0)
         fcntl.ioctl(slave_fd, termios.TIOCSWINSZ, term_size)
@@ -121,8 +122,8 @@ class FixedPtyManager:
                         incomplete_bytes = b""
                     except UnicodeDecodeError as e:
                         if e.start > 0:
-                            data = full_data[:e.start].decode("utf-8")
-                            incomplete_bytes = full_data[e.start:]
+                            data = full_data[: e.start].decode("utf-8")
+                            incomplete_bytes = full_data[e.start :]
                         else:
                             incomplete_bytes = full_data
                             continue
@@ -149,7 +150,7 @@ class FixedPtyManager:
                                 except Exception:
                                     pass
 
-            except (OSError, IOError) as e:
+            except OSError as e:
                 if hasattr(e, "errno") and e.errno == 9:
                     break
                 continue
@@ -212,10 +213,8 @@ class FixedPtyManager:
 
 def python_repl(tool: ToolUse, **kwargs: Any) -> ToolResult:
     """Execute Python code with proper PTY cleanup and status handling."""
-    import sys
     from datetime import datetime
-    from io import StringIO
-    
+
     console = console_util.create()
 
     tool_use_id = tool["toolUseId"]
@@ -237,7 +236,7 @@ def python_repl(tool: ToolUse, **kwargs: Any) -> ToolResult:
 
         from rich.panel import Panel
         from rich.syntax import Syntax
-        
+
         console.print(
             Panel(
                 Syntax(code, "python", theme="monokai"),
@@ -246,9 +245,9 @@ def python_repl(tool: ToolUse, **kwargs: Any) -> ToolResult:
         )
 
         if not strands_dev and not non_interactive_mode:
-            from rich.table import Table
             from rich import box
-            
+            from rich.table import Table
+
             details_table = Table(show_header=False, box=box.SIMPLE)
             details_table.add_column("Property", style="cyan", justify="right")
             details_table.add_column("Value", style="green")
@@ -266,7 +265,7 @@ def python_repl(tool: ToolUse, **kwargs: Any) -> ToolResult:
                     box=box.ROUNDED,
                 )
             )
-            
+
             user_input = get_user_input(
                 "<yellow><bold>Do you want to proceed with Python code execution?</bold> [y/*]</yellow>"
             )
@@ -363,13 +362,13 @@ def python_repl(tool: ToolUse, **kwargs: Any) -> ToolResult:
 
     except Exception as e:
         from pathlib import Path
-        
+
         error_tb = traceback.format_exc()
         error_time = datetime.now()
 
         from rich.panel import Panel
         from rich.syntax import Syntax
-        
+
         console.print(
             Panel(
                 Syntax(error_tb, "python", theme="monokai"),

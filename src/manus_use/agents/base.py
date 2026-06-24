@@ -18,7 +18,7 @@ class BaseManusAgent(Agent):
         config: Config | None = None,
         system_prompt: str | None = None,
         context_manager: str | Any = "auto",
-        **kwargs
+        **kwargs,
     ):
         """Initialize base agent.
 
@@ -57,11 +57,13 @@ class BaseManusAgent(Agent):
             context_manager=context_manager,
             **kwargs,
         )
+
     def __del__(self):
         """Ensure proper cleanup."""
         # Properly handle cleanup by checking if parent class has __del__
-        if hasattr(super(), '__del__'):
+        if hasattr(super(), "__del__"):
             super().__del__()
+
     def _get_default_system_prompt(self) -> str:
         """Get default system prompt for this agent type."""
         return "You are a helpful AI assistant."

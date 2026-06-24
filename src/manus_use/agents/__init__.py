@@ -33,9 +33,7 @@ class BrowserAgent(BaseManusAgent):
     ):
         resolved_config = config or Config.from_file()
         self.headless = (
-            headless
-            if headless is not None
-            else bool(getattr(resolved_config.tools, "browser_headless", True))
+            headless if headless is not None else bool(getattr(resolved_config.tools, "browser_headless", True))
         )
 
         tools = []
@@ -55,6 +53,7 @@ class BrowserAgent(BaseManusAgent):
             "You are a helpful AI assistant specialized in web browsing and page extraction. "
             "Use browser tools to navigate, extract relevant content, and summarize findings."
         )
+
 
 __all__ = [
     "ManusAgent",

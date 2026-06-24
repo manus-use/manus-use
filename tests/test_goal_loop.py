@@ -1,10 +1,10 @@
 """Tests for GoalLoop integration in VulnerabilityIntelligenceAgent."""
 
 
-
 # ---------------------------------------------------------------------------
 # Validator unit tests (no strands import needed)
 # ---------------------------------------------------------------------------
+
 
 def _import_validator():
     """Import the module-level validator function."""
@@ -12,6 +12,7 @@ def _import_validator():
         _REQUIRED_REPORT_SECTIONS,
         _report_complete_validator,
     )
+
     return _report_complete_validator, _REQUIRED_REPORT_SECTIONS
 
 
@@ -98,6 +99,7 @@ def test_validator_non_text_blocks_ignored():
 # ---------------------------------------------------------------------------
 # Integration: GoalLoop is importable and wires into VulnerabilityIntelligenceAgent
 # ---------------------------------------------------------------------------
+
 
 def test_goal_loop_attached_to_agent():
     """GoalLoop plugin is importable and accepts the VA report validator."""

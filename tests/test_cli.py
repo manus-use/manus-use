@@ -11,6 +11,7 @@ from click.testing import CliRunner  # noqa: F401 – not used here; argparse te
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _invoke_main(argv, *, patch_single_shot=True, single_shot_rc=0):
     """Call cli.main() with a patched sys.argv.
 
@@ -50,6 +51,7 @@ def _invoke_main(argv, *, patch_single_shot=True, single_shot_rc=0):
 # --version
 # ---------------------------------------------------------------------------
 
+
 def test_version_flag():
     """--version prints version string and exits 0."""
     from manus_use import cli
@@ -63,6 +65,7 @@ def test_version_flag():
 # ---------------------------------------------------------------------------
 # Single-shot mode (positional task argument)
 # ---------------------------------------------------------------------------
+
 
 def test_single_shot_dispatches_task():
     """`manus-use 'do X'` routes to _run_single_shot with correct task."""
@@ -128,6 +131,7 @@ def test_single_shot_nonzero_exit():
 # Interactive mode (no positional task)
 # ---------------------------------------------------------------------------
 
+
 def test_no_task_goes_interactive():
     """Omitting the task argument invokes _run_interactive."""
     captured = _invoke_main([])
@@ -150,6 +154,7 @@ def test_output_without_task_is_error():
 # ---------------------------------------------------------------------------
 # _run_single_shot output-file writing
 # ---------------------------------------------------------------------------
+
 
 def test_run_single_shot_writes_output_file(tmp_path):
     """_run_single_shot saves result text to the specified output path."""

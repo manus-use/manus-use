@@ -4,10 +4,11 @@ Custom tool for querying open-source threat intelligence feeds.
 This module follows the Strands SDK's module-based tool specification.
 """
 
+from typing import Any
+
 import requests
-import json
-from typing import Dict, Any, List
 from strands.types.tools import ToolResult, ToolUse
+
 from manus_use.tools.tool_output_logger import log_tool_output_size
 
 TOOL_SPEC = {
@@ -31,6 +32,7 @@ TOOL_SPEC = {
     },
 }
 
+
 def query_threat_intelligence_feeds(tool: ToolUse, **kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
     tool_input = tool["input"]
@@ -40,7 +42,7 @@ def query_threat_intelligence_feeds(tool: ToolUse, **kwargs: Any) -> ToolResult:
         result = {
             "toolUseId": tool_use_id,
             "status": "error",
-            "content": [{"text": "Invalid CVE ID. Must be a non-empty string."}]
+            "content": [{"text": "Invalid CVE ID. Must be a non-empty string."}],
         }
         log_tool_output_size("query_threat_intelligence_feeds", result)
         return result
@@ -51,13 +53,13 @@ def query_threat_intelligence_feeds(tool: ToolUse, **kwargs: Any) -> ToolResult:
     threat_feeds = [
         {
             "name": "CISA Cybersecurity Advisories",
-            "url": "https://www.cisa.gov/cybersecurity-advisories/all.xml", # Updated RSS feed
-            "type": "rss"
+            "url": "https://www.cisa.gov/cybersecurity-advisories/all.xml",  # Updated RSS feed
+            "type": "rss",
         },
         # Removed US-CERT Alerts as it was causing 404 errors and may be deprecated.
     ]
 
-    found_intelligence: List[Dict[str, Any]] = []
+    found_intelligence: list[dict[str, Any]] = []
 
     for feed in threat_feeds:
         try:
@@ -69,12 +71,17 @@ def query_threat_intelligence_feeds(tool: ToolUse, **kwargs: Any) -> ToolResult:
             if cve_id.upper() in content.upper():
                 # In a real tool, you'd parse the RSS/JSON/HTML more intelligently
                 # to extract relevant snippets, titles, and links.
-                found_intelligence.append({
-                    "feed_name": feed["name"],
-                    "feed_url": feed["url"],
-                    "cve_found": cve_id,
-                    "snippet": content[content.upper().find(cve_id.upper())-50 : content.upper().find(cve_id.upper())+100] + "..." # Basic snippet
-                })
+                found_intelligence.append(
+                    {
+                        "feed_name": feed["name"],
+                        "feed_url": feed["url"],
+                        "cve_found": cve_id,
+                        "snippet": content[
+                            content.upper().find(cve_id.upper()) - 50 : content.upper().find(cve_id.upper()) + 100
+                        ]
+                        + "...",  # Basic snippet
+                    }
+                )
 
         except requests.exceptions.RequestException as e:
             # Log the error but continue with other feeds
@@ -86,7 +93,14 @@ def query_threat_intelligence_feeds(tool: ToolUse, **kwargs: Any) -> ToolResult:
         result = {
             "toolUseId": tool_use_id,
             "status": "success",
-            "content": [{"json": {"summary": f"No direct threat intelligence found for {cve_id} in curated feeds.", "intelligence": []}}]
+            "content": [
+                {
+                    "json": {
+                        "summary": f"No direct threat intelligence found for {cve_id} in curated feeds.",
+                        "intelligence": [],
+                    }
+                }
+            ],
         }
         log_tool_output_size("query_threat_intelligence_feeds", result)
         return result
@@ -95,7 +109,7 @@ def query_threat_intelligence_feeds(tool: ToolUse, **kwargs: Any) -> ToolResult:
     result = {
         "toolUseId": tool_use_id,
         "status": "success",
-        "content": [{"json": {"summary": summary, "intelligence": found_intelligence}}]
+        "content": [{"json": {"summary": summary, "intelligence": found_intelligence}}],
     }
     log_tool_output_size("query_threat_intelligence_feeds", result)
     return result

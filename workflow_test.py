@@ -7,14 +7,13 @@ with headless=False for browser operations
 import os
 import sys
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any
 
 # Add the src directory to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 # Import Strands SDK
 from strands import Agent
-from strands.tools import tool
 
 # Import our workflow tool
 from manus_use.tools import manus_workflow
@@ -22,9 +21,10 @@ from manus_use.tools.manus_workflow import WORKFLOW_DIR
 
 # Create custom tools for the workflow agent
 
+
 class WorkflowAgent:
     """Agent that manages complex workflows using multiple agent types"""
-    
+
     def __init__(self, model_name: str = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"):
         """Initialize the workflow agent"""
         # Create system prompt
@@ -98,49 +98,41 @@ When creating workflows:
 
 Always ensure workflows are well-structured and tasks are properly sequenced.
 """
-        
+
         # Initialize the agent with tools
-        self.agent = Agent(
-            model=model_name,
-            system_prompt=self.system_prompt,
-            tools=[manus_workflow]
-        )
-    
+        self.agent = Agent(model=model_name, system_prompt=self.system_prompt, tools=[manus_workflow])
+
     def handle_request(self, request: str) -> str:
         """Handle a user request by creating and executing appropriate workflows"""
         response = self.agent(request)
         return response
 
-def start_workflow(workflow_id: str) -> Dict[str, Any]:
+
+def start_workflow(workflow_id: str) -> dict[str, Any]:
     """
     Start execution of a workflow.
-    
+
     Args:
         workflow_id: The ID of the workflow to start
-        
+
     Returns:
         Result of starting the workflow
     """
-    tool_use = {
-        "toolUseId": f"start-{workflow_id}",
-        "input": {
-            "action": "start",
-            "workflow_id": workflow_id
-        }
-    }
-    return manus_workflow_module.manus_workflow(tool_use)
+    tool_use = {"toolUseId": f"start-{workflow_id}", "input": {"action": "start", "workflow_id": workflow_id}}
+    return manus_workflow(tool_use)
+
+
 # Example usage
 def main():
     """Example of using the WorkflowAgent"""
     print("=== Workflow Agent Example ===")
     print(f"Workflow directory: {WORKFLOW_DIR}")
-    
+
     # Ensure workflow directory exists
     os.makedirs(WORKFLOW_DIR, exist_ok=True)
-    
+
     # Create the agent
     agent = WorkflowAgent()
-
 
     response1 = agent.handle_request("what are your tools?")
     print(f"Response: {response1}")
@@ -153,12 +145,13 @@ def main():
     """
     response1 = agent.handle_request(research_request)
     print(f"Response: {response1}")
-    
+
 
 if __name__ == "__main__":
     # Check if we're running with a configured model
     try:
         from manus_use.config import Config
+
         config = Config.from_file()
         if config.llm.provider == "bedrock":
             print("Using AWS Bedrock configuration")
@@ -170,5 +163,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Configuration error: {e}")
         print("Using default agent configuration")
-    
+
     main()
