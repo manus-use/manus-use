@@ -98,6 +98,46 @@ Your process is optimized to build a comprehensive picture from authoritative, f
 """
 
 
+# ---------------------------------------------------------------------------
+# GoalLoop validator
+# ---------------------------------------------------------------------------
+
+# Sections the final VA report must contain.  Using a programmatic validator
+# avoids spawning an LLM judge on every successful run (zero extra cost).
+_REQUIRED_REPORT_SECTIONS: tuple[str, ...] = (
+    "CVSS",
+    "Remediation",
+    "Exploitability",
+    "Detection",
+)
+
+
+def _report_complete_validator(
+    response: dict,  # last assistant message from the agent
+    agent: Any,  # host agent instance (unused but required by the interface)
+) -> bool | dict:
+    """Return True when the response contains all required VA report sections.
+
+    On failure returns a dict with ``passed=False`` and ``feedback`` listing
+    the missing sections so the agent can complete them in the next attempt.
+    """
+    text = " ".join(
+        block.get("text", "")
+        for block in response.get("content", [])
+        if isinstance(block, dict)
+    )
+    missing = [s for s in _REQUIRED_REPORT_SECTIONS if s.lower() not in text.lower()]
+    if not missing:
+        return True
+    return {
+        "passed": False,
+        "feedback": (
+            f"Report is incomplete. Missing required sections: {missing}. "
+            "Please complete those sections and regenerate the full report."
+        ),
+    }
+
+
 class VulnerabilityIntelligenceAgent:
     """Agent that performs vulnerability analysis via a sequential, tool-based workflow.
 
@@ -163,6 +203,17 @@ class VulnerabilityIntelligenceAgent:
         # safety-net fallback inside agentic mode.
         context_manager: str = "agentic"
 
+        # GoalLoop: ensure the final response contains all required report
+        # sections before returning.  Uses a fast programmatic validator (no
+        # judge-agent invocation) so there is no extra LLM cost on success.
+        from strands.vended_plugins.goal import GoalLoop
+
+        goal_loop = GoalLoop(
+            goal=_report_complete_validator,
+            max_attempts=2,
+            timeout=900.0,
+        )
+
         tools: list[Any] = [
             "manus_use.tools.http_request",
             "manus_use.tools.python_repl",
@@ -193,8 +244,10 @@ class VulnerabilityIntelligenceAgent:
 
         # Attach the bundled verify-exploit skill when AgentSkills is available.
         plugin = self._resolve_skills_plugin()
+        plugins: list[Any] = [goal_loop]
         if plugin is not None:
-            agent_kwargs["plugins"] = [plugin]
+            plugins.append(plugin)
+        agent_kwargs["plugins"] = plugins
 
         self.agent = Agent(**agent_kwargs)
 
