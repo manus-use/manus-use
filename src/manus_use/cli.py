@@ -103,6 +103,95 @@ def _make_agent(agent_type: str, config: Config):
 # Single-shot and interactive runners
 # ---------------------------------------------------------------------------
 
+def _build_analyze_parser() -> argparse.ArgumentParser:
+    """Build the argument parser for the `analyze` subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="manus-use analyze",
+        description="Run a vulnerability intelligence analysis for a CVE.",
+    )
+    parser.add_argument(
+        "cve_id",
+        metavar="CVE-ID",
+        help="CVE identifier to analyze (e.g. CVE-2025-6554)",
+    )
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="Enable Docker-based exploit verification (default: off)",
+    )
+    parser.add_argument(
+        "--output",
+        choices=["text", "json", "lark"],
+        default="text",
+        help="Report output format (default: text)",
+    )
+    parser.add_argument(
+        "--config",
+        metavar="FILE",
+        type=Path,
+        default=None,
+        help="Path to a config.toml file (overrides default search paths)",
+    )
+    return parser
+
+
+def _run_analyze(
+    *,
+    cve_id: str,
+    verify: bool,
+    output: str,
+    config: Config,
+) -> int:
+    """Run the vulnerability intelligence analysis for a CVE and report it.
+
+    Returns an exit code (0 = success, 1 = failure).
+    """
+    try:
+        from .agents import VulnerabilityIntelligenceAgent
+    except ImportError as exc:
+        console.print(f"[red]\u2717 Vulnerability intelligence agent unavailable: {exc}[/red]")
+        return 1
+
+    console.print(f"[bold blue]Analyzing {cve_id}[/bold blue]")
+    if verify:
+        console.print("[dim]Exploit verification: ENABLED[/dim]")
+
+    try:
+        agent = VulnerabilityIntelligenceAgent(config=config)
+    except Exception as exc:
+        console.print(f"[red]\u2717 Failed to initialise agent: {exc}[/red]")
+        return 1
+
+    request = agent.build_request(cve_id, verify=verify)
+
+    try:
+        with console.status(f"Running analysis for {cve_id}\u2026", spinner="dots"):
+            result = agent.handle_request(request)
+    except Exception as exc:
+        console.print(f"[red]\u2717 Analysis failed: {exc}[/red]")
+        return 1
+
+    result_text = str(result)
+
+    if output == "json":
+        import json
+
+        console.print_json(json.dumps({"cve": cve_id, "report": result_text}))
+    elif output == "lark":
+        console.print(
+            "[dim]Report delivered to Lark (see create_lark_document output above).[/dim]"
+        )
+        console.print(
+            Panel(result_text, title=f"[bold green]{cve_id}[/bold green]", border_style="green")
+        )
+    else:
+        console.print(
+            Panel(result_text, title=f"[bold green]{cve_id}[/bold green]", border_style="green")
+        )
+
+    return 0
+
+
 def _run_single_shot(
     task: str,
     *,
@@ -542,7 +631,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
 # main() entry point
 # ---------------------------------------------------------------------------
 
-_SUBCOMMANDS = {"init", "doctor"}
+_SUBCOMMANDS = {"init", "doctor", "analyze"}
 
 
 def _build_run_parser() -> argparse.ArgumentParser:
@@ -563,6 +652,10 @@ def _build_run_parser() -> argparse.ArgumentParser:
             "  # Setup helpers\n"
             "  manus-use init           # create ~/.manus-use/config.toml interactively\n"
             "  manus-use doctor         # check packages, config, and API keys\n"
+            "\n"
+            "  # Vulnerability intelligence analysis\n"
+            "  manus-use analyze CVE-2025-6554\n"
+            "  manus-use analyze CVE-2024-3094 --verify --output json\n"
         ),
     )
     parser.add_argument(
@@ -664,6 +757,17 @@ def main() -> None:
         idx = argv.index("doctor")
         args = _build_doctor_parser().parse_args(argv[idx + 1 :])
         sys.exit(_cmd_doctor(args))
+
+    if first_positional == "analyze":
+        idx = argv.index("analyze")
+        analyze_args = _build_analyze_parser().parse_args(argv[idx + 1 :])
+        config = Config.from_file(analyze_args.config)
+        sys.exit(_run_analyze(
+            cve_id=analyze_args.cve_id,
+            verify=analyze_args.verify,
+            output=analyze_args.output,
+            config=config,
+        ))
 
     # Default: run / interactive
     run_parser = _build_run_parser()
