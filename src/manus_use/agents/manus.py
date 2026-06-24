@@ -1,18 +1,21 @@
 """Manus-style agent implementation."""
 
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from strands.types.tools import AgentTool
 
 from manus_use.agents.base import BaseManusAgent
 from manus_use.config import Config
-from typing import Dict, List, Optional
-
-from mcp.client.sse import sse_client
-from strands.tools.mcp import MCPClient
-from strands.tools import tool
-import manus_use.tools.web_search as web_search  
+import manus_use.tools.web_search as web_search
 import manus_use.tools.code_execute as code_execute
+
+# MCP transport is an optional heavy dependency; only imported when actually used.
+try:
+    from mcp.client.sse import sse_client  # noqa: F401
+    from strands.tools.mcp import MCPClient  # noqa: F401
+    _MCP_AVAILABLE = True
+except ImportError:
+    _MCP_AVAILABLE = False
 
 from strands_tools import (
     file_read, file_write, python_repl, shell,
