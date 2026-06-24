@@ -1,10 +1,10 @@
 """Tests for agent implementations."""
 
-import unittest
-import pytest
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
-from manus_use.agents import ManusAgent, BrowserAgent, DataAnalysisAgent
+import pytest
+
+from manus_use.agents import BrowserAgent, DataAnalysisAgent, ManusAgent
 from manus_use.config import Config
 
 
@@ -12,13 +12,13 @@ def test_manus_agent_initialization():
     """Test ManusAgent initialization."""
     # Mock the model to avoid actual API calls
     with patch("manus_use.config.Config.get_model") as mock_model:
-        mock_model.return_value = Mock()
-        
+        mock_model.return_value = Mock(stateful=False)
+
         agent = ManusAgent()
-        
+
         # Check that agent has tools
         assert hasattr(agent, "_tools") or hasattr(agent, "tools")
-        
+
         # Check system prompt
         prompt = agent._get_default_system_prompt()
         assert "Manus" in prompt
@@ -28,13 +28,13 @@ def test_manus_agent_initialization():
 def test_browser_agent_initialization():
     """Test BrowserAgent initialization."""
     with patch("manus_use.config.Config.get_model") as mock_model:
-        mock_model.return_value = Mock()
-        
+        mock_model.return_value = Mock(stateful=False)
+
         agent = BrowserAgent()
-        
+
         # Check browser-specific attributes
         assert hasattr(agent, "headless")
-        
+
         # Check system prompt
         prompt = agent._get_default_system_prompt()
         assert "browsing" in prompt.lower()
@@ -43,10 +43,10 @@ def test_browser_agent_initialization():
 def test_data_analysis_agent_initialization():
     """Test DataAnalysisAgent initialization."""
     with patch("manus_use.config.Config.get_model") as mock_model:
-        mock_model.return_value = Mock()
-        
+        mock_model.return_value = Mock(stateful=False)
+
         agent = DataAnalysisAgent()
-        
+
         # Check system prompt
         prompt = agent._get_default_system_prompt()
         assert "data analysis" in prompt.lower()
@@ -57,12 +57,12 @@ def test_agent_with_custom_config():
     """Test agent with custom configuration."""
     config = Config()
     config.llm.temperature = 0.5
-    
+
     with patch("manus_use.config.Config.get_model") as mock_model:
-        mock_model.return_value = Mock()
-        
+        mock_model.return_value = Mock(stateful=False)
+
         agent = ManusAgent(config=config)
-        
+
         # Verify config was used
         assert agent.config.llm.temperature == 0.5
 
@@ -70,15 +70,15 @@ def test_agent_with_custom_config():
 def test_agent_add_tools():
     """Test adding tools to agent."""
     with patch("manus_use.config.Config.get_model") as mock_model:
-        mock_model.return_value = Mock()
-        
+        mock_model.return_value = Mock(stateful=False)
+
         # Create agent with no tools
         agent = ManusAgent(tools=[])
-        
+
         # Mock tool
         mock_tool = Mock()
         mock_tool.__name__ = "test_tool"
-        
+
         # Verify that add_tools method is removed
         with pytest.raises(AttributeError):
             agent.add_tools([mock_tool])
@@ -87,27 +87,28 @@ def test_agent_add_tools():
 def test_agent_constructor_tools():
     """Test tools passed to agent constructor."""
     with patch("manus_use.config.Config.get_model") as mock_model:
-        mock_model.return_value = Mock()
-        
+        mock_model.return_value = Mock(stateful=False)
+
         mock_tool = Mock()
         mock_tool.__name__ = "constructor_tool"
-        
+
         agent = ManusAgent(tools=[mock_tool])
-        
+
         # Verify tool is present
         # Accessing agent.tools is the public way for Strands
         assert mock_tool in agent.tools
 
 
 # Need to import MCPAgent and MCPClient for the next test
-from manus_use.agents.mcp import MCPAgent
 from strands.tools.mcp import MCPClient
+
+from manus_use.agents.mcp import MCPAgent
 
 
 def test_mcp_agent_tool_initialization():
     """Test tool initialization and add_mcp_server for MCPAgent."""
     with patch("manus_use.config.Config.get_model") as mock_model_create:
-        mock_model_create.return_value = Mock()
+        mock_model_create.return_value = Mock(stateful=False)
 
         # Mock tools
         mock_tool1 = Mock()
@@ -135,19 +136,18 @@ def test_mcp_agent_tool_initialization():
 
         # Assert mock_tool2 is NOT in agent's tools (as add_tools was removed from add_mcp_server)
         assert mock_tool2 not in agent.tools
-        
+
         # Assert mock_server2 IS in agent.mcp_servers
         assert mock_server2 in agent.mcp_servers
-        
+
         # Assert mock_tool1 IS STILL in agent.tools
         assert mock_tool1 in agent.tools
 
 # --- Tests for BrowserUseAgent ---
 import asyncio
-import logging
-from unittest.mock import MagicMock # For async context manager
 
 from manus_use.agents.browser_use_agent import BrowserUseAgent
+
 # Assuming BROWSER_USE_AVAILABLE is True for most tests, will patch it for specific cases
 
 @pytest.fixture
@@ -257,7 +257,7 @@ def test_browser_use_agent_get_llm_bedrock(mock_os_getenv, MockChatBedrock, mock
 
     agent = BrowserUseAgent(config=mock_config_fixture)
     llm = agent._get_browser_llm()
-    
+
     mock_os_getenv.assert_called_once_with('AWS_DEFAULT_REGION', mock_config_fixture.llm.aws_region or 'us-east-1')
     MockChatBedrock.assert_called_once_with(
         model_id=mock_config_fixture.llm.model,
@@ -389,10 +389,10 @@ def test_browser_use_agent_call_sync_context(mock_asyncio, mock_run_task, mock_c
     """Test __call__ in a synchronous context."""
     mock_asyncio.get_running_loop.side_effect = RuntimeError("No running event loop")
     mock_asyncio.run = Mock(return_value="sync_result") # Mock asyncio.run
-    
+
     agent = BrowserUseAgent(config=mock_config_fixture)
     result = agent(task="sync_task_str")
-    
+
     mock_asyncio.get_running_loop.assert_called_once()
     mock_asyncio.run.assert_called_once() # asyncio.run should be used in sync context
     mock_run_task.assert_called_once_with("sync_task_str")
@@ -405,11 +405,11 @@ def test_browser_use_agent_call_async_context(mock_asyncio, mock_run_task, mock_
     """Test __call__ in an asynchronous context."""
     mock_loop = Mock()
     mock_asyncio.get_running_loop.return_value = mock_loop # Simulate existing loop
-    
+
     agent = BrowserUseAgent(config=mock_config_fixture)
     # Call the agent
     coroutine_result = agent(task="async_task_str_direct")
-    
+
     mock_asyncio.get_running_loop.assert_called_once()
     mock_asyncio.run.assert_not_called() # asyncio.run should not be called
     mock_run_task.assert_called_once_with("async_task_str_direct")
@@ -421,7 +421,7 @@ def test_browser_use_agent_call_async_context(mock_asyncio, mock_run_task, mock_
 def test_browser_use_agent_call_list_input(mock_asyncio, mock_run_task, mock_config_fixture):
     """Test __call__ with a list of message dicts as input."""
     mock_asyncio.get_running_loop.side_effect = RuntimeError("No running event loop") # Test sync path
-    
+
     agent = BrowserUseAgent(config=mock_config_fixture)
     task_list = [
         {"role": "user", "content": "ignore this"},
