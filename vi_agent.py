@@ -1,10 +1,21 @@
 #!/usr/bin/env python3
 """Vulnerability Intelligence agent entry point.
 
-The :class:`VulnerabilityIntelligenceAgent` implementation now lives in the
-importable module ``manus_use.agents.vi_agent``. This script remains a thin
-command-line entry point so existing ``python vi_agent.py CVE-...`` workflows
-keep working.
+The :class:`VulnerabilityIntelligenceAgent` implementation lives in
+``manus_use.agents.vi_agent``. This script is a thin command-line entry point
+so existing ``python vi_agent.py CVE-...`` workflows keep working.
+
+The agent runs an 8-step analysis pipeline for each CVE:
+
+1. NVD data + GitHub advisory
+2. CISA KEV check + OTX threat intel
+3. PoC hunt — trickest/cve index, PoC Week community digest,
+   ExploitDB, Packetstorm, GitHub search
+4. URL verification (browser fallback)
+5. Deep PoC static code analysis
+6. CWE analysis
+7. Threat actor feed query
+8. Lark document report
 """
 
 import os
