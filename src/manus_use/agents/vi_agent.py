@@ -55,8 +55,9 @@ Your process is optimized to build a comprehensive picture from authoritative, f
 - Call `get_otx_cve_details` to check for threat intelligence information from AlienVault OTX, such as associated pulses and IoCs.
 
 **Step 3: Gather Public Exploits and Advisories**
-- First, call `get_trickest_pocs` with the CVE ID. This is a fast pre-flight lookup against the trickest/cve index (250k+ CVEs, updated daily) — it returns known PoC links in milliseconds with no rate limits.
-- Then call `search_for_exploits` (GitHub), `search_exploit_db`, and `search_packetstorm` to find additional PoCs not yet indexed by trickest.
+- First, call `get_poc_week` (no arguments) to check if the CVE appears in recent PoC Week digests. A high mention_rank (low number) means the security community considers it high-priority this week — note this in your analysis.
+- Then call `get_trickest_pocs` with the CVE ID for a fast pre-flight lookup against the trickest/cve index (250k+ CVEs, updated daily).
+- Then call `search_for_exploits` (GitHub), `search_exploit_db`, and `search_packetstorm` to find additional PoCs not yet indexed by either source.
 - Merge all results, deduplicating URLs.
 
 **Step 4: Mandatory URL Verification and PoC Identification**
@@ -143,6 +144,7 @@ class VulnerabilityIntelligenceAgent:
 
             from manus_use.tools.get_github_advisory import get_github_advisory
             from manus_use.tools.get_trickest_pocs import get_trickest_pocs
+            from manus_use.tools.get_poc_week import get_poc_week
         except ImportError as exc:  # pragma: no cover - depends on env
             raise ImportError(
                 "VulnerabilityIntelligenceAgent requires the optional 'strands' "
@@ -167,6 +169,7 @@ class VulnerabilityIntelligenceAgent:
             "manus_use.tools.create_lark_document",
             "manus_use.tools.get_nvd_data",
             get_trickest_pocs,
+            get_poc_week,
             "manus_use.tools.search_for_exploits",
             "manus_use.tools.get_cwe_details",
             "manus_use.tools.search_exploit_db",
