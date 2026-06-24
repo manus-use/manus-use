@@ -137,14 +137,11 @@ class VulnerabilityIntelligenceAgent:
             os.environ.setdefault("BYPASS_TOOL_CONSENT", "True")
 
             from strands import Agent
-            from strands.agent.conversation_manager import (
-                SlidingWindowConversationManager,
-            )
             from strands_tools import current_time
 
             from manus_use.tools.get_github_advisory import get_github_advisory
-            from manus_use.tools.get_trickest_pocs import get_trickest_pocs
             from manus_use.tools.get_poc_week import get_poc_week
+            from manus_use.tools.get_trickest_pocs import get_trickest_pocs
         except ImportError as exc:  # pragma: no cover - depends on env
             raise ImportError(
                 "VulnerabilityIntelligenceAgent requires the optional 'strands' "
@@ -156,11 +153,15 @@ class VulnerabilityIntelligenceAgent:
 
         model_obj = model if model is not None else self._resolve_model(model_name)
 
-        conversation_manager = SlidingWindowConversationManager(
-            window_size=40,
-            should_truncate_results=True,
-            per_turn=True,
-        )
+        # Use agentic context management: the model monitors its own token
+        # usage and decides when/what to compress via summarize_context,
+        # truncate_context, and pin_context tools.  This is better than a
+        # fixed SlidingWindow for the VI pipeline because the model can
+        # distinguish "NVD dump I already parsed" from "PoC code I still need".
+        # A ContextOffloader (inline threshold 8 000 tokens) is added
+        # automatically; SlidingWindowConversationManager is kept as a
+        # safety-net fallback inside agentic mode.
+        context_manager: str = "agentic"
 
         tools: list[Any] = [
             "manus_use.tools.http_request",
@@ -184,7 +185,7 @@ class VulnerabilityIntelligenceAgent:
             tools.append(use_browser)
 
         agent_kwargs: dict[str, Any] = dict(
-            conversation_manager=conversation_manager,
+            context_manager=context_manager,
             model=model_obj,
             system_prompt=self.system_prompt,
             tools=tools,

@@ -135,6 +135,20 @@ class LarkConfig(BaseModel):
     api_token: Optional[str] = None
 
 
+class AgentConfig(BaseModel):
+    """Agent behaviour configuration."""
+
+    context_manager: str = Field(
+        default="auto",
+        description=(
+            "Strands context manager mode for general agents. "
+            "'auto' composes SummarizingConversationManager + ContextOffloader. "
+            "'agentic' lets the model manage context via tool calls. "
+            "VulnerabilityIntelligenceAgent always uses 'agentic'."
+        ),
+    )
+
+
 class Config(BaseModel):
     """Main configuration."""
     
@@ -147,6 +161,7 @@ class Config(BaseModel):
     mcp: MCPConfig = Field(default_factory=MCPConfig)
     webhooks: WebhooksConfig = Field(default_factory=WebhooksConfig)
     lark: LarkConfig = Field(default_factory=LarkConfig)
+    agent: AgentConfig = Field(default_factory=AgentConfig)
     
     @classmethod
     def from_file(cls, path: Optional[Path] = None) -> "Config":
