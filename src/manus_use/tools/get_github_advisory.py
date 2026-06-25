@@ -1,14 +1,17 @@
 """Tool to fetch data from the GitHub Advisory Database."""
 
 import os
+from typing import Any
+
 import requests
 from strands.tools import tool
-from typing import Dict, Any
-from src.manus_use.config import Config
+
+from manus_use.config import Config
 from manus_use.tools.tool_output_logger import log_tool_output_size
 
+
 @tool
-def get_github_advisory(cve_id: str) -> Dict[str, Any]:
+def get_github_advisory(cve_id: str) -> dict[str, Any]:
     """
     Fetches vulnerability advisory information from the GitHub Advisory Database for a given CVE ID.
 
@@ -50,7 +53,7 @@ def get_github_advisory(cve_id: str) -> Dict[str, Any]:
             result = {"message": f"No advisory found on GitHub for {cve_id}."}
             log_tool_output_size("get_github_advisory", {"content": [{"json": result}]})
             return result
-        
+
         # The API returns a list of advisories; we will return the first and most relevant one.
         result = data[0]
         log_tool_output_size("get_github_advisory", {"content": [{"json": result}]})

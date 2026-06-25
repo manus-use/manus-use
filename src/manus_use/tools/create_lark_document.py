@@ -1,8 +1,9 @@
-from typing import Any
-from strands.types.tools import ToolResult, ToolUse
 import os
-from src.manus_use.config import Config
+from typing import Any
 
+from strands.types.tools import ToolResult, ToolUse
+
+from manus_use.config import Config
 
 TOOL_SPEC = {
     "name": "create_lark_document",

@@ -4,12 +4,6 @@ Strands Agent that uses the workflow tool to handle complex tasks
 with headless=False for browser operations
 """
 
-import sys
-from pathlib import Path
-from typing import Optional, Dict, Any
-
-# Add the src directory to Python path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 # Import Strands SDK
 from strands import Agent
@@ -21,7 +15,7 @@ import manus_use.tools.workflow_tool as workflow_tool
 
 class WorkflowAgent:
     """Agent that manages complex workflows using multiple agent types"""
-    
+
     def __init__(self, model_name: str = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"):
         """Initialize the workflow agent"""
         # Create system prompt
@@ -51,28 +45,28 @@ Example task format:
 
 Always ensure workflows are well-structured and tasks are properly sequenced.
 """
-        
+
         # Initialize the agent with tools
         self.agent = Agent(
             model=model_name,
             system_prompt=self.system_prompt,
             tools=[workflow_tool]
         )
-    
+
     def handle_request(self, request: str) -> str:
         """Handle a user request by creating and executing appropriate workflows"""
         response = self.agent(request)
         return response
-    
+
 # Example usage
 def main():
     """Example of using the WorkflowAgent"""
     print("=== Workflow Agent Example ===")
     #print(f"Workflow directory: {WORKFLOW_DIR}")
-    
+
     # Ensure workflow directory exists
     #os.makedirs(WORKFLOW_DIR, exist_ok=True)
-    
+
     # Create the agent
     agent = WorkflowAgent()
     # Example 1: Research and Analysis Task
@@ -83,7 +77,7 @@ def main():
     """
     response1 = agent.handle_request(research_request)
     print(f"Response: {response1}")
-    
+
 
 if __name__ == "__main__":
     # Check if we're running with a configured model
@@ -100,5 +94,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Configuration error: {e}")
         print("Using default agent configuration")
-    
+
     main()
