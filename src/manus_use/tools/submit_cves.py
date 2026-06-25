@@ -1,20 +1,34 @@
-from typing import Any, List, Dict
+import os
+from typing import Any
+
+import requests
 from strands import Agent
 from strands.types.tools import ToolResult, ToolUse
-import requests
-import asyncio
-import os
-from src.manus_use.config import Config
-from strands.tools.mcp.mcp_client import MCPClient
-from mcp.client.streamable_http import streamablehttp_client
 
-sse_url = "http://localhost:3001/mcp"
-sse_mcp_client = MCPClient(lambda: streamablehttp_client(sse_url))
+from manus_use.config import Config
 
-# Create an agent with MCP tools
-sse_mcp_client.start()
-# List available tools from MCP server (sync call)
-tools = sse_mcp_client.list_tools_sync()
+# MCP client is initialised lazily on first use so that importing this module
+# does not immediately attempt a network connection to localhost:3001.
+_sse_mcp_client = None
+_mcp_tools = None
+
+
+def _get_mcp_tools():
+    """Return MCP tools, initialising the MCP client on first call."""
+    global _sse_mcp_client, _mcp_tools  # noqa: PLW0603
+    if _mcp_tools is not None:
+        return _mcp_tools
+    try:
+        from mcp.client.streamable_http import streamablehttp_client  # noqa: PLC0415
+        from strands.tools.mcp.mcp_client import MCPClient  # noqa: PLC0415
+
+        sse_url = os.environ.get("MCP_SSE_URL", "http://localhost:3001/mcp")
+        _sse_mcp_client = MCPClient(lambda: streamablehttp_client(sse_url))
+        _sse_mcp_client.start()
+        _mcp_tools = _sse_mcp_client.list_tools_sync()
+    except Exception:  # noqa: BLE001
+        _mcp_tools = []
+    return _mcp_tools
 
 TOOL_SPEC = {
     "name": "submit_cves",
@@ -95,7 +109,7 @@ TOOL_SPEC = {
 
 def analyze_affected_assets(cves):
     for cve in cves:
-        agent = Agent(tools=tools)
+        agent = Agent(tools=_get_mcp_tools())
         result = agent(
             f"please submit a match asset task for {cve}."
         )
@@ -113,9 +127,9 @@ def submit_cves(tool: ToolUse, **kwargs: Any) -> ToolResult:
             "status": "error",
             "content": [{"text": "The 'cve_list' parameter cannot be empty."}]
         }
-    
+
     print(f"Submitting {len(cve_list)} CVEs to webhook...")
-    
+
     """ First webhook (webhook.site) - with timeout
     try:
         url1 = "https://webhook.site/693c24d6-518f-48b7-8af5-e71563fabd5e"
@@ -148,7 +162,7 @@ def submit_cves(tool: ToolUse, **kwargs: Any) -> ToolResult:
         print(success_message)
 
         analyze_affected_assets(critical_cves)
-        
+
         return {
             "toolUseId": tool_use_id,
             "status": "success",
