@@ -22,7 +22,7 @@ def _invoke_main(argv, *, patch_single_shot=True, single_shot_rc=0):
 
     captured = {}
 
-    def fake_single_shot(task, *, mode, agent_type, show_plan, output, fmt, no_history, config):
+    def fake_single_shot(task, *, mode, agent_type, show_plan, output, fmt, no_history, config, stream=False):
         captured["task"] = task
         captured["mode"] = mode
         captured["agent_type"] = agent_type
