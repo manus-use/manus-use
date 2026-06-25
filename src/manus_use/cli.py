@@ -985,11 +985,52 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
         return 1
 
 
+def _build_variants_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-use variants",
+        description="CVE variant analysis — find similar bugs in related codebases",
+        add_help=True,
+    )
+    p.add_argument("cve_id", metavar="CVE-ID", help="CVE identifier, e.g. CVE-2024-3094")
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return p
+
+
+def _run_variants(argv: list[str]) -> int:
+    parser = _build_variants_parser()
+    args = parser.parse_args(argv)
+    cve_id = args.cve_id.strip()
+    if not cve_id:
+        parser.error("CVE-ID is required")
+
+    try:
+        from manus_use.agents.variant_agent import VariantAnalysisAgent
+    except ImportError as exc:
+        print(f"[error] missing dependencies: {exc}", file=sys.stderr)
+        return 1
+
+    agent = VariantAnalysisAgent()
+    result = agent.analyze_variants(cve_id)
+
+    if args.output == "json":
+        import json
+
+        print(json.dumps({"cve_id": cve_id, "report": result}))
+    else:
+        print(result)
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # main() entry point
 # ---------------------------------------------------------------------------
 
-_SUBCOMMANDS = {"init", "doctor", "analyze", "history", "discover", "remediate"}
+_SUBCOMMANDS = {"init", "doctor", "analyze", "history", "discover", "remediate", "variants"}
 
 
 def _build_run_parser() -> argparse.ArgumentParser:
@@ -1275,6 +1316,10 @@ def main() -> None:
         idx = argv.index("history")
         history_args = _build_history_parser().parse_args(argv[idx + 1 :])
         sys.exit(_cmd_history(history_args))
+
+    if first_positional == "variants":
+        idx = argv.index("variants")
+        sys.exit(_run_variants(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")

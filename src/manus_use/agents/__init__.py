@@ -9,6 +9,7 @@ from manus_use.agents.manus import ManusAgent
 from manus_use.agents.mcp import MCPAgent
 from manus_use.agents.remediation_agent import RemediationAgent
 from manus_use.agents.vd_agent import VulnerabilityDiscoveryAgent
+from manus_use.agents.variant_agent import VariantAnalysisAgent
 from manus_use.agents.vi_agent import VulnerabilityIntelligenceAgent
 from manus_use.config import Config
 
@@ -65,5 +66,6 @@ __all__ = [
     "MCPAgent",
     "RemediationAgent",
     "VulnerabilityDiscoveryAgent",
+    "VariantAnalysisAgent",
     "VulnerabilityIntelligenceAgent",
 ]
