@@ -315,7 +315,7 @@ class TestBackwardCompat:
 
         captured = {}
 
-        def fake_ss(task, *, mode, agent_type, show_plan, output, config):
+        def fake_ss(task, *, mode, agent_type, show_plan, output, fmt, no_history, config):
             captured["task"] = task
             return 0
 
