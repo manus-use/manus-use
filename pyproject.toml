@@ -113,6 +113,7 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+addopts = "-m 'not integration'"
 markers = [
     "integration: marks tests as integration tests requiring live services (deselect with '-m not integration')",
 ]

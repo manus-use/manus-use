@@ -365,6 +365,89 @@ def _run_discover(
 
 
 
+# ---------------------------------------------------------------------------
+# manus-use remediate
+# ---------------------------------------------------------------------------
+
+
+def _build_remediate_parser() -> argparse.ArgumentParser:
+    """Build the argument parser for the ``remediate`` subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="manus-use remediate",
+        description="Generate actionable remediation guidance for a CVE.",
+    )
+    parser.add_argument(
+        "cve_id",
+        metavar="CVE-ID",
+        help="CVE identifier to remediate (e.g. CVE-2024-3094)",
+    )
+    parser.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Report output format (default: text)",
+    )
+    parser.add_argument(
+        "--config",
+        metavar="FILE",
+        type=Path,
+        default=None,
+        help="Path to a config.toml file (overrides default search paths)",
+    )
+    return parser
+
+
+def _run_remediate(
+    *,
+    cve_id: str,
+    output: str,
+    config: Config,
+) -> int:
+    """Run the remediation workflow for a CVE and print the report.
+
+    Returns an exit code (0 = success, 1 = failure).
+    """
+    try:
+        from .agents import RemediationAgent
+    except ImportError as exc:
+        console.print(f"[red]\u2717 Remediation agent unavailable: {exc}[/red]")
+        return 1
+
+    console.print(f"[bold blue]Remediating {cve_id}[/bold blue]")
+
+    try:
+        agent = RemediationAgent(config=config)
+    except Exception as exc:
+        console.print(f"[red]\u2717 Failed to initialise agent: {exc}[/red]")
+        return 1
+
+    request = RemediationAgent.build_request(cve_id, output=output)
+
+    try:
+        with console.status(f"Generating remediation for {cve_id}\u2026", spinner="dots"):
+            result = agent.handle_request(request)
+    except Exception as exc:
+        console.print(f"[red]\u2717 Remediation failed: {exc}[/red]")
+        return 1
+
+    result_text = str(result)
+
+    if output == "json":
+        import json as _json
+
+        console.print_json(_json.dumps({"cve": cve_id, "report": result_text}))
+    else:
+        console.print(
+            Panel(
+                result_text,
+                title=f"[bold green]{cve_id} Remediation[/bold green]",
+                border_style="green",
+            )
+        )
+
+    return 0
+
+
 def _run_single_shot(
     task: str,
     *,
@@ -841,7 +924,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
 # main() entry point
 # ---------------------------------------------------------------------------
 
-_SUBCOMMANDS = {"init", "doctor", "analyze", "history", "discover"}
+_SUBCOMMANDS = {"init", "doctor", "analyze", "history", "discover", "remediate"}
 
 
 def _build_run_parser() -> argparse.ArgumentParser:
@@ -874,6 +957,10 @@ def _build_run_parser() -> argparse.ArgumentParser:
             "  manus-use discover\n"\
             "  manus-use discover --since 2025-06-01 --min-epss 0.7 --output json\n"\
             "  manus-use discover --dry-run\n"
+            "  \n"
+            "  # CVE remediation guidance\n"
+            "  manus-use remediate CVE-2024-3094\n"
+            "  manus-use remediate CVE-2024-3094 --output json\n"
         ),
     )
     parser.add_argument(
@@ -1127,6 +1214,16 @@ def main() -> None:
             min_epss=discover_args.min_epss,
             output=discover_args.output,
             dry_run=discover_args.dry_run,
+            config=config,
+        ))
+
+    if first_positional == "remediate":
+        idx = argv.index("remediate")
+        remediate_args = _build_remediate_parser().parse_args(argv[idx + 1 :])
+        config = Config.from_file(remediate_args.config)
+        sys.exit(_run_remediate(
+            cve_id=remediate_args.cve_id,
+            output=remediate_args.output,
             config=config,
         ))
 
