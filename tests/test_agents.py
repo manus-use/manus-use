@@ -100,9 +100,9 @@ def test_agent_constructor_tools():
 
 
 # Need to import MCPAgent and MCPClient for the next test
-from strands.tools.mcp import MCPClient
+from strands.tools.mcp import MCPClient  # noqa: E402
 
-from manus_use.agents.mcp import MCPAgent
+from manus_use.agents.mcp import MCPAgent  # noqa: E402
 
 
 def test_mcp_agent_tool_initialization():
@@ -121,7 +121,7 @@ def test_mcp_agent_tool_initialization():
         mock_server1.list_tools_sync = Mock(return_value=[mock_tool1])
 
         # Instantiate MCPAgent with mock_server1
-        agent = MCPAgent(mcp_servers=[mock_server1], tools=[]) # Pass empty tools list initially
+        agent = MCPAgent(mcp_servers=[mock_server1], tools=[])  # Pass empty tools list initially
 
         # Assert mock_tool1 is in agent's tools
         assert mock_tool1 in agent.tools
@@ -143,12 +143,14 @@ def test_mcp_agent_tool_initialization():
         # Assert mock_tool1 IS STILL in agent.tools
         assert mock_tool1 in agent.tools
 
-# --- Tests for BrowserUseAgent ---
-import asyncio
 
-from manus_use.agents.browser_use_agent import BrowserUseAgent
+# --- Tests for BrowserUseAgent ---
+import asyncio  # noqa: E402
+
+from manus_use.agents.browser_use_agent import BrowserUseAgent  # noqa: E402
 
 # Assuming BROWSER_USE_AVAILABLE is True for most tests, will patch it for specific cases
+
 
 @pytest.fixture
 def mock_config():
@@ -206,86 +208,94 @@ def mock_config_fixture(mock_config):
     """Backwards-compatible alias for older test names."""
     return mock_config
 
+
 # Patch BROWSER_USE_AVAILABLE at the module level for most tests
 # For the specific test where it's False, we'll patch it there.
-@patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
-@patch('manus_use.agents.browser_use_agent.ChatBedrock', create=True) # create=True allows patching non-existent attrs
-@patch('manus_use.agents.browser_use_agent.ChatOpenAI', create=True)
-def test_browser_use_agent_init_defaults(MockChatOpenAI, MockChatBedrock, mock_config_fixture):
+@patch("manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE", True)
+@patch("manus_use.agents.browser_use_agent.ChatBedrock", create=True)  # create=True allows patching non-existent attrs
+@patch("manus_use.agents.browser_use_agent.ChatOpenAI", create=True)
+def test_browser_use_agent_init_defaults(mock_chat_openai, mock_chat_bedrock, mock_config_fixture):
     """Test BrowserUseAgent initialization with default headless and memory."""
     agent = BrowserUseAgent(config=mock_config_fixture)
     assert agent.headless == mock_config_fixture.tools.browser_headless
-    assert agent.enable_memory == False
+    assert not agent.enable_memory
 
-@patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
-@patch('manus_use.agents.browser_use_agent.ChatBedrock', create=True)
-@patch('manus_use.agents.browser_use_agent.ChatOpenAI', create=True)
-def test_browser_use_agent_init_custom_settings(MockChatOpenAI, MockChatBedrock, mock_config_fixture):
+
+@patch("manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE", True)
+@patch("manus_use.agents.browser_use_agent.ChatBedrock", create=True)
+@patch("manus_use.agents.browser_use_agent.ChatOpenAI", create=True)
+def test_browser_use_agent_init_custom_settings(mock_chat_openai, mock_chat_bedrock, mock_config_fixture):
     """Test BrowserUseAgent initialization with custom headless and memory."""
     agent = BrowserUseAgent(config=mock_config_fixture, headless=False, enable_memory=True)
-    assert agent.headless == False
-    assert agent.enable_memory == True
+    assert not agent.headless
+    assert agent.enable_memory
 
-@patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', False)
+
+@patch("manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE", False)
 def test_browser_use_agent_init_unavailable(mock_config_fixture):
     """Test BrowserUseAgent raises ImportError if BROWSER_USE_AVAILABLE is False."""
     with pytest.raises(ImportError, match="Required package(s) for BrowserUseAgent missing"):
         BrowserUseAgent(config=mock_config_fixture)
 
+
 # _get_browser_llm tests
-@patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
-@patch('manus_use.agents.browser_use_agent.ChatOpenAI', create=True)
-@patch('manus_use.agents.browser_use_agent.os.getenv') # Mock os.getenv for region
-def test_browser_use_agent_get_llm_openai(mock_os_getenv, MockChatOpenAI, mock_config_fixture):
+@patch("manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE", True)
+@patch("manus_use.agents.browser_use_agent.ChatOpenAI", create=True)
+@patch("manus_use.agents.browser_use_agent.os.getenv")  # Mock os.getenv for region
+def test_browser_use_agent_get_llm_openai(mock_os_getenv, mock_chat_openai, mock_config_fixture):
     mock_config_fixture.llm.provider = "openai"
     agent = BrowserUseAgent(config=mock_config_fixture)
     llm = agent._get_browser_llm()
-    MockChatOpenAI.assert_called_once_with(
+    mock_chat_openai.assert_called_once_with(
         model_name=mock_config_fixture.llm.model,
         temperature=mock_config_fixture.llm.temperature,
-        max_tokens=mock_config_fixture.llm.max_tokens
+        max_tokens=mock_config_fixture.llm.max_tokens,
     )
-    assert llm == MockChatOpenAI.return_value
+    assert llm == mock_chat_openai.return_value
 
-@patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
-@patch('manus_use.agents.browser_use_agent.ChatBedrock', create=True)
-@patch('manus_use.agents.browser_use_agent.os.getenv')
-def test_browser_use_agent_get_llm_bedrock(mock_os_getenv, MockChatBedrock, mock_config_fixture):
+
+@patch("manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE", True)
+@patch("manus_use.agents.browser_use_agent.ChatBedrock", create=True)
+@patch("manus_use.agents.browser_use_agent.os.getenv")
+def test_browser_use_agent_get_llm_bedrock(mock_os_getenv, mock_chat_bedrock, mock_config_fixture):
     mock_config_fixture.llm.provider = "bedrock"
-    mock_os_getenv.return_value = "custom-region-from-env" # Simulate env var being set
-    mock_config_fixture.llm.aws_region = None # Ensure env var is preferred if config is None
+    mock_os_getenv.return_value = "custom-region-from-env"  # Simulate env var being set
+    mock_config_fixture.llm.aws_region = None  # Ensure env var is preferred if config is None
 
     agent = BrowserUseAgent(config=mock_config_fixture)
     llm = agent._get_browser_llm()
 
-    mock_os_getenv.assert_called_once_with('AWS_DEFAULT_REGION', mock_config_fixture.llm.aws_region or 'us-east-1')
-    MockChatBedrock.assert_called_once_with(
+    mock_os_getenv.assert_called_once_with("AWS_DEFAULT_REGION", mock_config_fixture.llm.aws_region or "us-east-1")
+    mock_chat_bedrock.assert_called_once_with(
         model_id=mock_config_fixture.llm.model,
         model_kwargs={
             "temperature": mock_config_fixture.llm.temperature,
-            "max_tokens": mock_config_fixture.llm.max_tokens
+            "max_tokens": mock_config_fixture.llm.max_tokens,
         },
-        region_name="custom-region-from-env"
+        region_name="custom-region-from-env",
     )
-    assert llm == MockChatBedrock.return_value
+    assert llm == mock_chat_bedrock.return_value
 
-@patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
+
+@patch("manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE", True)
 def test_browser_use_agent_get_llm_unsupported(mock_config_fixture):
     mock_config_fixture.llm.provider = "unsupported_provider"
     agent = BrowserUseAgent(config=mock_config_fixture)
     with pytest.raises(ValueError, match="Unsupported LLM provider"):
         agent._get_browser_llm()
 
-@patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
-@patch('manus_use.agents.browser_use_agent.ChatBedrock', None) # Simulate import failure
+
+@patch("manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE", True)
+@patch("manus_use.agents.browser_use_agent.ChatBedrock", None)  # Simulate import failure
 def test_browser_use_agent_get_llm_bedrock_import_error(mock_config_fixture):
     mock_config_fixture.llm.provider = "bedrock"
     agent = BrowserUseAgent(config=mock_config_fixture)
     with pytest.raises(ImportError, match="langchain-aws package is missing"):
         agent._get_browser_llm()
 
-@patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
-@patch('manus_use.agents.browser_use_agent.ChatOpenAI', None) # Simulate import failure
+
+@patch("manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE", True)
+@patch("manus_use.agents.browser_use_agent.ChatOpenAI", None)  # Simulate import failure
 def test_browser_use_agent_get_llm_openai_import_error(mock_config_fixture):
     mock_config_fixture.llm.provider = "openai"
     agent = BrowserUseAgent(config=mock_config_fixture)
@@ -294,21 +304,21 @@ def test_browser_use_agent_get_llm_openai_import_error(mock_config_fixture):
 
 
 # Task Execution Tests
-@patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
-@patch('manus_use.agents.browser_use_agent.Controller')
-@patch('manus_use.agents.browser_use_agent.BrowserProfile')
-@patch('manus_use.agents.browser_use_agent.BrowserUse')
-@patch('manus_use.agents.browser_use_agent.ChatOpenAI', create=True)
-@patch('manus_use.agents.browser_use_agent.logging') # Patch the whole logging module
+@patch("manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE", True)
+@patch("manus_use.agents.browser_use_agent.Controller")
+@patch("manus_use.agents.browser_use_agent.BrowserProfile")
+@patch("manus_use.agents.browser_use_agent.BrowserUse")
+@patch("manus_use.agents.browser_use_agent.ChatOpenAI", create=True)
+@patch("manus_use.agents.browser_use_agent.logging")  # Patch the whole logging module
 def test_browser_use_agent_run_task_various_results(
-    mock_logging, MockChatOpenAI, MockBrowserUse, MockBrowserProfile, MockController, mock_config_fixture
+    mock_logging, mock_chat_openai, mock_browser_use, mock_browser_profile, mock_controller, mock_config_fixture
 ):
     async def _run():
         agent = BrowserUseAgent(config=mock_config_fixture, headless=True, enable_memory=True)
-        mock_llm_instance = MockChatOpenAI.return_value
+        mock_llm_instance = mock_chat_openai.return_value
 
         mock_browser_use_instance = Mock()
-        MockBrowserUse.return_value = mock_browser_use_instance
+        mock_browser_use.return_value = mock_browser_use_instance
 
         # --- Test 1: extracted_content() returns a list of strings ---
         mock_run_result_1 = Mock()
@@ -316,15 +326,15 @@ def test_browser_use_agent_run_task_various_results(
         mock_browser_use_instance.run = AsyncMock(return_value=mock_run_result_1)
 
         result = await agent._run_browser_task("test task 1")
-        MockBrowserUse.assert_called_with(
+        mock_browser_use.assert_called_with(
             task="test task 1",
             llm=mock_llm_instance,
-            browser_profile=MockBrowserProfile.return_value,
-            controller=MockController.return_value,
+            browser_profile=mock_browser_profile.return_value,
+            controller=mock_controller.return_value,
             enable_memory=True,
             validate_output=False,
         )
-        MockBrowserProfile.assert_called_with(headless=True)
+        mock_browser_profile.assert_called_with(headless=True)
         assert result == "Page Title: Example\nBody text..."
         mock_logging.warning.assert_not_called()
         mock_logging.info.assert_not_called()
@@ -348,9 +358,7 @@ def test_browser_use_agent_run_task_various_results(
 
         result = await agent._run_browser_task("test task 3")
         assert result == ""
-        mock_logging.info.assert_called_once_with(
-            "BrowserUseAgent: result.extracted_content() returned None."
-        )
+        mock_logging.info.assert_called_once_with("BrowserUseAgent: result.extracted_content() returned None.")
         mock_logging.warning.assert_not_called()
 
         # --- Test 4: extracted_content is not callable (or missing) ---
@@ -363,7 +371,10 @@ def test_browser_use_agent_run_task_various_results(
         result = await agent._run_browser_task("test task 4")
         assert result == "string_fallback_for_no_method"
         mock_logging.warning.assert_called_once()
-        assert "Could not find 'extracted_content' method on result or it's not callable" in mock_logging.warning.call_args[0][0]
+        assert (
+            "Could not find 'extracted_content' method on result or it's not callable"
+            in mock_logging.warning.call_args[0][0]
+        )
         mock_logging.info.assert_not_called()
 
         # --- Test 5: extracted_content attribute exists but is not callable (more explicit) ---
@@ -376,63 +387,69 @@ def test_browser_use_agent_run_task_various_results(
         result = await agent._run_browser_task("test task 5")
         assert result == "string_fallback_attr_not_callable"
         mock_logging.warning.assert_called_once()
-        assert "Could not find 'extracted_content' method on result or it's not callable" in mock_logging.warning.call_args[0][0]
+        assert (
+            "Could not find 'extracted_content' method on result or it's not callable"
+            in mock_logging.warning.call_args[0][0]
+        )
         mock_logging.info.assert_not_called()
 
     asyncio.run(_run())
 
 
-@patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
-@patch('manus_use.agents.browser_use_agent.BrowserUseAgent._run_browser_task', new_callable=AsyncMock)
-@patch('manus_use.agents.browser_use_agent.asyncio')
+@patch("manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE", True)
+@patch("manus_use.agents.browser_use_agent.BrowserUseAgent._run_browser_task", new_callable=AsyncMock)
+@patch("manus_use.agents.browser_use_agent.asyncio")
 def test_browser_use_agent_call_sync_context(mock_asyncio, mock_run_task, mock_config_fixture):
     """Test __call__ in a synchronous context."""
     mock_asyncio.get_running_loop.side_effect = RuntimeError("No running event loop")
-    mock_asyncio.run = Mock(return_value="sync_result") # Mock asyncio.run
+    mock_asyncio.run = Mock(return_value="sync_result")  # Mock asyncio.run
 
     agent = BrowserUseAgent(config=mock_config_fixture)
     result = agent(task="sync_task_str")
 
     mock_asyncio.get_running_loop.assert_called_once()
-    mock_asyncio.run.assert_called_once() # asyncio.run should be used in sync context
+    mock_asyncio.run.assert_called_once()  # asyncio.run should be used in sync context
     mock_run_task.assert_called_once_with("sync_task_str")
     assert result == "sync_result"
 
-@patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
-@patch('manus_use.agents.browser_use_agent.BrowserUseAgent._run_browser_task', new_callable=AsyncMock)
-@patch('manus_use.agents.browser_use_agent.asyncio')
+
+@patch("manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE", True)
+@patch("manus_use.agents.browser_use_agent.BrowserUseAgent._run_browser_task", new_callable=AsyncMock)
+@patch("manus_use.agents.browser_use_agent.asyncio")
 def test_browser_use_agent_call_async_context(mock_asyncio, mock_run_task, mock_config_fixture):
     """Test __call__ in an asynchronous context."""
     mock_loop = Mock()
-    mock_asyncio.get_running_loop.return_value = mock_loop # Simulate existing loop
+    mock_asyncio.get_running_loop.return_value = mock_loop  # Simulate existing loop
 
     agent = BrowserUseAgent(config=mock_config_fixture)
     # Call the agent
     coroutine_result = agent(task="async_task_str_direct")
 
     mock_asyncio.get_running_loop.assert_called_once()
-    mock_asyncio.run.assert_not_called() # asyncio.run should not be called
+    mock_asyncio.run.assert_not_called()  # asyncio.run should not be called
     mock_run_task.assert_called_once_with("async_task_str_direct")
-    assert hasattr(coroutine_result, "__await__") # Should return an awaitable
+    assert hasattr(coroutine_result, "__await__")  # Should return an awaitable
 
-@patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
-@patch('manus_use.agents.browser_use_agent.BrowserUseAgent._run_browser_task', new_callable=AsyncMock)
-@patch('manus_use.agents.browser_use_agent.asyncio')
+
+@patch("manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE", True)
+@patch("manus_use.agents.browser_use_agent.BrowserUseAgent._run_browser_task", new_callable=AsyncMock)
+@patch("manus_use.agents.browser_use_agent.asyncio")
 def test_browser_use_agent_call_list_input(mock_asyncio, mock_run_task, mock_config_fixture):
     """Test __call__ with a list of message dicts as input."""
-    mock_asyncio.get_running_loop.side_effect = RuntimeError("No running event loop") # Test sync path
+    mock_asyncio.get_running_loop.side_effect = RuntimeError("No running event loop")  # Test sync path
 
     agent = BrowserUseAgent(config=mock_config_fixture)
     task_list = [
         {"role": "user", "content": "ignore this"},
         {"role": "assistant", "content": "ignore this too"},
-        {"role": "user", "content": "actual_task_from_list"}
+        {"role": "user", "content": "actual_task_from_list"},
     ]
     agent(task=task_list)
     mock_run_task.assert_called_once_with("actual_task_from_list")
 
+
 # Test for stream_async (basic test to ensure it calls __call__ and yields)
-@patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
+@patch("manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE", True)
 def test_browser_use_agent_stream_async(mock_config_fixture):
     async def _run():
         agent = BrowserUseAgent(config=mock_config_fixture)
@@ -447,7 +464,7 @@ def test_browser_use_agent_stream_async(mock_config_fixture):
     asyncio.run(_run())
 
 
-@patch('manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE', True)
+@patch("manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE", True)
 def test_browser_use_agent_stream_async_with_awaitable_call(mock_config_fixture):
     async def _run():
         agent = BrowserUseAgent(config=mock_config_fixture)

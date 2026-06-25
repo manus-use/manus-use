@@ -290,8 +290,10 @@ def test_exploit_sandbox_start_target_uses_create_connect_start(monkeypatch):
 
     class FakeNetwork:
         name = "exploit-net-test"
+
         def connect(self, container, aliases=None):
             call_log.append(("network.connect", aliases))
+
         def disconnect(self, container):
             call_log.append("network.disconnect")
 
@@ -299,6 +301,7 @@ def test_exploit_sandbox_start_target_uses_create_connect_start(monkeypatch):
         def create(self, image, **kwargs):
             call_log.append(("containers.create", kwargs.get("network_mode"), kwargs.get("network")))
             return FakeContainer()
+
         def run(self, *args, **kwargs):
             call_log.append("containers.run")
             return FakeContainer()
@@ -326,10 +329,10 @@ def test_exploit_sandbox_start_target_uses_create_connect_start(monkeypatch):
     sandbox.start_target("test-image")
 
     # Verify create was called (not run)
-    assert any(isinstance(c, tuple) and c[0] == "containers.create" for c in call_log), \
+    assert any(isinstance(c, tuple) and c[0] == "containers.create" for c in call_log), (
         f"containers.create not called: {call_log}"
-    assert not any(c == "containers.run" for c in call_log), \
-        f"containers.run should not be called: {call_log}"
+    )
+    assert not any(c == "containers.run" for c in call_log), f"containers.run should not be called: {call_log}"
 
     # Verify network_mode="none" was used (no default bridge)
     create_calls = [c for c in call_log if isinstance(c, tuple) and c[0] == "containers.create"]
@@ -341,8 +344,7 @@ def test_exploit_sandbox_start_target_uses_create_connect_start(monkeypatch):
     assert connect_calls[0][1] == ["target"], f"Expected alias ['target'], got: {connect_calls[0]}"
 
     # Verify disconnect was NOT called
-    assert not any(c == "network.disconnect" for c in call_log), \
-        f"disconnect should not be called: {call_log}"
+    assert not any(c == "network.disconnect" for c in call_log), f"disconnect should not be called: {call_log}"
 
     # Verify start was called after connect
     start_idx = next(i for i, c in enumerate(call_log) if c == "container.start")
@@ -357,10 +359,12 @@ def test_exploit_sandbox_run_local_exploit_returns_interpreter_metadata(monkeypa
     class FakeContainer:
         def __init__(self):
             self.id = "fake-id"
+
         def exec_run(self, cmd, **kwargs):
             class Result:
                 exit_code = 0
                 output = (b"python3\n", b"")
+
             return Result()
 
     sandbox = ExploitSandbox()
@@ -610,9 +614,7 @@ def test_apply_asyncio_compat_patch_is_idempotent_and_avoids_wait_for():
     import sniffio._impl as sniffio_impl
 
     original_state = dict(use_browser_patch_module._PATCH_STATE)
-    original_shutdowns = dict(
-        use_browser_patch_module._PATCH_STATE.get("original_shutdown_default_executor", {})
-    )
+    original_shutdowns = dict(use_browser_patch_module._PATCH_STATE.get("original_shutdown_default_executor", {}))
     original_httpcore_shields = _capture_httpcore_shields()
     original_sniffio_current = sniffio.current_async_library
     original_sniffio_impl_current = sniffio_impl.current_async_library
@@ -649,9 +651,7 @@ def test_apply_asyncio_compat_patch_is_idempotent_and_avoids_wait_for():
         assert patched is use_browser_patch_module._shutdown_default_executor_without_wait_for
         assert "wait_for" not in patched.__code__.co_names
         assert (
-            use_browser_patch_module._PATCH_STATE["original_shutdown_default_executor"][
-                asyncio.SelectorEventLoop
-            ]
+            use_browser_patch_module._PATCH_STATE["original_shutdown_default_executor"][asyncio.SelectorEventLoop]
             is original_selector_shutdown
         )
 
@@ -668,9 +668,7 @@ def test_apply_asyncio_compat_patch_is_idempotent_and_avoids_wait_for():
         sniffio_impl.current_async_library = original_sniffio_impl_current
         use_browser_patch_module._PATCH_STATE.clear()
         use_browser_patch_module._PATCH_STATE.update(original_state)
-        use_browser_patch_module._PATCH_STATE[
-            "original_shutdown_default_executor"
-        ] = original_shutdowns
+        use_browser_patch_module._PATCH_STATE["original_shutdown_default_executor"] = original_shutdowns
 
 
 def test_asyncio_compat_sniffio_fallback_requires_current_task():
@@ -679,9 +677,7 @@ def test_asyncio_compat_sniffio_fallback_requires_current_task():
     import sniffio._impl as sniffio_impl
 
     original_state = dict(use_browser_patch_module._PATCH_STATE)
-    original_shutdowns = dict(
-        use_browser_patch_module._PATCH_STATE.get("original_shutdown_default_executor", {})
-    )
+    original_shutdowns = dict(use_browser_patch_module._PATCH_STATE.get("original_shutdown_default_executor", {}))
     original_httpcore_shields = _capture_httpcore_shields()
     original_sniffio_current = sniffio.current_async_library
     original_sniffio_impl_current = sniffio_impl.current_async_library
@@ -736,9 +732,7 @@ def test_asyncio_compat_sniffio_fallback_requires_current_task():
         sniffio_impl.current_async_library = original_sniffio_impl_current
         use_browser_patch_module._PATCH_STATE.clear()
         use_browser_patch_module._PATCH_STATE.update(original_state)
-        use_browser_patch_module._PATCH_STATE[
-            "original_shutdown_default_executor"
-        ] = original_shutdowns
+        use_browser_patch_module._PATCH_STATE["original_shutdown_default_executor"] = original_shutdowns
 
 
 def test_httpcore_async_shield_noops_without_current_task():
@@ -748,9 +742,7 @@ def test_httpcore_async_shield_noops_without_current_task():
     import sniffio._impl as sniffio_impl
 
     original_state = dict(use_browser_patch_module._PATCH_STATE)
-    original_shutdowns = dict(
-        use_browser_patch_module._PATCH_STATE.get("original_shutdown_default_executor", {})
-    )
+    original_shutdowns = dict(use_browser_patch_module._PATCH_STATE.get("original_shutdown_default_executor", {}))
     original_httpcore_shields = _capture_httpcore_shields()
     original_sniffio_current = sniffio.current_async_library
     original_sniffio_impl_current = sniffio_impl.current_async_library
@@ -798,9 +790,7 @@ def test_httpcore_async_shield_noops_without_current_task():
         sniffio_impl.current_async_library = original_sniffio_impl_current
         use_browser_patch_module._PATCH_STATE.clear()
         use_browser_patch_module._PATCH_STATE.update(original_state)
-        use_browser_patch_module._PATCH_STATE[
-            "original_shutdown_default_executor"
-        ] = original_shutdowns
+        use_browser_patch_module._PATCH_STATE["original_shutdown_default_executor"] = original_shutdowns
 
 
 def test_httpcore_async_shield_preserves_task_context_behavior():
@@ -810,9 +800,7 @@ def test_httpcore_async_shield_preserves_task_context_behavior():
     import sniffio._impl as sniffio_impl
 
     original_state = dict(use_browser_patch_module._PATCH_STATE)
-    original_shutdowns = dict(
-        use_browser_patch_module._PATCH_STATE.get("original_shutdown_default_executor", {})
-    )
+    original_shutdowns = dict(use_browser_patch_module._PATCH_STATE.get("original_shutdown_default_executor", {}))
     original_httpcore_shields = _capture_httpcore_shields()
     original_sniffio_current = sniffio.current_async_library
     original_sniffio_impl_current = sniffio_impl.current_async_library
@@ -842,9 +830,7 @@ def test_httpcore_async_shield_preserves_task_context_behavior():
         sniffio_impl.current_async_library = original_sniffio_impl_current
         use_browser_patch_module._PATCH_STATE.clear()
         use_browser_patch_module._PATCH_STATE.update(original_state)
-        use_browser_patch_module._PATCH_STATE[
-            "original_shutdown_default_executor"
-        ] = original_shutdowns
+        use_browser_patch_module._PATCH_STATE["original_shutdown_default_executor"] = original_shutdowns
 
 
 def test_apply_comprehensive_patch_filters_timeout_args_for_compatible_actions(monkeypatch):
@@ -952,7 +938,7 @@ def test_apply_comprehensive_patch_normalizes_quoted_selector(monkeypatch):
     result = asyncio.run(run_action())
 
     assert result == [{"text": "Text content: text for .commit-msg"}]
-    assert manager.page.text_calls == [('.commit-msg', 1234)]
+    assert manager.page.text_calls == [(".commit-msg", 1234)]
 
 
 def test_apply_comprehensive_patch_preserves_attribute_selector_with_internal_quotes(monkeypatch):
@@ -986,9 +972,7 @@ def test_apply_comprehensive_patch_does_not_retry_invalid_selector_errors(monkey
 
         async def text_content(self, selector, timeout=None):
             self.text_calls.append((selector, timeout))
-            raise ValueError(
-                'Page.wait_for_selector: Unexpected token "" while parsing css selector "div["'
-            )
+            raise ValueError('Page.wait_for_selector: Unexpected token "" while parsing css selector "div["')
 
         async def evaluate(self, script):
             return None
@@ -1167,10 +1151,14 @@ def test_create_lark_document_is_openclaw_defaults_false_when_not_set(monkeypatc
     }
 
     import requests
-    monkeypatch.setattr(requests, "post", lambda *a, **kw: type("R", (), {"raise_for_status": lambda s: None, "text": "ok"})())
+
+    monkeypatch.setattr(
+        requests, "post", lambda *a, **kw: type("R", (), {"raise_for_status": lambda s: None, "text": "ok"})()
+    )
 
     cld_module.create_lark_document(tool_use)
     assert tool_use["input"]["is_openclaw"] is False
+
 
 def test_create_lark_document_technical_details_schema_wording():
     """technical_details schema should require concise Markdown sections with exact headings."""
@@ -1222,7 +1210,10 @@ def test_create_lark_document_is_openclaw_defaults_true_when_openclaw_env(monkey
     }
 
     import requests
-    monkeypatch.setattr(requests, "post", lambda *a, **kw: type("R", (), {"raise_for_status": lambda s: None, "text": "ok"})())
+
+    monkeypatch.setattr(
+        requests, "post", lambda *a, **kw: type("R", (), {"raise_for_status": lambda s: None, "text": "ok"})()
+    )
 
     cld_module.create_lark_document(tool_use)
     assert tool_use["input"]["is_openclaw"] is True
@@ -1256,7 +1247,10 @@ def test_create_lark_document_is_openclaw_explicit_override(monkeypatch):
     }
 
     import requests
-    monkeypatch.setattr(requests, "post", lambda *a, **kw: type("R", (), {"raise_for_status": lambda s: None, "text": "ok"})())
+
+    monkeypatch.setattr(
+        requests, "post", lambda *a, **kw: type("R", (), {"raise_for_status": lambda s: None, "text": "ok"})()
+    )
 
     cld_module.create_lark_document(tool_use)
     assert tool_use["input"]["is_openclaw"] is True

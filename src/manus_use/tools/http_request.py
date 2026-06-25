@@ -5,7 +5,8 @@ import os
 from typing import Any
 
 from strands.types.tools import ToolResult, ToolUse
-from strands_tools.http_request import TOOL_SPEC, http_request as _http_request
+from strands_tools.http_request import http_request as _http_request
+
 from manus_use.tools.tool_output_logger import log_tool_output_size
 
 # Truncation limits — override via environment variables if needed.

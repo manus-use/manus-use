@@ -124,10 +124,7 @@ def get_trickest_pocs(cve_id: str) -> str:
             markdown = resp.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
-            return (
-                f"No trickest/cve entry found for {cve_id}. "
-                "The CVE may be too new or not yet indexed."
-            )
+            return f"No trickest/cve entry found for {cve_id}. The CVE may be too new or not yet indexed."
         return f"HTTP error fetching trickest/cve data for {cve_id}: {exc.code} {exc.reason}"
     except Exception as exc:  # noqa: BLE001
         return f"Error fetching trickest/cve data for {cve_id}: {exc}"

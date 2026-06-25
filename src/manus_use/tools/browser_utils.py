@@ -7,22 +7,28 @@ error handling, fallback behavior, and diagnostics for missing elements.
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import Page
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 logger = logging.getLogger(__name__)
 
-_JS_FUNCTION_PREFIX = re.compile(
-    r"^\s*(?:async\s+)?(?:function\b|(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>)"
-)
-_JS_STATEMENT_PREFIX = re.compile(
-    r"^\s*(?:return\b|const\b|let\b|var\b|if\b|for\b|while\b|switch\b|try\b|throw\b)"
-)
+_JS_FUNCTION_PREFIX = re.compile(r"^\s*(?:async\s+)?(?:function\b|(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>)")
+_JS_STATEMENT_PREFIX = re.compile(r"^\s*(?:return\b|const\b|let\b|var\b|if\b|for\b|while\b|switch\b|try\b|throw\b)")
 _QUERY_SELECTOR_PROPERTY_PATTERNS = [
-    (re.compile(r"document\.querySelector\(([^\n]+?)\)\.textContent"), r"(document.querySelector(\1)?.textContent ?? null)"),
-    (re.compile(r"document\.querySelector\(([^\n]+?)\)\.innerText"), r"(document.querySelector(\1)?.innerText ?? null)"),
-    (re.compile(r"document\.querySelector\(([^\n]+?)\)\.innerHTML"), r"(document.querySelector(\1)?.innerHTML ?? null)"),
+    (
+        re.compile(r"document\.querySelector\(([^\n]+?)\)\.textContent"),
+        r"(document.querySelector(\1)?.textContent ?? null)",
+    ),
+    (
+        re.compile(r"document\.querySelector\(([^\n]+?)\)\.innerText"),
+        r"(document.querySelector(\1)?.innerText ?? null)",
+    ),
+    (
+        re.compile(r"document\.querySelector\(([^\n]+?)\)\.innerHTML"),
+        r"(document.querySelector(\1)?.innerHTML ?? null)",
+    ),
     (re.compile(r"document\.querySelector\(([^\n]+?)\)\.value"), r"(document.querySelector(\1)?.value ?? null)"),
     (re.compile(r"document\.querySelector\(([^\n]+?)\)\.href"), r"(document.querySelector(\1)?.href ?? null)"),
 ]
@@ -39,19 +45,19 @@ FALLBACK_SELECTORS = {
 
 class BrowserTimeoutError(Exception):
     """Custom exception for browser timeout with diagnostic information."""
-    
+
     def __init__(
         self,
         selector: str,
         timeout_ms: int,
-        url: Optional[str] = None,
-        tried_fallbacks: Optional[List[str]] = None,
+        url: str | None = None,
+        tried_fallbacks: list[str] | None = None,
     ):
         self.selector = selector
         self.timeout_ms = timeout_ms
         self.url = url
         self.tried_fallbacks = tried_fallbacks or []
-        
+
         msg = f"Timeout ({timeout_ms}ms) waiting for element: '{selector}'"
         if url:
             msg += f" on page: {url}"
@@ -62,7 +68,7 @@ class BrowserTimeoutError(Exception):
         msg += "\n    2. Check if page is fully loaded"
         msg += "\n    3. Use get_html() to inspect page structure"
         msg += "\n    4. Use evaluate() to find elements dynamically"
-        
+
         super().__init__(msg)
 
 
@@ -106,7 +112,7 @@ def prepare_evaluate_script(script: str) -> str:
     return normalize_evaluate_script(make_dom_read_script_null_safe(script))
 
 
-def normalize_browser_selector(selector: Optional[str]) -> Optional[str]:
+def normalize_browser_selector(selector: str | None) -> str | None:
     """Normalize browser selectors while preserving valid attribute selectors."""
     if selector is None or not isinstance(selector, str):
         return selector
@@ -139,14 +145,14 @@ def is_selector_syntax_error(error: Exception) -> bool:
     )
 
 
-def _looks_like_raw_text_url(url: Optional[str]) -> bool:
+def _looks_like_raw_text_url(url: str | None) -> bool:
     if not url:
         return False
     lowered = url.lower()
     return any(hint in lowered for hint in RAW_TEXT_URL_HINTS)
 
 
-async def is_probably_raw_text_page(page: Page, url: Optional[str] = None) -> bool:
+async def is_probably_raw_text_page(page: Page, url: str | None = None) -> bool:
     """Heuristically detect raw/plaintext patch-like pages."""
     if _looks_like_raw_text_url(url):
         return True
@@ -203,19 +209,19 @@ async def get_text_with_fallback(
     selector: str,
     timeout_ms: int = DEFAULT_TIMEOUT,
     use_fallbacks: bool = True,
-) -> Tuple[str, Optional[str]]:
+) -> tuple[str, str | None]:
     """
     Get text content from an element with fallback support and better error handling.
-    
+
     Args:
         page: Playwright Page object
         selector: CSS selector for the element
         timeout_ms: Timeout in milliseconds (default: 10000)
         use_fallbacks: Whether to try fallback selectors (default: True)
-    
+
     Returns:
         Tuple of (text_content, actual_selector_used)
-        
+
     Raises:
         BrowserTimeoutError: If element not found after timeout and fallbacks
     """
@@ -224,22 +230,22 @@ async def get_text_with_fallback(
         raise ValueError("Selector cannot be empty")
 
     selectors_to_try = [selector]
-    
+
     if use_fallbacks:
         for key, fallbacks in FALLBACK_SELECTORS.items():
             if selector.lower() == key or selector.lower() in f"<{key}>":
                 for fb in fallbacks:
                     if fb not in selectors_to_try:
                         selectors_to_try.append(fb)
-    
+
     errors = []
     url = None
-    
+
     try:
         url = page.url
     except Exception:
         pass
-    
+
     for sel in selectors_to_try:
         try:
             text = await page.text_content(sel, timeout=timeout_ms)
@@ -267,7 +273,7 @@ async def get_text_with_fallback(
                 raise ValueError(f"Invalid CSS selector '{sel}': {e}") from e
             errors.append(f"'{sel}': {type(e).__name__}: {str(e)[:50]}")
             continue
-    
+
     raise BrowserTimeoutError(
         selector=selector,
         timeout_ms=timeout_ms,
@@ -278,20 +284,20 @@ async def get_text_with_fallback(
 
 async def get_html_with_fallback(
     page: Page,
-    selector: Optional[str] = None,
+    selector: str | None = None,
     timeout_ms: int = DEFAULT_TIMEOUT,
 ) -> str:
     """
     Get HTML content with better error handling and diagnostics.
-    
+
     Args:
         page: Playwright Page object
         selector: CSS selector for specific element (optional)
         timeout_ms: Timeout in milliseconds (default: 10000)
-    
+
     Returns:
         HTML content string
-        
+
     Raises:
         BrowserTimeoutError: If element not found after timeout
     """
@@ -300,7 +306,7 @@ async def get_html_with_fallback(
         url = page.url
     except Exception:
         pass
-    
+
     try:
         selector = normalize_browser_selector(selector)
 
@@ -311,14 +317,14 @@ async def get_html_with_fallback(
         if await is_probably_raw_text_page(page, url=url):
             logger.info("Raw text page detected for selector '%s'; returning full page content", selector)
             return await page.content()
-        
+
         # Playwright's default wait_for_selector state is "visible".
         # For HTML extraction, visibility is not a requirement (e.g., <title> lives in <head>
         # and is never visible). Waiting for "visible" causes false timeouts.
         await page.wait_for_selector(selector, timeout=timeout_ms, state="attached")
         result = await page.inner_html(selector)
         return result
-        
+
     except PlaywrightTimeoutError:
         if await is_probably_raw_text_page(page, url=url):
             logger.info("Selector '%s' timed out on raw text page; returning full page content", selector)
@@ -327,7 +333,7 @@ async def get_html_with_fallback(
             selector=selector or "full page",
             timeout_ms=timeout_ms,
             url=url,
-        )
+        ) from None
     except Exception as e:
         if is_selector_syntax_error(e):
             raise ValueError(f"Invalid CSS selector '{selector}': {e}") from e
@@ -338,12 +344,12 @@ async def get_html_with_fallback(
 async def find_best_content_selector(page: Page) -> str:
     """
     Find the best selector for main content on the page.
-    
+
     Tries common content selectors in order of preference.
-    
+
     Args:
         page: Playwright Page object
-    
+
     Returns:
         Best selector found, or "body" as fallback
     """
@@ -356,8 +362,8 @@ async def find_best_content_selector(page: Page) -> str:
         (".article", "div.article"),
         ("body", "body"),
     ]
-    
-    for name, selector in candidates:
+
+    for _name, selector in candidates:
         try:
             element = await page.query_selector(selector)
             if element:
@@ -367,23 +373,23 @@ async def find_best_content_selector(page: Page) -> str:
                     return selector
         except Exception:
             continue
-    
+
     return "body"
 
 
-async def extract_page_text(page: Page, timeout_ms: int = DEFAULT_TIMEOUT) -> Dict[str, Any]:
+async def extract_page_text(page: Page, timeout_ms: int = DEFAULT_TIMEOUT) -> dict[str, Any]:
     """
     Extract text content from page with intelligent selector detection.
-    
+
     This is a high-level function that:
     1. Tries to find the best content selector
     2. Extracts text with fallbacks
     3. Returns comprehensive results with diagnostics
-    
+
     Args:
         page: Playwright Page object
         timeout_ms: Timeout in milliseconds
-    
+
     Returns:
         Dictionary with:
         - text: Extracted text content
@@ -397,14 +403,14 @@ async def extract_page_text(page: Page, timeout_ms: int = DEFAULT_TIMEOUT) -> Di
         "url": None,
         "method": None,
     }
-    
+
     try:
         result["url"] = page.url
     except Exception:
         pass
-    
+
     best_selector = await find_best_content_selector(page)
-    
+
     try:
         text, actual_selector = await get_text_with_fallback(
             page, best_selector, timeout_ms=timeout_ms, use_fallbacks=True
@@ -413,27 +419,27 @@ async def extract_page_text(page: Page, timeout_ms: int = DEFAULT_TIMEOUT) -> Di
         result["selector"] = actual_selector
         result["method"] = "text_content"
         return result
-        
+
     except BrowserTimeoutError as e:
         logger.warning(f"get_text_with_fallback failed: {e}")
-        
+
     try:
         html = await get_html_with_fallback(page, timeout_ms=timeout_ms)
         result["text"] = html[:5000]
         result["selector"] = "full page"
         result["method"] = "html_content"
         return result
-        
+
     except Exception as e:
         logger.error(f"Fallback to HTML also failed: {e}")
-        
+
     try:
         text = await page.evaluate("() => document.body.innerText")
         result["text"] = text or ""
         result["selector"] = "body"
         result["method"] = "javascript_innerText"
         return result
-        
+
     except Exception as e:
         logger.error(f"All text extraction methods failed: {e}")
         result["text"] = f"Error: Could not extract text from page. {str(e)}"
@@ -441,36 +447,38 @@ async def extract_page_text(page: Page, timeout_ms: int = DEFAULT_TIMEOUT) -> Di
         return result
 
 
-def format_browser_error(error: Exception, context: Optional[Dict[str, Any]] = None) -> str:
+def format_browser_error(error: Exception, context: dict[str, Any] | None = None) -> str:
     """
     Format browser errors with helpful diagnostic information.
-    
+
     Args:
         error: The exception that occurred
         context: Optional context dictionary (url, selector, etc.)
-    
+
     Returns:
         Formatted error message with suggestions
     """
     context = context or {}
     lines = [f"Browser Error: {type(error).__name__}: {str(error)}"]
-    
+
     if context.get("url"):
         lines.append(f"  URL: {context['url']}")
     if context.get("selector"):
         lines.append(f"  Selector: {context['selector']}")
-    
+
     if isinstance(error, PlaywrightTimeoutError):
-        lines.extend([
-            "",
-            "Timeout Suggestions:",
-            "  1. The element may not exist on the page",
-            "  2. The page may still be loading (try wait action)",
-            "  3. The selector may be incorrect",
-            "  4. Use get_html() to inspect page structure",
-            "  5. Use evaluate() to find elements: document.querySelectorAll('*')",
-        ])
+        lines.extend(
+            [
+                "",
+                "Timeout Suggestions:",
+                "  1. The element may not exist on the page",
+                "  2. The page may still be loading (try wait action)",
+                "  3. The selector may be incorrect",
+                "  4. Use get_html() to inspect page structure",
+                "  5. Use evaluate() to find elements: document.querySelectorAll('*')",
+            ]
+        )
     elif isinstance(error, BrowserTimeoutError):
         pass
-    
+
     return "\n".join(lines)

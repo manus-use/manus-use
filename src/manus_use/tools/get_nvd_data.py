@@ -4,13 +4,15 @@ Custom tool for fetching detailed NVD data for CVEs.
 This module follows the Strands SDK's module-based tool specification.
 """
 
-import requests
 import json
-from typing import Dict, Any
+from typing import Any
+
+import requests
 from strands.types.tools import ToolResult, ToolUse
+
 from manus_use.tools.tool_output_logger import log_tool_output_size
 
-TOOL_SPEC = { # Minor change to force re-evaluation
+TOOL_SPEC = {  # Minor change to force re-evaluation
     "name": "get_nvd_data",
     "description": (
         "Fetches detailed, authoritative vulnerability data for a given CVE ID directly from the "
@@ -31,6 +33,7 @@ TOOL_SPEC = { # Minor change to force re-evaluation
         }
     },
 }
+
 
 def get_nvd_data(tool: ToolUse, **kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
@@ -58,7 +61,9 @@ def get_nvd_data(tool: ToolUse, **kwargs: Any) -> ToolResult:
             result = {
                 "toolUseId": tool_use_id,
                 "status": "error",
-                "content": [{"text": f"No vulnerability data found for {cve_id}. It may be an invalid or rejected CVE."}]
+                "content": [
+                    {"text": f"No vulnerability data found for {cve_id}. It may be an invalid or rejected CVE."}
+                ],
             }
             log_tool_output_size("get_nvd_data", result)
             return result
@@ -77,11 +82,7 @@ def get_nvd_data(tool: ToolUse, **kwargs: Any) -> ToolResult:
         # Add CISA KEV info to the main vulnerability data
         vulnerability_data["cisa_kev_info"] = cisa_kev_info
 
-        result = {
-            "toolUseId": tool_use_id,
-            "status": "success",
-            "content": [{"json": vulnerability_data}]
-        }
+        result = {"toolUseId": tool_use_id, "status": "success", "content": [{"json": vulnerability_data}]}
         log_tool_output_size("get_nvd_data", result)
         return result
 
@@ -90,10 +91,18 @@ def get_nvd_data(tool: ToolUse, **kwargs: Any) -> ToolResult:
         log_tool_output_size("get_nvd_data", result)
         return result
     except json.JSONDecodeError:
-        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": "Failed to parse JSON response from NVD API."}]}
+        result = {
+            "toolUseId": tool_use_id,
+            "status": "error",
+            "content": [{"text": "Failed to parse JSON response from NVD API."}],
+        }
         log_tool_output_size("get_nvd_data", result)
         return result
     except Exception as e:
-        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"An unexpected error occurred: {e}"}]}
+        result = {
+            "toolUseId": tool_use_id,
+            "status": "error",
+            "content": [{"text": f"An unexpected error occurred: {e}"}],
+        }
         log_tool_output_size("get_nvd_data", result)
         return result

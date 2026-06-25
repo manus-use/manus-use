@@ -17,30 +17,30 @@ from langchain_aws import ChatBedrock
 
 async def main():
     """Run browser-use directly with AWS Bedrock."""
-    
+
     # Initialize AWS Bedrock LLM
     llm = ChatBedrock(
-        model_id='us.anthropic.claude-3-7-sonnet-20250219-v1:0',
+        model_id="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
         model_kwargs={
-            'temperature': 0.0,
-            'max_tokens': 4096,
+            "temperature": 0.0,
+            "max_tokens": 4096,
         },
-        region_name='us-east-1'
+        region_name="us-east-1",
     )
-    
+
     # Define the task
     task = """Navigate to https://www.anthropic.com and tell me about their latest AI model announcements."""
-    
+
     print(f"Task: {task}")
     print("\nStarting browser-use with AWS Bedrock...\n")
-    
+
     # Create browser
     browser = Browser(
         config=BrowserConfig(
             headless=False  # Show browser window
         )
     )
-    
+
     # Create agent
     agent = Agent(
         task=task,
@@ -49,13 +49,13 @@ async def main():
         browser=browser,
         validate_output=False,
     )
-    
+
     # Run the agent
     await agent.run(max_steps=10)
-    
+
     # Close browser
     await browser.close()
-    
+
     print("\n✅ Demo completed!")
 
 
@@ -65,5 +65,5 @@ if __name__ == "__main__":
         print("⚠️  AWS credentials not found in environment.")
         print("Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY")
         sys.exit(1)
-    
+
     asyncio.run(main())

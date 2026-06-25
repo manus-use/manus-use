@@ -1,9 +1,8 @@
 """Tools for ManusUse agents."""
 
-from typing import Any, List, Optional
+from typing import Any
 
 from strands.types.tools import AgentTool
-
 from strands_tools import (
     calculator,
     current_time,
@@ -12,12 +11,12 @@ from strands_tools import (
     file_read,
     file_write,
     generate_image,
-    retrieve,
     shell,
 )
 
-from manus_use.tools.python_repl import python_repl
 from manus_use.tools.http_request import http_request
+from manus_use.tools.python_repl import python_repl
+
 # Collect all tools
 ALL_TOOLS = {
     "file_read": file_read,
@@ -27,23 +26,20 @@ ALL_TOOLS = {
     "http_request": http_request,
     "editor": editor,
     "environment": environment,
-    #"web_search": retrieve.retrieve,  # Using retrieve for web search
+    # "web_search": retrieve.retrieve,  # Using retrieve for web search
     "generate_image": generate_image,
     "current_time": current_time,
-    "calculator": calculator
+    "calculator": calculator,
 }
 
 
-def get_tools_by_names(
-    names: List[str], 
-    config: Optional[Any] = None
-) -> List[AgentTool]:
+def get_tools_by_names(names: list[str], config: Any | None = None) -> list[AgentTool]:
     """Get tools by their names.
-    
+
     Args:
         names: List of tool names to retrieve
         config: Optional configuration object
-        
+
     Returns:
         List of tool instances
     """
@@ -66,8 +62,8 @@ __all__ = [
     "http_request",
     "editor",
     "environment",
-    #"web_search": retrieve.retrieve,  # Using retrieve for web search
+    # "web_search": retrieve.retrieve,  # Using retrieve for web search
     "generate_image",
     "current_time",
-    "calculator"
+    "calculator",
 ]

@@ -4,12 +4,14 @@ Custom tool for checking if a CVE exists in the CISA Known Exploited Vulnerabili
 This module follows the Strands SDK's module-based tool specification.
 """
 
-import requests
 import json
 import time
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any
+
+import requests
 from strands.types.tools import ToolResult, ToolUse
+
 from manus_use.tools.tool_output_logger import log_tool_output_size
 
 TOOL_SPEC = {
@@ -36,7 +38,8 @@ TOOL_SPEC = {
 CACHE_FILE = Path(__file__).parent / ".cisa_kev_cache.json"
 CACHE_DURATION = 3600  # Cache for 1 hour
 
-def _get_kev_data() -> Dict[str, Any]:
+
+def _get_kev_data() -> dict[str, Any]:
     """Fetches KEV data from CISA, with caching."""
     if CACHE_FILE.exists():
         cached_data = json.loads(CACHE_FILE.read_text())
@@ -44,16 +47,19 @@ def _get_kev_data() -> Dict[str, Any]:
             return cached_data.get("data", {})
 
     try:
-        response = requests.get("https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json", timeout=15)
+        response = requests.get(
+            "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json", timeout=15
+        )
         response.raise_for_status()
         data = response.json()
-        
+
         # Save to cache
         CACHE_FILE.write_text(json.dumps({"timestamp": time.time(), "data": data}))
         return data
     except requests.exceptions.RequestException as e:
         print(f"Error fetching CISA KEV data: {e}")
         return {}
+
 
 def check_cisa_kev(tool: ToolUse, **kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
@@ -64,7 +70,7 @@ def check_cisa_kev(tool: ToolUse, **kwargs: Any) -> ToolResult:
         result = {
             "toolUseId": tool_use_id,
             "status": "error",
-            "content": [{"text": "Invalid CVE ID. Must be a non-empty string."}]
+            "content": [{"text": "Invalid CVE ID. Must be a non-empty string."}],
         }
         log_tool_output_size("check_cisa_kev", result)
         return result
@@ -74,7 +80,7 @@ def check_cisa_kev(tool: ToolUse, **kwargs: Any) -> ToolResult:
         result = {
             "toolUseId": tool_use_id,
             "status": "error",
-            "content": [{"text": "Could not retrieve or parse CISA KEV data."}]
+            "content": [{"text": "Could not retrieve or parse CISA KEV data."}],
         }
         log_tool_output_size("check_cisa_kev", result)
         return result
@@ -92,7 +98,7 @@ def check_cisa_kev(tool: ToolUse, **kwargs: Any) -> ToolResult:
         result = {
             "toolUseId": tool_use_id,
             "status": "success",
-            "content": [{"json": {"summary": summary, "exploited": True, "details": vulnerability_details}}]
+            "content": [{"json": {"summary": summary, "exploited": True, "details": vulnerability_details}}],
         }
         log_tool_output_size("check_cisa_kev", result)
         return result
@@ -101,7 +107,7 @@ def check_cisa_kev(tool: ToolUse, **kwargs: Any) -> ToolResult:
         result = {
             "toolUseId": tool_use_id,
             "status": "success",
-            "content": [{"json": {"summary": summary, "exploited": False}}]
+            "content": [{"json": {"summary": summary, "exploited": False}}],
         }
         log_tool_output_size("check_cisa_kev", result)
         return result

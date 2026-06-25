@@ -1,25 +1,21 @@
 """Data analysis agent implementation."""
 
-from typing import Any, List, Optional
+from typing import Any
 
 from strands.types.tools import AgentTool
 
-from .base import BaseManusAgent
 from ..config import Config
+from .base import BaseManusAgent
 
 
 class DataAnalysisAgent(BaseManusAgent):
     """Agent specialized for data analysis and visualization."""
-    
+
     def __init__(
-        self,
-        tools: Optional[List[AgentTool]] = None,
-        model: Optional[Any] = None,
-        config: Optional[Config] = None,
-        **kwargs
+        self, tools: list[AgentTool] | None = None, model: Any | None = None, config: Config | None = None, **kwargs
     ):
         """Initialize data analysis agent.
-        
+
         Args:
             tools: List of tools to use
             model: Model instance or None to use config
@@ -29,15 +25,11 @@ class DataAnalysisAgent(BaseManusAgent):
         # Get data analysis tools if none provided
         if tools is None:
             tools = self._get_default_tools(config)
-            
+
         super().__init__(
-            tools=tools,
-            model=model,
-            config=config,
-            system_prompt=self._get_default_system_prompt(),
-            **kwargs
+            tools=tools, model=model, config=config, system_prompt=self._get_default_system_prompt(), **kwargs
         )
-        
+
     def _get_default_system_prompt(self) -> str:
         """Get data analysis agent system prompt."""
         return """You are a data analysis expert capable of:
@@ -55,21 +47,21 @@ When analyzing data:
 5. Provide actionable insights and recommendations
 
 Always explain your analysis process and findings clearly."""
-        
-    def _get_default_tools(self, config: Optional[Config] = None) -> List[AgentTool]:
+
+    def _get_default_tools(self, config: Config | None = None) -> list[AgentTool]:
         """Get default tools for data analysis."""
         from ..tools import get_tools_by_names
-        
+
         config = config or Config.from_file()
-        
+
         # Data analysis specific tools
         tool_names = [
             "file_read",
-            "file_write", 
+            "file_write",
             "code_execute",  # For pandas, numpy operations
             "create_chart",
             "data_analyze",
             "statistical_test",
         ]
-        
+
         return get_tools_by_names(tool_names, config=config)

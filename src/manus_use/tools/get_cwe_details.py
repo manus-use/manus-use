@@ -4,10 +4,11 @@ Custom tool for fetching detailed CWE (Common Weakness Enumeration) information.
 This module follows the Strands SDK's module-based tool specification.
 """
 
+from typing import Any
+
 import requests
-import json
-from typing import Dict, Any
 from strands.types.tools import ToolResult, ToolUse
+
 from manus_use.tools.tool_output_logger import log_tool_output_size
 
 TOOL_SPEC = {
@@ -32,6 +33,7 @@ TOOL_SPEC = {
     },
 }
 
+
 def get_cwe_details(tool: ToolUse, **kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
     tool_input = tool["input"]
@@ -52,7 +54,7 @@ def get_cwe_details(tool: ToolUse, **kwargs: Any) -> ToolResult:
         result = {
             "toolUseId": tool_use_id,
             "status": "error",
-            "content": [{"text": "Invalid CWE ID format. Number part is missing or invalid."}]
+            "content": [{"text": "Invalid CWE ID format. Number part is missing or invalid."}],
         }
         log_tool_output_size("get_cwe_details", result)
         return result
@@ -72,7 +74,11 @@ def get_cwe_details(tool: ToolUse, **kwargs: Any) -> ToolResult:
 
         start_index = html_content.find(description_start_marker)
         if start_index == -1:
-            result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"Could not find description for {cwe_id} on the page."}]}
+            result = {
+                "toolUseId": tool_use_id,
+                "status": "error",
+                "content": [{"text": f"Could not find description for {cwe_id} on the page."}],
+            }
             log_tool_output_size("get_cwe_details", result)
             return result
 
@@ -82,32 +88,46 @@ def get_cwe_details(tool: ToolUse, **kwargs: Any) -> ToolResult:
         end_index = html_content.find(description_end_marker, start_index)
         if end_index == -1:
             # Fallback if Extended_Description is not present, try to find the next div
-            end_index = html_content.find('<div id=', start_index)
+            end_index = html_content.find("<div id=", start_index)
             if end_index == -1:
-                end_index = len(html_content) # Read to end if no other div found
+                end_index = len(html_content)  # Read to end if no other div found
 
         raw_description = html_content[start_index:end_index].strip()
 
         # Simple HTML tag stripping (very basic)
-        clean_description = raw_description.replace('<p>', '').replace('</p>', '').replace('<ul>', '').replace('</ul>', '').replace('<li>', '').replace('</li>', '').replace('<br>', '').replace('<br/>', '').strip()
+        clean_description = (
+            raw_description.replace("<p>", "")
+            .replace("</p>", "")
+            .replace("<ul>", "")
+            .replace("</ul>", "")
+            .replace("<li>", "")
+            .replace("</li>", "")
+            .replace("<br>", "")
+            .replace("<br/>", "")
+            .strip()
+        )
 
         result = {
             "toolUseId": tool_use_id,
             "status": "success",
-            "content": [{"json": {
-                "cwe_id": cwe_id,
-                "description": clean_description,
-                "url": url
-            }}]
+            "content": [{"json": {"cwe_id": cwe_id, "description": clean_description, "url": url}}],
         }
         log_tool_output_size("get_cwe_details", result)
         return result
 
     except requests.exceptions.RequestException as e:
-        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"Request to CWE website failed: {e}"}]}
+        result = {
+            "toolUseId": tool_use_id,
+            "status": "error",
+            "content": [{"text": f"Request to CWE website failed: {e}"}],
+        }
         log_tool_output_size("get_cwe_details", result)
         return result
     except Exception as e:
-        result = {"toolUseId": tool_use_id, "status": "error", "content": [{"text": f"An unexpected error occurred during CWE details fetching: {e}"}]}
+        result = {
+            "toolUseId": tool_use_id,
+            "status": "error",
+            "content": [{"text": f"An unexpected error occurred during CWE details fetching: {e}"}],
+        }
         log_tool_output_size("get_cwe_details", result)
         return result

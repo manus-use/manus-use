@@ -46,7 +46,7 @@ def main():
         ),
     )
 
-    print(f"=== Variant Analysis Agent (AgentSkills test) ===")
+    print("=== Variant Analysis Agent (AgentSkills test) ===")
     print(f"Query: {cve_id}\n")
 
     result = agent(f"Analyze {cve_id}")

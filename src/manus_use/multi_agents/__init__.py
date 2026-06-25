@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .workflow_agent import WorkflowAgent
 
@@ -30,8 +30,8 @@ class TaskPlan:
     task_id: str
     description: str
     agent_type: AgentType
-    dependencies: List[str] = field(default_factory=list)
-    inputs: Dict[str, Any] = field(default_factory=dict)
+    dependencies: list[str] = field(default_factory=list)
+    inputs: dict[str, Any] = field(default_factory=dict)
     expected_output: str = ""
     priority: int = 3
     estimated_complexity: ComplexityLevel = ComplexityLevel.MEDIUM
@@ -41,8 +41,8 @@ class TaskPlan:
 class OrchestratorResult:
     success: bool
     output: str = ""
-    error: Optional[str] = None
-    tasks: List[TaskPlan] = field(default_factory=list)
+    error: str | None = None
+    tasks: list[TaskPlan] = field(default_factory=list)
 
 
 class Orchestrator:
@@ -52,10 +52,10 @@ class Orchestrator:
     area (constructor, ``agents`` attribute, and ``run`` method) remains stable.
     """
 
-    def __init__(self, *, config: Any = None, model_name: Optional[str] = None):
+    def __init__(self, *, config: Any = None, model_name: str | None = None):
         self.config = config
         self.model_name = model_name
-        self.agents: Dict[str, Any] = {}
+        self.agents: dict[str, Any] = {}
         self._workflow_agent = WorkflowAgent(model_name=model_name) if model_name else WorkflowAgent()
 
     def run(self, request: str) -> OrchestratorResult:

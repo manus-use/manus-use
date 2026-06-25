@@ -1,18 +1,23 @@
-
 import asyncio
-import json
+
+from browser_use.agent.service import Agent
+
 # from browser_use import Agent, ActionResult
-from browser_use.browser.browser import Browser, BrowserConfig, BrowserProfile, BrowserSession
+from browser_use.browser.browser import BrowserProfile, BrowserSession
 from browser_use.controller.service import Controller
 from browser_use.llm import ChatAnthropicBedrock
 from pydantic import BaseModel, Field
-from browser_use.agent.service import Agent
+
+
 # Define the structured output format for the browser agent
 class BrowserTaskResult(BaseModel):
     """Structured output for the browser agent."""
+
     task_completed: bool = Field(description="Whether the assigned tasks are successfully completed.")
     summary: str = Field(description="A high-level summary of what was found or accomplished.")
     result: str = Field(description="Result data, or error messages from the tasks.")
+
+
 """
 controller = Controller()
 @controller.registry.action('Done with task', param_model=BrowserTaskResult)
@@ -23,14 +28,10 @@ async def done(params: BrowserTaskResult):
 	return 'blablabla'
 """
 
+
 class BrowserAgentRunner:
     def __init__(self, headless: bool = True, keep_alive: bool = True):
-        self.browser_session = BrowserSession(
-            browser_profile=BrowserProfile(
-                keep_alive=keep_alive,
-                headless=headless
-            )
-        )
+        self.browser_session = BrowserSession(browser_profile=BrowserProfile(keep_alive=keep_alive, headless=headless))
 
     async def start_browser(self):
         await self.browser_session.start()
@@ -52,15 +53,9 @@ class BrowserAgentRunner:
             model="us.anthropic.claude-sonnet-4-20250514-v1:0",
             aws_region="us-west-2",
         )
-        controller = Controller(
-            output_model=output_model
-        )
+        controller = Controller(output_model=output_model)
         agent = Agent(
-            task=task,
-            llm=llm,
-            controller=controller,
-            browser_session=self.browser_session,
-            validate_output=True
+            task=task, llm=llm, controller=controller, browser_session=self.browser_session, validate_output=True
         )
         result_model = None
         history = await agent.run(max_steps=300)
@@ -73,7 +68,7 @@ class BrowserAgentRunner:
             error_result = BrowserTaskResult(
                 task_completed=False,
                 summary="Agent failed to produce a result.",
-                result="The agent did not return a valid BrowserTaskResult model."
+                result="The agent did not return a valid BrowserTaskResult model.",
             )
             return error_result.model_dump_json(indent=2)
 
@@ -84,7 +79,6 @@ class BrowserAgentRunner:
     @classmethod
     async def cli_entry(cls):
         import sys
-        import asyncio
 
         if len(sys.argv) > 1:
             tasks_to_run = sys.argv[1:]
@@ -100,27 +94,32 @@ class BrowserAgentRunner:
         else:
             print("Please provide one or more tasks as command-line arguments for direct testing.")
 
+
 class AssetMatch(BaseModel):
     result: str = Field(description="Result data, or error messages from the tasks.")
     precisely_matched_assets: int = Field(description="The number of Assets Precisely Matched")
     fuzzy_matched_asset: int = Field(description="The number of Assets Fuzzy Matched (Name + Version)")
 
+
 # MCP server implementation to provide tools using MCP official Python SDK
 
-from mcp.server import MCPServer, Tool, tool
-from mcp.types import ToolInput, ToolOutput
+from mcp.server import MCPServer, tool  # noqa: E402
+from mcp.types import ToolInput, ToolOutput  # noqa: E402
+
 
 class AssetMatchInput(ToolInput):
     task: str
+
 
 class AssetMatchOutput(ToolOutput):
     result: str
     precisely_matched_assets: int
     fuzzy_matched_asset: int
 
+
 class BrowserAgentTools:
     def __init__(self) -> None:
-        self.runner=BrowserAgentRunner(headless=True)
+        self.runner = BrowserAgentRunner(headless=True)
 
     @tool(
         name="asset_match",
@@ -137,11 +136,13 @@ class BrowserAgentTools:
             fuzzy_matched_asset=result.fuzzy_matched_asset,
         )
 
+
 async def main():
     browser = BrowserAgentTools()
     await browser.runner.start_browser()
     server = MCPServer(tools=browser)
     server.run_stdio()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     asyncio.run(main())

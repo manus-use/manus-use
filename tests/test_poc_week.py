@@ -192,6 +192,7 @@ def test_get_poc_week_rounds_to_sunday(mock_urlopen):
     result = get_poc_week("2026-04-29")  # Wednesday
     assert result["week_date"] == "2026-04-26"  # prior Sunday
 
+
 @patch("manus_use.tools.get_poc_week.urlopen")
 def test_get_poc_week_no_date_uses_today(mock_urlopen):
     mock_urlopen.return_value = _make_mock_response(SAMPLE_HTML)
@@ -212,9 +213,7 @@ def test_get_poc_week_invalid_date():
 
 @patch("manus_use.tools.get_poc_week.urlopen")
 def test_get_poc_week_404_retries_and_fails(mock_urlopen):
-    mock_urlopen.side_effect = HTTPError(
-        url="https://example.com", code=404, msg="Not Found", hdrs=None, fp=None
-    )
+    mock_urlopen.side_effect = HTTPError(url="https://example.com", code=404, msg="Not Found", hdrs=None, fp=None)
     result = get_poc_week("2026-04-27", max_retries=2)
     assert "error" in result
     assert "No PoC Week issue found" in result["error"]
@@ -223,9 +222,7 @@ def test_get_poc_week_404_retries_and_fails(mock_urlopen):
 @patch("manus_use.tools.get_poc_week.urlopen")
 def test_get_poc_week_404_then_success(mock_urlopen):
     """First call returns 404; second call (prior week) succeeds."""
-    http_err = HTTPError(
-        url="https://example.com", code=404, msg="Not Found", hdrs=None, fp=None
-    )
+    http_err = HTTPError(url="https://example.com", code=404, msg="Not Found", hdrs=None, fp=None)
     mock_urlopen.side_effect = [http_err, _make_mock_response(SAMPLE_HTML)]
     result = get_poc_week("2026-04-26", max_retries=2)  # Sunday
     assert "error" not in result

@@ -1,20 +1,13 @@
 import asyncio
 import logging
 import os
+from collections.abc import AsyncGenerator, Coroutine
 from typing import (
     Any,
-    Optional,
-    List,
-    Union,
-    Coroutine,
-    Dict,
-    AsyncGenerator,
-    Type,
 )
 
 from pydantic import BaseModel
 from strands import Agent
-from strands.types.tools import AgentTool # Though not used directly, often part of agent modules
 
 from manus_use.config import Config
 from manus_use.tools.patches import apply_comprehensive_patch
@@ -27,15 +20,15 @@ try:
     from browser_use.agent.views import (
         AgentHistoryList,
         AgentOutput,
-    ) # Assuming AgentOutput is what model_output is
+    )  # Assuming AgentOutput is what model_output is
     from browser_use.browser.profile import BrowserProfile
     from browser_use.browser.views import (
         BrowserStateSummary,
-    ) # Assuming this is what browser_state_summary is
+    )  # Assuming this is what browser_state_summary is
     from browser_use.controller.service import Controller
     from langchain_aws import ChatBedrock
-    from langchain_openai import ChatOpenAI
     from langchain_core.language_models.chat_models import BaseChatModel
+    from langchain_openai import ChatOpenAI
 
     BROWSER_USE_AVAILABLE = True
     IMPORTED_MODULES = {
@@ -58,7 +51,7 @@ except ImportError as e:
         IMPORTED_MODULES["langchain_aws"] = False
     if "langchain_openai" in str(e).lower() or "openai" in str(e).lower():
         IMPORTED_MODULES["langchain_openai"] = False
-    
+
     MISSING_PACKAGES = [pkg for pkg, imported in IMPORTED_MODULES.items() if not imported]
 
     # Define placeholders for type hints if imports fail
@@ -77,7 +70,7 @@ class BrowserUseAgent(Agent):
     """
     Strands Agent wrapper for the 'browser-use' library.
 
-    This agent delegates browser automation tasks to an instance of 
+    This agent delegates browser automation tasks to an instance of
     `browser_use.Agent`. It manages the lifecycle of the `browser_use.Agent`,
     configures it based on the main application's settings, and translates
     Strands Agent calls to `browser-use` operations.
@@ -90,17 +83,17 @@ class BrowserUseAgent(Agent):
 
     def __init__(
         self,
-        config: Optional[Config] = None,
-        headless: Optional[bool] = None,
-        enable_memory: Optional[bool] = None,
-        output_model: Optional[Type[BaseModel]] = None,
+        config: Config | None = None,
+        headless: bool | None = None,
+        enable_memory: bool | None = None,
+        output_model: type[BaseModel] | None = None,
         **kwargs: Any,
     ):
         """Initialize BrowserUseAgent.
 
         Args:
             config: Configuration object for LLM and other settings.
-            headless: Whether to run the browser in headless mode. 
+            headless: Whether to run the browser in headless mode.
                       Overrides config if set.
             enable_memory: Whether to enable memory for the browser-use agent.
                            Overrides config if set, defaults to False.
@@ -127,7 +120,7 @@ class BrowserUseAgent(Agent):
             raise ImportError(error_message)
 
         self.config = config or Config.from_file()
-        
+
         # Get browser_use specific config
         browser_config = self.config.browser_use
 
@@ -146,7 +139,7 @@ class BrowserUseAgent(Agent):
             else (browser_config.enable_memory if isinstance(browser_config.enable_memory, bool) else False)
         )
         self.output_model = output_model
-        
+
         # Store other browser_use settings
         self.max_steps = browser_config.max_steps
         self.max_actions_per_step = browser_config.max_actions_per_step
@@ -164,13 +157,13 @@ class BrowserUseAgent(Agent):
         self.screenshot_path = browser_config.screenshot_path
 
         self._apply_browser_patch_config()
-        
+
         # Initialize Strands Agent with a dummy model and no tools,
         # as browser-use handles its own LLM and actions.
         super().__init__(
             model=self._get_dummy_model(),
-            tools=[], # No Strands tools for this agent
-            system_prompt="", # browser-use handles its own prompting
+            tools=[],  # No Strands tools for this agent
+            system_prompt="",  # browser-use handles its own prompting
             **kwargs,
         )
 
@@ -198,7 +191,8 @@ class BrowserUseAgent(Agent):
         Raises ImportError if required LLM packages are missing, or ValueError for
         unsupported providers.
         """
-        def _coerce_str(value: Any) -> Optional[str]:
+
+        def _coerce_str(value: Any) -> str | None:
             return value if isinstance(value, str) and value.strip() else None
 
         browser_config = getattr(self.config, "browser_use", None)
@@ -229,9 +223,7 @@ class BrowserUseAgent(Agent):
 
         if provider == "bedrock":
             if not ChatBedrock:
-                raise ImportError(
-                    "langchain-aws package is missing. Please install with: pip install langchain-aws"
-                )
+                raise ImportError("langchain-aws package is missing. Please install with: pip install langchain-aws")
             return ChatBedrock(
                 model_id=model_name,
                 model_kwargs={"temperature": temperature, "max_tokens": max_tokens},
@@ -264,16 +256,16 @@ class BrowserUseAgent(Agent):
         then processes the result to return a summary string.
         Ensures the browser_use.Agent is closed after execution.
         """
-        browser_use_agent_instance: Optional[BrowserUse] = None
+        browser_use_agent_instance: BrowserUse | None = None
         try:
             self._apply_browser_patch_config()
             # Keep BrowserProfile construction minimal for compatibility across
             # browser_use versions (and unit tests).
             browser_profile = BrowserProfile(headless=self.headless)
-            
+
             controller_kwargs = {}
             if self.output_model:
-                controller_kwargs['output_model'] = self.output_model
+                controller_kwargs["output_model"] = self.output_model
 
             controller = Controller(**controller_kwargs)
 
@@ -285,18 +277,18 @@ class BrowserUseAgent(Agent):
                 enable_memory=self.enable_memory,
                 # Only pass parameters that browser-use actually supports
                 # max_steps, max_actions_per_step, etc. are not supported in current version
-                validate_output=False, # Kept from original implementation
+                validate_output=False,  # Kept from original implementation
             )
 
             result: AgentHistoryList = await browser_use_agent_instance.run()
 
-            if self.output_model and hasattr(result, 'final_result') and callable(result.final_result):
+            if self.output_model and hasattr(result, "final_result") and callable(result.final_result):
                 # If output_model is used, final_result() gives JSON string
                 final_json_string = result.final_result()
                 logging.debug("Exiting _run_browser_task with final_json_string.")
                 return final_json_string if final_json_string is not None else ""
 
-            if hasattr(result, 'extracted_content') and callable(result.extracted_content):
+            if hasattr(result, "extracted_content") and callable(result.extracted_content):
                 extracted_items = result.extracted_content()
                 if isinstance(extracted_items, list):
                     logging.debug("Exiting _run_browser_task with joined extracted_items.")
@@ -316,27 +308,36 @@ class BrowserUseAgent(Agent):
                 logging.debug("Exiting _run_browser_task with str(result) as fallback.")
                 return str(result)
         finally:
-            if browser_use_agent_instance and hasattr(browser_use_agent_instance, 'close'):
+            if browser_use_agent_instance and hasattr(browser_use_agent_instance, "close"):
                 try:
-                    logging.debug(f"Attempting to close browser_use agent instance in _run_browser_task. keep_alive: {self.keep_alive}")
+                    logging.debug(
+                        f"Attempting to close browser_use agent instance in _run_browser_task. keep_alive: {self.keep_alive}"
+                    )
                     if self.keep_alive:
                         logging.info(f"Applying {BROWSER_CLOSE_TIMEOUT}s timeout to close() due to keep_alive=True.")
                         try:
                             await asyncio.wait_for(browser_use_agent_instance.close(), timeout=BROWSER_CLOSE_TIMEOUT)
-                            logging.debug(f"Successfully closed browser_use agent instance in _run_browser_task within timeout. keep_alive: {self.keep_alive}")
+                            logging.debug(
+                                f"Successfully closed browser_use agent instance in _run_browser_task within timeout. keep_alive: {self.keep_alive}"
+                            )
                         except asyncio.TimeoutError:
-                            logging.warning(f"Timeout closing browser_use agent instance in _run_browser_task after {BROWSER_CLOSE_TIMEOUT}s (keep_alive: {self.keep_alive}). Proceeding with agent shutdown.")
+                            logging.warning(
+                                f"Timeout closing browser_use agent instance in _run_browser_task after {BROWSER_CLOSE_TIMEOUT}s (keep_alive: {self.keep_alive}). Proceeding with agent shutdown."
+                            )
                     else:
                         await browser_use_agent_instance.close()
-                        logging.debug(f"Successfully closed browser_use agent instance in _run_browser_task. keep_alive: {self.keep_alive}")
+                        logging.debug(
+                            f"Successfully closed browser_use agent instance in _run_browser_task. keep_alive: {self.keep_alive}"
+                        )
                 except Exception as e_close:
-                    logging.error(f"Error closing browser_use_agent_instance in _run_browser_task (keep_alive: {self.keep_alive}): {e_close}", exc_info=True)
+                    logging.error(
+                        f"Error closing browser_use_agent_instance in _run_browser_task (keep_alive: {self.keep_alive}): {e_close}",
+                        exc_info=True,
+                    )
         logging.warning("Reached supposedly unreachable return in _run_browser_task's finally block.")
-        return "" # Should be unreachable if try block returns
+        return ""  # Should be unreachable if try block returns
 
-    def __call__(
-        self, task: Union[str, List[dict]]
-    ) -> Union[str, Coroutine[Any, Any, str]]:
+    def __call__(self, task: str | list[dict]) -> str | Coroutine[Any, Any, str]:
         """
         Execute a browser task using browser-use.
         This method delegates directly to browser-use instead of using the
@@ -353,8 +354,8 @@ class BrowserUseAgent(Agent):
         task_str: str
         if isinstance(task, list):
             task_str = task[-1].get("content", "") if task and task[-1].get("role") == "user" else ""
-            if not task_str: # Fallback if last message isn't user or no content
-                 task_str = str(task) # Or some other summarization
+            if not task_str:  # Fallback if last message isn't user or no content
+                task_str = str(task)  # Or some other summarization
         else:
             task_str = task
 
@@ -363,15 +364,13 @@ class BrowserUseAgent(Agent):
             if loop.is_running():
                 # We're in an async context, return a coroutine
                 return self._run_browser_task(task_str)
-            else: # Should not happen often in typical async frameworks
+            else:  # Should not happen often in typical async frameworks
                 return asyncio.run(self._run_browser_task(task_str))
         except RuntimeError:
             # No event loop, typically means a sync context
             return asyncio.run(self._run_browser_task(task_str))
 
-    async def stream_async(
-        self, task: Union[str, List[dict]], **kwargs: Any
-    ) -> AsyncGenerator[Dict[str, Any], None]:
+    async def stream_async(self, task: str | list[dict], **kwargs: Any) -> AsyncGenerator[dict[str, Any], None]:
         """
         Execute a browser task using browser-use and stream intermediate updates.
 
@@ -390,7 +389,7 @@ class BrowserUseAgent(Agent):
         if isinstance(task, list):
             task_str = task[-1].get("content", "") if task and task[-1].get("role") == "user" else ""
             if not task_str:
-                 task_str = str(task)
+                task_str = str(task)
         else:
             task_str = task
 
@@ -403,32 +402,25 @@ class BrowserUseAgent(Agent):
                     maybe_result = await maybe_result
                 yield {"type": "text", "text": str(maybe_result)}
             except Exception as e:
-                logging.error(
-                    "Error during BrowserUseAgent stream_async fallback: %s", e, exc_info=True
-                )
+                logging.error("Error during BrowserUseAgent stream_async fallback: %s", e, exc_info=True)
                 yield {"type": "error", "message": str(e)}
             return
 
-        queue: asyncio.Queue[Optional[Dict[str, Any]]] = asyncio.Queue()
-        browser_use_agent_instance: Optional[BrowserUse] = None
+        queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+        browser_use_agent_instance: BrowserUse | None = None
         run_task_bg = None
 
-        async def step_callback(
-            summary: BrowserStateSummary, model_out: AgentOutput, step_num: int
-        ):
+        async def step_callback(summary: BrowserStateSummary, model_out: AgentOutput, step_num: int):
             try:
                 event_data = {
                     "type": "step_update",
                     "step": step_num,
                     "url": summary.url if summary else None,
                     "title": summary.title if summary else None,
-                    "planned_actions": [
-                        action.model_dump(exclude_unset=True)
-                        for action in model_out.action
-                    ] if model_out and model_out.action else [],
-                    "next_goal": model_out.current_state.next_goal
-                    if model_out and model_out.current_state
-                    else None,
+                    "planned_actions": [action.model_dump(exclude_unset=True) for action in model_out.action]
+                    if model_out and model_out.action
+                    else [],
+                    "next_goal": model_out.current_state.next_goal if model_out and model_out.current_state else None,
                 }
                 await queue.put(event_data)
             except Exception as e_cb:
@@ -436,24 +428,23 @@ class BrowserUseAgent(Agent):
                 # Attempt to put an error on the queue so the consumer knows something went wrong
                 await queue.put({"type": "error", "message": f"Error in step_callback: {str(e_cb)}"})
 
-
         async def done_callback(history: AgentHistoryList):
             try:
                 final_content_str = ""
-                if self.output_model and hasattr(history, 'final_result') and callable(history.final_result):
+                if self.output_model and hasattr(history, "final_result") and callable(history.final_result):
                     final_content_str = history.final_result() or ""
-                elif hasattr(history, 'extracted_content') and callable(history.extracted_content):
+                elif hasattr(history, "extracted_content") and callable(history.extracted_content):
                     extracted_items = history.extracted_content()
                     if isinstance(extracted_items, list):
                         final_content_str = "\n".join(str(item) for item in extracted_items)
                     elif extracted_items is not None:
                         final_content_str = str(extracted_items)
-                
+
                 event_data = {
                     "type": "final_result",
-                    "is_successful": history.is_successful() if hasattr(history, 'is_successful') else None,
-                    "total_steps": len(history.history) if hasattr(history, 'history') else None, # More direct way
-                    "content": final_content_str, # Unified content string
+                    "is_successful": history.is_successful() if hasattr(history, "is_successful") else None,
+                    "total_steps": len(history.history) if hasattr(history, "history") else None,  # More direct way
+                    "content": final_content_str,  # Unified content string
                     # Optionally include more from history if needed
                     # "full_history": history.model_dump(exclude_unset=True) # Could be very large
                 }
@@ -467,10 +458,10 @@ class BrowserUseAgent(Agent):
         try:
             self._apply_browser_patch_config()
             browser_profile = BrowserProfile(headless=self.headless)
-            
+
             controller_kwargs = {}
             if self.output_model:
-                controller_kwargs['output_model'] = self.output_model
+                controller_kwargs["output_model"] = self.output_model
             controller = Controller(**controller_kwargs)
 
             browser_use_agent_instance = BrowserUse(
@@ -480,7 +471,7 @@ class BrowserUseAgent(Agent):
                 controller=controller,
                 enable_memory=self.enable_memory,
                 # Only pass parameters that browser-use actually supports
-                validate_output=False, 
+                validate_output=False,
                 register_new_step_callback=step_callback,
                 register_done_callback=done_callback,
             )
@@ -495,44 +486,55 @@ class BrowserUseAgent(Agent):
                 yield item
                 queue.task_done()
             logging.info("Exited stream_async main event processing loop.")
-            
+
             # Await the background task to ensure it finishes and to catch any exceptions
-            if run_task_bg: # Check if task was created
-                 await run_task_bg
-                 logging.info("Finished awaiting run_task_bg in stream_async within try block.")
+            if run_task_bg:  # Check if task was created
+                await run_task_bg
+                logging.info("Finished awaiting run_task_bg in stream_async within try block.")
 
         except Exception as e:
             logging.error(f"Error during BrowserUseAgent stream_async execution: {e}", exc_info=True)
             yield {"type": "error", "message": f"Error during streaming task: {str(e)}"}
             # Ensure queue is unblocked if consumer is still waiting
-            if queue.empty(): # Check if queue is empty before putting None
+            if queue.empty():  # Check if queue is empty before putting None
                 await queue.put(None)
         finally:
             if run_task_bg and not run_task_bg.done():
                 logging.debug("Cancelling background browser-use run task.")
                 run_task_bg.cancel()
                 try:
-                    await run_task_bg # Await cancellation
+                    await run_task_bg  # Await cancellation
                 except asyncio.CancelledError:
                     logging.debug("Background browser-use run task was successfully cancelled.")
                 except Exception as e_cancel:
                     logging.error(f"Error during cancellation of browser-use run task: {e_cancel}")
-            
-            if browser_use_agent_instance and hasattr(browser_use_agent_instance, 'close'):
+
+            if browser_use_agent_instance and hasattr(browser_use_agent_instance, "close"):
                 try:
-                    logging.info(f"Attempting to close browser_use agent instance in stream_async. keep_alive: {self.keep_alive}")
+                    logging.info(
+                        f"Attempting to close browser_use agent instance in stream_async. keep_alive: {self.keep_alive}"
+                    )
                     if self.keep_alive:
                         logging.info(f"Applying {BROWSER_CLOSE_TIMEOUT}s timeout to close() due to keep_alive=True.")
                         try:
                             await asyncio.wait_for(browser_use_agent_instance.close(), timeout=BROWSER_CLOSE_TIMEOUT)
-                            logging.info(f"Successfully closed browser_use agent instance in stream_async within timeout. keep_alive: {self.keep_alive}")
+                            logging.info(
+                                f"Successfully closed browser_use agent instance in stream_async within timeout. keep_alive: {self.keep_alive}"
+                            )
                         except asyncio.TimeoutError:
-                            logging.warning(f"Timeout closing browser_use agent instance in stream_async after {BROWSER_CLOSE_TIMEOUT}s (keep_alive: {self.keep_alive}). Proceeding with agent shutdown.")
+                            logging.warning(
+                                f"Timeout closing browser_use agent instance in stream_async after {BROWSER_CLOSE_TIMEOUT}s (keep_alive: {self.keep_alive}). Proceeding with agent shutdown."
+                            )
                     else:
                         await browser_use_agent_instance.close()
-                        logging.info(f"Successfully closed browser_use agent instance in stream_async. keep_alive: {self.keep_alive}")
+                        logging.info(
+                            f"Successfully closed browser_use agent instance in stream_async. keep_alive: {self.keep_alive}"
+                        )
                 except Exception as e_close:
-                    logging.error(f"Error closing browser_use_agent_instance in stream_async (keep_alive: {self.keep_alive}): {e_close}", exc_info=True)
+                    logging.error(
+                        f"Error closing browser_use_agent_instance in stream_async (keep_alive: {self.keep_alive}): {e_close}",
+                        exc_info=True,
+                    )
             logging.info("stream_async method is completing its execution (end of finally block).")
 
     async def cleanup(self):
@@ -550,6 +552,7 @@ class BrowserUseAgent(Agent):
         is handled via their `close()` method within `_run_browser_task` and `stream_async`.
         """
         pass
+
 
 # Example usage (illustrative, typically not part of the agent file itself)
 # if __name__ == "__main__":
@@ -574,7 +577,7 @@ class BrowserUseAgent(Agent):
 #                 tools = ToolsConfig()
 #                 def get_model(self): # Dummy model for base Strands Agent
 #                     return Mock() # from unittest.mock
-            
+
 #             config = MockConfig()
 
 #         except Exception as e_conf:
@@ -584,7 +587,7 @@ class BrowserUseAgent(Agent):
 #         # Ensure OPENAI_API_KEY (or Bedrock credentials) are set in your environment
 #         if config.llm.provider == "openai" and not os.getenv("OPENAI_API_KEY"):
 #             logging.warning("OPENAI_API_KEY not set, example might fail.")
-        
+
 #         agent = BrowserUseAgent(config=config, headless=True, enable_memory=False)
 
 #         # --- Example for __call__ (non-streaming) ---

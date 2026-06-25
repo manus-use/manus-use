@@ -9,6 +9,7 @@ import pytest
 # Module import / agent class
 # ---------------------------------------------------------------------------
 
+
 def test_vi_agent_module_imports_without_crashing():
     """The module must be importable even without optional deps installed."""
     import manus_use.agents.vi_agent as vi
@@ -44,6 +45,7 @@ def test_build_request_enables_verification():
 # ---------------------------------------------------------------------------
 # CLI `analyze` subcommand
 # ---------------------------------------------------------------------------
+
 
 def test_analyze_help_exits_zero():
     """`manus-use analyze --help` prints help and exits 0."""
@@ -95,9 +97,7 @@ def test_run_analyze_calls_handle_request_with_cve():
     from manus_use.agents.vi_agent import VulnerabilityIntelligenceAgent
 
     with mock.patch.object(VulnerabilityIntelligenceAgent, "__init__", return_value=None):
-        with mock.patch.object(
-            VulnerabilityIntelligenceAgent, "handle_request", return_value="REPORT"
-        ) as m_handle:
+        with mock.patch.object(VulnerabilityIntelligenceAgent, "handle_request", return_value="REPORT") as m_handle:
             rc = cli._run_analyze(
                 cve_id="CVE-2025-6554",
                 verify=False,

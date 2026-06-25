@@ -10,23 +10,23 @@ from langchain_aws import ChatBedrock
 
 async def analyze_browser_use_documentation():
     """Use browser agent to analyze and extract browser-use documentation."""
-    
+
     print("=== Browser-Use Documentation Analyzer ===\n")
-    
+
     # Initialize LLM
     llm = ChatBedrock(
-        model_id='us.anthropic.claude-3-7-sonnet-20250219-v1:0',
+        model_id="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
         model_kwargs={
-            'temperature': 0.0,
-            'max_tokens': 4096,
+            "temperature": 0.0,
+            "max_tokens": 4096,
         },
-        region_name='us-east-1'
+        region_name="us-east-1",
     )
-    
+
     # Comprehensive task
     task = """
     Navigate to https://deepwiki.com/browser-use/browser-use and extract comprehensive information:
-    
+
     1. Overview and purpose of browser-use
     2. Key features and capabilities
     3. Installation instructions (pip install command)
@@ -36,80 +36,82 @@ async def analyze_browser_use_documentation():
     7. Best practices and tips
     8. Common use cases and examples
     9. Any limitations or considerations
-    
+
     Extract ALL code examples you find and organize the information in a clear, structured way.
     Be thorough and capture every important detail from the documentation.
     """
-    
+
     print("Configuration:")
     print("- Target URL: https://deepwiki.com/browser-use/browser-use")
     print("- Max steps: 50")
     print("- Goal: Extract complete documentation\n")
-    
+
     # Create agent
     agent = Agent(
         task=task,
         llm=llm,
         max_input_tokens=200000,
     )
-    
+
     try:
         print("Starting browser agent...")
         print("This may take several minutes...\n")
-        
+
         # Run the agent
         result = await agent.run(max_steps=50)
-        
+
         if result:
             # Extract content
-            if hasattr(result, 'final_answer'):
+            if hasattr(result, "final_answer"):
                 content = result.final_answer
-            elif hasattr(result, 'history') and result.history:
+            elif hasattr(result, "history") and result.history:
                 last_item = result.history[-1]
-                if hasattr(last_item, 'extracted_content'):
+                if hasattr(last_item, "extracted_content"):
                     content = last_item.extracted_content
                 else:
                     content = str(last_item)
             else:
                 content = str(result)
-            
-            print("\n" + "="*60)
+
+            print("\n" + "=" * 60)
             print("EXTRACTION COMPLETE")
-            print("="*60)
-            
+            print("=" * 60)
+
             # Create structured markdown report
             report = create_markdown_report(content)
-            
+
             # Save to file
             output_file = Path("browser_use_analysis.md")
-            with open(output_file, 'w') as f:
+            with open(output_file, "w") as f:
                 f.write(report)
-            
+
             print(f"\n✓ Report saved to: {output_file}")
             print(f"  File size: {output_file.stat().st_size} bytes")
-            
+
             # Show preview
-            lines = report.split('\n')[:20]
+            lines = report.split("\n")[:20]
             print("\nReport preview:")
             print("-" * 50)
             for line in lines:
                 print(line)
-            if len(report.split('\n')) > 20:
+            if len(report.split("\n")) > 20:
                 print("...\n")
-                
+
         else:
             print("\n✗ No content extracted")
-            
+
     except Exception as e:
         print(f"\n✗ Error: {e}")
         import traceback
+
         traceback.print_exc()
 
 
 def create_markdown_report(raw_content: str) -> str:
     """Create a structured markdown report from extracted content."""
-    
+
     # Create a structured report
+    _features_default = "- AI-friendly API design\n- Supports multiple browser backends\n- Built-in error handling\n- Async/await support"
     report = f"""# Browser-Use Documentation Analysis
 
 ## Executive Summary
@@ -137,7 +139,7 @@ Browser-Use is a powerful browser automation library that enables AI agents to i
 
 ## Key Features
 
-{extract_section(raw_content, "features", "- AI-friendly API design\n- Supports multiple browser backends\n- Built-in error handling\n- Async/await support")}
+{extract_section(raw_content, "features", _features_default)}
 
 ## Installation
 
@@ -242,7 +244,7 @@ Browser-Use provides a powerful and flexible solution for AI-driven browser auto
 
 *Report generated using multi-agent analysis with Browser-Use and AWS Bedrock*
 """
-    
+
     return report
 
 
@@ -251,15 +253,15 @@ def extract_section(content: str, keyword: str, default: str) -> str:
     # Simple extraction logic - in practice would use more sophisticated parsing
     content_lower = content.lower()
     keyword_lower = keyword.lower()
-    
+
     if keyword_lower in content_lower:
         # Try to extract relevant section
         start = content_lower.find(keyword_lower)
         # Extract up to 500 characters after keyword
-        section = content[start:start+500].strip()
+        section = content[start : start + 500].strip()
         if section:
             return section
-    
+
     return default
 
 
@@ -269,7 +271,7 @@ async def main():
     print("=" * 50)
     print("\nThis will analyze the browser-use documentation")
     print("and create a comprehensive markdown report.\n")
-    
+
     await analyze_browser_use_documentation()
     print("\n✅ Analysis complete!")
 

@@ -13,7 +13,8 @@ import logging
 import os
 import threading
 import warnings
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any
 
 from manus_use.tools.browser_utils import (
     BrowserTimeoutError,
@@ -26,13 +27,13 @@ from manus_use.tools.browser_utils import (
 
 logger = logging.getLogger(__name__)
 
-_PATCH_CONFIG: Dict[str, Any] = {
+_PATCH_CONFIG: dict[str, Any] = {
     "default_timeout_ms": int(os.getenv("STRANDS_BROWSER_DEFAULT_TIMEOUT", "10000")),
     "max_retries": int(os.getenv("STRANDS_BROWSER_MAX_RETRIES", "3")),
     "retry_delay_seconds": int(os.getenv("STRANDS_BROWSER_RETRY_DELAY", "2")),
     "enable_fallbacks": os.getenv("STRANDS_BROWSER_ENABLE_FALLBACKS", "true").lower() == "true",
 }
-_PATCH_STATE: Dict[str, Any] = {
+_PATCH_STATE: dict[str, Any] = {
     "applied": False,
     "original_init": None,
     "original_handle_action": None,
@@ -69,8 +70,7 @@ async def _shutdown_default_executor_without_wait_for(self, timeout=None):
         await future
     except asyncio.CancelledError:
         warnings.warn(
-            "The executor did not finish joining its threads "
-            f"within {timeout} seconds.",
+            f"The executor did not finish joining its threads within {timeout} seconds.",
             RuntimeWarning,
             stacklevel=2,
         )
@@ -136,9 +136,7 @@ def apply_asyncio_compat_patch() -> bool:
                 return "asyncio"
 
         _PATCH_STATE["original_sniffio_current_async_library"] = original_current_async_library
-        _PATCH_STATE[
-            "original_sniffio_impl_current_async_library"
-        ] = original_impl_current_async_library
+        _PATCH_STATE["original_sniffio_impl_current_async_library"] = original_impl_current_async_library
         sniffio.current_async_library = current_async_library_with_asyncio_fallback
         sniffio_impl.current_async_library = current_async_library_with_asyncio_fallback
 
@@ -251,28 +249,24 @@ def _coerce_int(value: Any, fallback: int) -> int:
 
 def configure_browser_patch(
     *,
-    default_timeout_ms: Optional[int] = None,
-    max_retries: Optional[int] = None,
-    retry_delay_seconds: Optional[int] = None,
-    enable_fallbacks: Optional[bool] = None,
-) -> Dict[str, Any]:
+    default_timeout_ms: int | None = None,
+    max_retries: int | None = None,
+    retry_delay_seconds: int | None = None,
+    enable_fallbacks: bool | None = None,
+) -> dict[str, Any]:
     """Update runtime patch configuration and return the active settings."""
     if default_timeout_ms is not None:
-        _PATCH_CONFIG["default_timeout_ms"] = _coerce_int(
-            default_timeout_ms, _PATCH_CONFIG["default_timeout_ms"]
-        )
+        _PATCH_CONFIG["default_timeout_ms"] = _coerce_int(default_timeout_ms, _PATCH_CONFIG["default_timeout_ms"])
     if max_retries is not None:
         _PATCH_CONFIG["max_retries"] = _coerce_int(max_retries, _PATCH_CONFIG["max_retries"])
     if retry_delay_seconds is not None:
-        _PATCH_CONFIG["retry_delay_seconds"] = _coerce_int(
-            retry_delay_seconds, _PATCH_CONFIG["retry_delay_seconds"]
-        )
+        _PATCH_CONFIG["retry_delay_seconds"] = _coerce_int(retry_delay_seconds, _PATCH_CONFIG["retry_delay_seconds"])
     if enable_fallbacks is not None:
         _PATCH_CONFIG["enable_fallbacks"] = bool(enable_fallbacks)
     return dict(_PATCH_CONFIG)
 
 
-def _get_timeout_ms(args: Dict[str, Any]) -> int:
+def _get_timeout_ms(args: dict[str, Any]) -> int:
     return _coerce_int(args.get("timeout_ms"), _PATCH_CONFIG["default_timeout_ms"])
 
 
@@ -309,7 +303,7 @@ def _rebind_action_registry(browser_manager: Any, browser_api_methods: Any) -> N
             actions[action_name] = patched_action
 
 
-def _resolve_action_method(browser_manager: Any, browser_api_methods: Any, action: str) -> Optional[Callable[..., Any]]:
+def _resolve_action_method(browser_manager: Any, browser_api_methods: Any, action: str) -> Callable[..., Any] | None:
     _rebind_action_registry(browser_manager, browser_api_methods)
 
     actions = getattr(browser_manager, "_actions", None)
@@ -322,7 +316,9 @@ def _resolve_action_method(browser_manager: Any, browser_api_methods: Any, actio
     return None
 
 
-def _build_action_args(action_method: Callable[..., Any], args: Dict[str, Any], page: Any, browser_manager: Any) -> Dict[str, Any]:
+def _build_action_args(
+    action_method: Callable[..., Any], args: dict[str, Any], page: Any, browser_manager: Any
+) -> dict[str, Any]:
     signature = inspect.signature(action_method)
     action_args = {name: value for name, value in args.items() if name in signature.parameters}
 
@@ -340,7 +336,7 @@ def _build_action_args(action_method: Callable[..., Any], args: Dict[str, Any], 
     return action_args
 
 
-def _missing_required_params(action_method: Callable[..., Any], action_args: Dict[str, Any]) -> list[str]:
+def _missing_required_params(action_method: Callable[..., Any], action_args: dict[str, Any]) -> list[str]:
     signature = inspect.signature(action_method)
     missing = []
     for name, param in signature.parameters.items():
@@ -355,10 +351,10 @@ def _missing_required_params(action_method: Callable[..., Any], action_args: Dic
 
 def apply_comprehensive_patch(
     *,
-    default_timeout_ms: Optional[int] = None,
-    max_retries: Optional[int] = None,
-    retry_delay_seconds: Optional[int] = None,
-    enable_fallbacks: Optional[bool] = None,
+    default_timeout_ms: int | None = None,
+    max_retries: int | None = None,
+    retry_delay_seconds: int | None = None,
+    enable_fallbacks: bool | None = None,
 ) -> bool:
     """Apply a compatibility patch to ``strands_tools.use_browser`` if available."""
     apply_asyncio_compat_patch()
@@ -484,7 +480,7 @@ def apply_comprehensive_patch(
                     attempt + 1,
                     error,
                 )
-                await asyncio.sleep(retry_delay_local * (2 ** attempt))
+                await asyncio.sleep(retry_delay_local * (2**attempt))
 
     BrowserApiMethods.get_text = staticmethod(patched_get_text)
     BrowserApiMethods.get_html = staticmethod(patched_get_html)
@@ -492,9 +488,7 @@ def apply_comprehensive_patch(
     BrowserManager.handle_action = patched_handle_action
     _PATCH_STATE["applied"] = True
 
-    logger.info(
-        "Successfully patched strands_tools.use_browser with timeout handling and evaluate normalization"
-    )
+    logger.info("Successfully patched strands_tools.use_browser with timeout handling and evaluate normalization")
     return True
 
 

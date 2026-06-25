@@ -1,12 +1,14 @@
 import os
+
 from mcp.client.sse import sse_client
 from strands import Agent
 from strands.tools.mcp import MCPClient
+
 from src.manus_use.config import Config
 
 # Get the SSE URL from the config file
 config = Config.from_file()
-sse_url = getattr(getattr(config, 'mcp', None), 'server_url', None)
+sse_url = getattr(getattr(config, "mcp", None), "server_url", None)
 if not sse_url and not os.environ.get("MCP_SSE_URL"):
     # Get the SSE URL from the environment variable
     raise ValueError("MCP SSE server URL not set in config. Please set [mcp] server_url in your config.toml.")

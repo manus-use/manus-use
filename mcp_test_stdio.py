@@ -1,7 +1,9 @@
-from strands import Agent
-from strands.tools.mcp.mcp_client import MCPClient
 from mcp.client.stdio import StdioServerParameters, stdio_client
 from pydantic import BaseModel, Field
+from strands import Agent
+from strands.tools.mcp.mcp_client import MCPClient
+
+
 class AssetMatch(BaseModel):
     result: str = Field(description="Result data, or error messages from the tasks.")
     precisely_matched_assets: int = Field(description="The number of Assets Precisely Matched")
@@ -9,9 +11,9 @@ class AssetMatch(BaseModel):
 
 
 stdio_params = StdioServerParameters(
-    command="uv", 
-    args =["run", "--with", "mcp", "mcp", "run", "main.py"], # run --with mcp mcp run main.py
-    cwd="/Users/x/Develop/manus/mcp-server-demo"
+    command="uv",
+    args=["run", "--with", "mcp", "mcp", "run", "main.py"],  # run --with mcp mcp run main.py
+    cwd="/Users/x/Develop/manus/mcp-server-demo",
 )
 
 # Create the MCP client that wraps the stdio client
@@ -26,7 +28,5 @@ with mcp_client:
 
     # Now you can call tools by name
     result = agent("")
-    esult = agent.structured_output(AssetMatch,
-                                     "ased on our conversation, provide an asset match"
-                                     )
+    esult = agent.structured_output(AssetMatch, "ased on our conversation, provide an asset match")
     print(result)

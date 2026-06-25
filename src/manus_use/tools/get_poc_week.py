@@ -72,9 +72,7 @@ def _parse_poc_week(html: str) -> list[dict[str, Any]]:
 
     # Split into per-CVE sections by h2/h3 headings — supports both
     # markdown (## CVE-…) and HTML (<h2>CVE-…</h2>) heading styles.
-    sections = re.split(
-        r"\n(?=(?:#{1,3}\s+|<h[1-3]>)CVE-)", html, flags=re.IGNORECASE
-    )
+    sections = re.split(r"\n(?=(?:#{1,3}\s+|<h[1-3]>)CVE-)", html, flags=re.IGNORECASE)
 
     rank = 0
     for section in sections:
@@ -87,29 +85,21 @@ def _parse_poc_week(html: str) -> list[dict[str, Any]]:
         is_new = "NEW" in heading_match.group(2).upper()
 
         # Severity line: "- Severity: 9.8 CRITICAL"
-        severity_match = re.search(
-            r"-\s*Severity:\s*(.+?)(?:\n|$)", section, re.IGNORECASE
-        )
+        severity_match = re.search(r"-\s*Severity:\s*(.+?)(?:\n|$)", section, re.IGNORECASE)
         severity = severity_match.group(1).strip() if severity_match else None
 
         # Impacted products
-        products_match = re.search(
-            r"-\s*Impacted Products?:\s*(.+?)(?:\n|$)", section, re.IGNORECASE
-        )
+        products_match = re.search(r"-\s*Impacted Products?:\s*(.+?)(?:\n|$)", section, re.IGNORECASE)
         products = products_match.group(1).strip() if products_match else None
 
         # Description (first paragraph after "Description:")
-        desc_match = re.search(
-            r"-\s*Description:\s*([\s\S]+?)(?:\n-\s|\Z)", section, re.IGNORECASE
-        )
+        desc_match = re.search(r"-\s*Description:\s*([\s\S]+?)(?:\n-\s|\Z)", section, re.IGNORECASE)
         description: str | None = None
         if desc_match:
             description = " ".join(desc_match.group(1).split())
 
         # PoC URLs — lines after a "PoC:" marker
-        poc_section_match = re.search(
-            r"-\s*PoC:\s*([\s\S]+?)(?:\n-\s[A-Z]|\Z)", section, re.IGNORECASE
-        )
+        poc_section_match = re.search(r"-\s*PoC:\s*([\s\S]+?)(?:\n-\s[A-Z]|\Z)", section, re.IGNORECASE)
         poc_urls: list[str] = []
         if poc_section_match:
             raw = poc_section_match.group(1)
@@ -216,8 +206,7 @@ def get_poc_week(
     if html is None or fetched_date is None:
         return {
             "error": (
-                f"No PoC Week issue found within {max_retries} weeks of "
-                f"{target.isoformat()}. Last error: {last_error}"
+                f"No PoC Week issue found within {max_retries} weeks of {target.isoformat()}. Last error: {last_error}"
             )
         }
 
