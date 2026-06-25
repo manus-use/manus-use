@@ -85,20 +85,24 @@ def display_task_plan(tasks) -> None:
 # Agent factory
 # ---------------------------------------------------------------------------
 
-def _make_agent(agent_type: str, config: Config):
-    """Instantiate the requested agent type."""
+def _make_agent(agent_type: str, config: Config, **agent_kwargs):
+    """Instantiate the requested agent type.
+
+    Extra keyword arguments (e.g. *callback_handler*) are forwarded to the
+    agent constructor so callers can inject streaming handlers.
+    """
     if agent_type == "browser":
         from .agents import BrowserUseAgent
-        return BrowserUseAgent(config=config)
+        return BrowserUseAgent(config=config, **agent_kwargs)
     if agent_type == "data":
         from .agents import DataAnalysisAgent
-        return DataAnalysisAgent(config=config)
+        return DataAnalysisAgent(config=config, **agent_kwargs)
     if agent_type == "mcp":
         from .agents import MCPAgent
-        return MCPAgent(config=config)
+        return MCPAgent(config=config, **agent_kwargs)
     # default: manus
     from .agents import ManusAgent
-    return ManusAgent(config=config)
+    return ManusAgent(config=config, **agent_kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -458,6 +462,7 @@ def _run_single_shot(
     fmt: str,
     no_history: bool,
     config: Config,
+    stream: bool = False,
 ) -> int:
     """Execute a single task non-interactively and exit.
 
@@ -501,13 +506,73 @@ def _run_single_shot(
             return 1
         result_text = workflow_result.output
     else:
-        with console.status("Running…", spinner="dots"):
-            response = agent(task)
-        result_text = str(response)
+        if stream:
+            # --stream + --format json are incompatible: warn and fall back.
+            if fmt == "json":
+                sys.stderr.write(
+                    "[warn] --stream is incompatible with --format json;"
+                    " falling back to buffered JSON output\n"
+                )
+
+            # Try to use PrintingCallbackHandler for real-time output.
+            _streamed = False
+            try:
+                from strands.handlers import PrintingCallbackHandler
+
+                stream_agent = _make_agent(
+                    agent_type,
+                    config,
+                    callback_handler=PrintingCallbackHandler(),
+                )
+                response = stream_agent(task)
+                # PrintingCallbackHandler already flushed tokens to stdout.
+                # str(response) extracts text content from AgentResult.
+                result_text = str(response)
+                _streamed = True
+            except (ImportError, TypeError):
+                pass
+
+            if not _streamed:
+                # Fallback: call normally, check if result is a generator.
+                response = agent(task)
+                import types
+
+                if isinstance(response, types.GeneratorType):
+                    chunks = []
+                    for chunk in response:
+                        chunk_str = str(chunk)
+                        sys.stdout.write(chunk_str)
+                        sys.stdout.flush()
+                        chunks.append(chunk_str)
+                    sys.stdout.write("\n")
+                    result_text = "".join(chunks)
+                else:
+                    sys.stderr.write(
+                        "[warn] streaming not supported by this agent/model,"
+                        " falling back to buffered output\n"
+                    )
+                    result_text = str(response)
+        else:
+            with console.status("Running…", spinner="dots"):
+                response = agent(task)
+            result_text = str(response)
 
     # ------------------------------------------------------------------
     # Output formatting
     # ------------------------------------------------------------------
+    if stream and fmt != "json" and not use_multi_agent:
+        # Streaming path already printed to stdout; only handle file save + history.
+        if output is not None:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(result_text, encoding="utf-8")
+            console.print(f"[dim]Output saved to {output}[/dim]")
+        if not no_history:
+            _append_history(
+                task, result_text,
+                agent_type=agent_type, mode=mode, success=True, format=fmt,
+            )
+        return 0
+
     if fmt == "json":
         payload = json.dumps(
             {
@@ -1019,6 +1084,12 @@ def _build_run_parser() -> argparse.ArgumentParser:
         default=None,
         help="Path to a config.toml file (overrides default search paths)",
     )
+    parser.add_argument(
+        "--stream",
+        action="store_true",
+        default=False,
+        help="Stream output tokens in real time (single-shot mode only)",
+    )
     return parser
 
 
@@ -1244,6 +1315,7 @@ def main() -> None:
             fmt=args.fmt,
             no_history=args.no_history,
             config=config,
+            stream=args.stream,
         )
         sys.exit(exit_code)
     else:
