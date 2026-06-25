@@ -195,6 +195,7 @@ def _run_analyze(
 
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # History helpers
 # ---------------------------------------------------------------------------
 
@@ -236,6 +237,132 @@ def _append_history(
     }
     with _HISTORY_PATH.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+# ---------------------------------------------------------------------------
+# manus-use discover
+# ---------------------------------------------------------------------------
+
+# manus-use discover
+# ---------------------------------------------------------------------------
+
+
+def _build_discover_parser() -> argparse.ArgumentParser:
+    """Build the argument parser for the `discover` subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="manus-use discover",
+        description="Discover recent high-EPSS CVEs and submit them for tracking.",
+    )
+    parser.add_argument(
+        "--since",
+        metavar="YYYY-MM-DD",
+        default=None,
+        help="Start date for the discovery window (default: 4 weeks ago)",
+    )
+    parser.add_argument(
+        "--min-epss",
+        metavar="SCORE",
+        type=float,
+        default=0.5,
+        help="Minimum EPSS score threshold, 0.0–1.0 (default: 0.5)",
+    )
+    parser.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Report output format (default: text)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Discover CVEs but do not submit them (default: off)",
+    )
+    parser.add_argument(
+        "--config",
+        metavar="FILE",
+        type=Path,
+        default=None,
+        help="Path to a config.toml file (overrides default search paths)",
+    )
+    return parser
+
+
+def _run_discover(
+    *,
+    since: str | None,
+    min_epss: float,
+    output: str,
+    dry_run: bool,
+    config: Config,
+) -> int:
+    """Run the vulnerability discovery workflow and report the results.
+
+    Returns an exit code (0 = success, 1 = failure).
+    """
+    try:
+        from .agents import VulnerabilityDiscoveryAgent
+    except ImportError as exc:
+        console.print(f"[red]\u2717 Vulnerability discovery agent unavailable: {exc}[/red]")
+        return 1
+
+    # Validate min_epss range
+    if not 0.0 <= min_epss <= 1.0:
+        console.print("[red]\u2717 --min-epss must be between 0.0 and 1.0[/red]")
+        return 1
+
+    since_display = since or "4 weeks ago"
+    console.print(
+        f"[bold blue]Discovering CVEs[/bold blue] "
+        f"since [cyan]{since_display}[/cyan] "
+        f"(min-epss={min_epss})"
+    )
+    if dry_run:
+        console.print("[dim]Dry-run mode: CVEs will NOT be submitted.[/dim]")
+
+    try:
+        agent = VulnerabilityDiscoveryAgent(config=config)
+    except Exception as exc:
+        console.print(f"[red]\u2717 Failed to initialise agent: {exc}[/red]")
+        return 1
+
+    request = VulnerabilityDiscoveryAgent.build_request(
+        since=since,
+        min_epss=min_epss,
+        dry_run=dry_run,
+    )
+
+    try:
+        with console.status("Running discovery workflow\u2026", spinner="dots"):
+            result = agent.handle_request(request)
+    except Exception as exc:
+        console.print(f"[red]\u2717 Discovery failed: {exc}[/red]")
+        return 1
+
+    result_text = str(result)
+
+    if output == "json":
+        import json
+
+        console.print_json(
+            json.dumps(
+                {
+                    "since": since,
+                    "min_epss": min_epss,
+                    "dry_run": dry_run,
+                    "result": result_text,
+                }
+            )
+        )
+    else:
+        console.print(
+            Panel(
+                result_text,
+                title="[bold green]Discovery Results[/bold green]",
+                border_style="green",
+            )
+        )
+
+    return 0
+
 
 
 def _run_single_shot(
@@ -714,7 +841,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
 # main() entry point
 # ---------------------------------------------------------------------------
 
-_SUBCOMMANDS = {"init", "doctor", "analyze", "history"}
+_SUBCOMMANDS = {"init", "doctor", "analyze", "history", "discover"}
 
 
 def _build_run_parser() -> argparse.ArgumentParser:
@@ -742,6 +869,11 @@ def _build_run_parser() -> argparse.ArgumentParser:
             "  # Vulnerability intelligence analysis\n"
             "  manus-use analyze CVE-2025-6554\n"
             "  manus-use analyze CVE-2024-3094 --verify --output json\n"
+            "  \n"\
+            "  # CVE discovery\n"\
+            "  manus-use discover\n"\
+            "  manus-use discover --since 2025-06-01 --min-epss 0.7 --output json\n"\
+            "  manus-use discover --dry-run\n"
         ),
     )
     parser.add_argument(
@@ -985,6 +1117,18 @@ def main() -> None:
         idx = argv.index("history")
         history_args = _build_history_parser().parse_args(argv[idx + 1 :])
         sys.exit(_cmd_history(history_args))
+
+    if first_positional == "discover":
+        idx = argv.index("discover")
+        discover_args = _build_discover_parser().parse_args(argv[idx + 1 :])
+        config = Config.from_file(discover_args.config)
+        sys.exit(_run_discover(
+            since=discover_args.since,
+            min_epss=discover_args.min_epss,
+            output=discover_args.output,
+            dry_run=discover_args.dry_run,
+            config=config,
+        ))
 
     # Default: run / interactive
     run_parser = _build_run_parser()
