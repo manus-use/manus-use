@@ -1,6 +1,8 @@
 """Command-line interface for ManusUse."""
 
 import argparse
+import datetime
+import json
 import os
 import re
 import shutil
@@ -192,6 +194,50 @@ def _run_analyze(
     return 0
 
 
+# ---------------------------------------------------------------------------
+# History helpers
+# ---------------------------------------------------------------------------
+
+_HISTORY_PATH = Path.home() / ".manus-use" / "history.jsonl"
+
+
+def _append_history(
+    task: str,
+    result: str,
+    *,
+    agent_type: str,
+    mode: str,
+    success: bool,
+    format: str = "text",
+) -> None:
+    """Append a single-shot run record to the history log.
+
+    The log lives at ``~/.manus-use/history.jsonl`` (one JSON object per line)
+    so it can be streamed/grepped without loading the whole file.
+
+    Each record has:
+    - ``timestamp``: ISO-8601 UTC timestamp
+    - ``task``: the user's task string
+    - ``agent``: agent type used
+    - ``mode``: execution mode (auto/single/multi)
+    - ``format``: output format requested
+    - ``success``: boolean
+    - ``result``: the result text (or error message)
+    """
+    _HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    record = {
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "task": task,
+        "agent": agent_type,
+        "mode": mode,
+        "format": format,
+        "success": success,
+        "result": result,
+    }
+    with _HISTORY_PATH.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
 def _run_single_shot(
     task: str,
     *,
@@ -199,6 +245,8 @@ def _run_single_shot(
     agent_type: str,
     show_plan: bool,
     output: Path | None,
+    fmt: str,
+    no_history: bool,
     config: Config,
 ) -> int:
     """Execute a single task non-interactively and exit.
@@ -225,28 +273,63 @@ def _run_single_shot(
             transient=True,
         ) as progress:
             _ptask = progress.add_task("Running workflow…", total=None)
-            result = orchestrator.run(task)
+            workflow_result = orchestrator.run(task)
             progress.update(_ptask, completed=True)
 
-        if not result.success:
+        if not workflow_result.success:
+            error_msg = f"Task failed: {workflow_result.error}"
             console.print(Panel(
-                f"Task failed: {result.error}",
+                error_msg,
                 title="[bold red]Error[/bold red]",
                 border_style="red",
             ))
+            if not no_history:
+                _append_history(
+                    task, error_msg,
+                    agent_type=agent_type, mode=mode, success=False, format=fmt,
+                )
             return 1
-        result_text = result.output
+        result_text = workflow_result.output
     else:
         with console.status("Running…", spinner="dots"):
             response = agent(task)
         result_text = str(response)
 
-    console.print(Panel(result_text, title="[bold green]Result[/bold green]", border_style="green"))
+    # ------------------------------------------------------------------
+    # Output formatting
+    # ------------------------------------------------------------------
+    if fmt == "json":
+        payload = json.dumps(
+            {
+                "task": task,
+                "agent": agent_type,
+                "mode": "multi" if use_multi_agent else "single",
+                "result": result_text,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        # Print raw JSON to stdout so it can be piped to other tools.
+        # Rich's print_json adds colours that break pipe consumers; use sys.stdout.
+        sys.stdout.write(payload + "\n")
+    else:
+        console.print(
+            Panel(result_text, title="[bold green]Result[/bold green]", border_style="green")
+        )
 
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(result_text, encoding="utf-8")
+        if fmt == "json":
+            output.write_text(payload, encoding="utf-8")
+        else:
+            output.write_text(result_text, encoding="utf-8")
         console.print(f"[dim]Output saved to {output}[/dim]")
+
+    if not no_history:
+        _append_history(
+            task, result_text,
+            agent_type=agent_type, mode=mode, success=True, format=fmt,
+        )
 
     return 0
 
@@ -631,7 +714,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
 # main() entry point
 # ---------------------------------------------------------------------------
 
-_SUBCOMMANDS = {"init", "doctor", "analyze"}
+_SUBCOMMANDS = {"init", "doctor", "analyze", "history"}
 
 
 def _build_run_parser() -> argparse.ArgumentParser:
@@ -645,13 +728,16 @@ def _build_run_parser() -> argparse.ArgumentParser:
             "  # Single-shot (non-interactive)\n"
             "  manus-use \"Create a factorial function in Python\"\n"
             "  manus-use --agent browser \"Find the top 5 trending GitHub repos today\"\n"
-            "  manus-use --output result.txt \"Summarise the latest AI news\"\n\n"
+            "  manus-use --output result.txt \"Summarise the latest AI news\"\n"
+            "  manus-use --format json \"List prime numbers up to 50\"\n"
+            "  manus-use --format json \"task\" | jq .result\n\n"
             "  # Interactive REPL\n"
             "  manus-use\n"
             "  manus-use --mode multi\n\n"
             "  # Setup helpers\n"
             "  manus-use init           # create ~/.manus-use/config.toml interactively\n"
             "  manus-use doctor         # check packages, config, and API keys\n"
+            "  manus-use history        # show recent runs (use --help for filters)\n"
             "\n"
             "  # Vulnerability intelligence analysis\n"
             "  manus-use analyze CVE-2025-6554\n"
@@ -693,6 +779,19 @@ def _build_run_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="Save the result to FILE (single-shot mode only)",
+    )
+    parser.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        dest="fmt",
+        help="Output format for single-shot mode: text (default) or json",
+    )
+    parser.add_argument(
+        "--no-history",
+        action="store_true",
+        dest="no_history",
+        help=f"Do not record this run in the history log ({_HISTORY_PATH})",
     )
     parser.add_argument(
         "--config",
@@ -741,6 +840,119 @@ def _build_doctor_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _build_history_parser() -> argparse.ArgumentParser:
+    """Build the `history` subcommand parser."""
+    parser = argparse.ArgumentParser(
+        prog="manus-use history",
+        description="Show past single-shot task runs recorded in the history log.",
+    )
+    parser.add_argument(
+        "--limit",
+        metavar="N",
+        type=int,
+        default=20,
+        help="Maximum number of entries to show (default: 20, 0 = all)",
+    )
+    parser.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        dest="fmt",
+        help="Display format: text (default) or json",
+    )
+    parser.add_argument(
+        "--grep",
+        metavar="PATTERN",
+        default=None,
+        help="Filter entries whose task contains PATTERN (case-insensitive substring)",
+    )
+    parser.add_argument(
+        "--clear",
+        action="store_true",
+        help="Delete all history entries (irreversible)",
+    )
+    return parser
+
+
+def _cmd_history(args: argparse.Namespace) -> int:
+    """Display (or clear) the single-shot run history log."""
+    if args.clear:
+        if _HISTORY_PATH.exists():
+            _HISTORY_PATH.unlink()
+        console.print("[dim]History cleared.[/dim]")
+        return 0
+
+    if not _HISTORY_PATH.exists():
+        console.print(
+            "[dim]No history yet – run a task with [cyan]manus-use 'task...'[/cyan] first.[/dim]"
+        )
+        return 0
+
+    records = []
+    with _HISTORY_PATH.open(encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue  # skip malformed lines
+
+    if args.grep:
+        pattern = args.grep.lower()
+        records = [r for r in records if pattern in r.get("task", "").lower()]
+
+    # Most-recent entries first, then apply limit.
+    records = list(reversed(records))
+    if args.limit > 0:
+        records = records[: args.limit]
+
+    if not records:
+        console.print("[dim]No matching history entries.[/dim]")
+        return 0
+
+    if args.fmt == "json":
+        sys.stdout.write(json.dumps(records, ensure_ascii=False, indent=2) + "\n")
+        return 0
+
+    # Text table
+    from rich.table import Table
+
+    table = Table(
+        title=f"Run history ({len(records)} entries)",
+        show_header=True,
+        header_style="bold magenta",
+    )
+    table.add_column("#", style="dim", width=4)
+    table.add_column("Timestamp", style="cyan", width=22)
+    table.add_column("Agent", style="yellow", width=8)
+    table.add_column("Fmt", style="blue", width=5)
+    table.add_column("OK", width=3)
+    table.add_column("Task", style="white")
+
+    for i, rec in enumerate(records, 1):
+        ts = rec.get("timestamp", "-")
+        # Trim timezone indicator for brevity
+        ts = ts[:19].replace("T", " ")
+        ok = "[green]✓[/green]" if rec.get("success") else "[red]✗[/red]"
+        task_text = rec.get("task", "")[:80]
+        if len(rec.get("task", "")) > 80:
+            task_text += "…"
+        table.add_row(
+            str(i),
+            ts,
+            rec.get("agent", "-"),
+            rec.get("format", "text"),
+            ok,
+            task_text,
+        )
+
+    console.print(table)
+    console.print(f"[dim]History file: {_HISTORY_PATH}[/dim]")
+    return 0
+
+
 def main() -> None:
     """Main CLI entry point."""
     argv = sys.argv[1:]
@@ -769,6 +981,11 @@ def main() -> None:
             config=config,
         ))
 
+    if first_positional == "history":
+        idx = argv.index("history")
+        history_args = _build_history_parser().parse_args(argv[idx + 1 :])
+        sys.exit(_cmd_history(history_args))
+
     # Default: run / interactive
     run_parser = _build_run_parser()
     args = run_parser.parse_args(argv)
@@ -783,12 +1000,16 @@ def main() -> None:
             agent_type=args.agent_type,
             show_plan=args.show_plan,
             output=args.output,
+            fmt=args.fmt,
+            no_history=args.no_history,
             config=config,
         )
         sys.exit(exit_code)
     else:
         if args.output is not None:
             run_parser.error("--output requires a task argument")
+        if args.fmt != "text":
+            run_parser.error("--format requires a task argument")
         _run_interactive(
             mode=args.mode,
             agent_type=args.agent_type,
