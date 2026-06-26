@@ -28,6 +28,7 @@ import sys
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _fresh_import(module_name: str):
     """Import *module_name* from scratch (drop any cached version first)."""
     # Remove the module and any sub-modules from the cache so the import is
@@ -94,9 +95,7 @@ class TestModuleImports:
         # should NOT have been inserted by the module.
         new_entries = [p for p in sys.path if p not in original_path]
         src_injections = [p for p in new_entries if p.endswith("/src")]
-        assert src_injections == [], (
-            f"workflow_agent injected unexpected sys.path entries: {src_injections}"
-        )
+        assert src_injections == [], f"workflow_agent injected unexpected sys.path entries: {src_injections}"
 
 
 # ---------------------------------------------------------------------------
@@ -124,8 +123,7 @@ def test_no_src_prefix_imports_in_package(tmp_path):
 
     assert violations == [], (
         "Found 'from src.' imports in the following files — "
-        "these break the installed package:\n  "
-        + "\n  ".join(violations)
+        "these break the installed package:\n  " + "\n  ".join(violations)
     )
 
 
@@ -151,6 +149,5 @@ def test_no_sys_path_src_injection_in_package():
 
     assert violations == [], (
         "Found sys.path.insert('src') calls in the following files — "
-        "these break the installed package:\n  "
-        + "\n  ".join(violations)
+        "these break the installed package:\n  " + "\n  ".join(violations)
     )

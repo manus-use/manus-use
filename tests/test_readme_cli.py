@@ -227,9 +227,7 @@ class TestAnalyzeSubcommand:
         with mock.patch.object(cli, "_run_analyze", side_effect=fake_run_analyze):
             with mock.patch("manus_use.cli.Config") as m_cfg:
                 m_cfg.from_file.return_value = mock.MagicMock()
-                with mock.patch.object(
-                    sys, "argv", ["manus-use", "analyze", "CVE-2025-6554"]
-                ):
+                with mock.patch.object(sys, "argv", ["manus-use", "analyze", "CVE-2025-6554"]):
                     with pytest.raises(SystemExit) as exc_info:
                         cli.main()
 
@@ -250,9 +248,7 @@ class TestAnalyzeSubcommand:
         with mock.patch.object(cli, "_run_analyze", side_effect=fake_run_analyze):
             with mock.patch("manus_use.cli.Config") as m_cfg:
                 m_cfg.from_file.return_value = mock.MagicMock()
-                with mock.patch.object(
-                    sys, "argv", ["manus-use", "analyze", "CVE-2025-6554", "--verify"]
-                ):
+                with mock.patch.object(sys, "argv", ["manus-use", "analyze", "CVE-2025-6554", "--verify"]):
                     with pytest.raises(SystemExit):
                         cli.main()
 

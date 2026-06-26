@@ -1,0 +1,48 @@
+# Pre-commit hooks for manus-use.
+#
+# Install:
+#   pip install pre-commit          # already in [dev] deps
+#   pre-commit install              # register the git hook
+#
+# Run manually against all files:
+#   pre-commit run --all-files
+#
+# Hooks run automatically on every `git commit` to catch issues before CI.
+
+repos:
+  # ── ruff: linting + auto-fix ─────────────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Keep in sync with the `ruff` version in pyproject.toml [dev] deps.
+    rev: v0.4.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+        name: ruff (lint + autofix)
+      - id: ruff-format
+        name: ruff (format)
+
+  # ── standard trailing-whitespace / EOF hygiene ───────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: "^tests/|^docs/"
+      - id: end-of-file-fixer
+        exclude: "^tests/|^docs/"
+      - id: check-yaml
+        name: validate YAML files
+      - id: check-toml
+        name: validate TOML files
+      - id: check-merge-conflict
+      - id: debug-statements
+        name: detect debug statements (pdb, breakpoint)
+
+  # ── mypy: static type checking ────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.15.0
+    hooks:
+      - id: mypy
+        name: mypy (type check)
+        args: [--ignore-missing-imports]
+        additional_dependencies: [pydantic>=2.0.0, toml>=0.10.2]
+        files: ^src/

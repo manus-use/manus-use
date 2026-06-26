@@ -27,27 +27,28 @@ console = Console()
 # Complexity heuristic
 # ---------------------------------------------------------------------------
 
+
 def is_complex_task(user_input: str) -> bool:
     """Determine if a task requires multi-agent orchestration."""
     complex_indicators = [
-        r'\band\b.*\band\b',
-        r'\bthen\b',
-        r'\bafter\b',
-        r'\banalyze\b.*\b(create|generate|build)',
-        r'\bcompare\b.*\bsummarize',
-        r'\bmultiple\b',
-        r'\bsteps?\b',
-        r'\bworkflow\b',
-        r'(first|second|third|finally)',
-        r'\b(visuali[sz]e|chart|graph)\b.*\b(analyze|data)',
-        r'\bbrowse\b.*\b(extract|analyze)',
-        r'\bresearch\b.*\b(implement|create)',
+        r"\band\b.*\band\b",
+        r"\bthen\b",
+        r"\bafter\b",
+        r"\banalyze\b.*\b(create|generate|build)",
+        r"\bcompare\b.*\bsummarize",
+        r"\bmultiple\b",
+        r"\bsteps?\b",
+        r"\bworkflow\b",
+        r"(first|second|third|finally)",
+        r"\b(visuali[sz]e|chart|graph)\b.*\b(analyze|data)",
+        r"\bbrowse\b.*\b(extract|analyze)",
+        r"\bresearch\b.*\b(implement|create)",
     ]
 
     if len(user_input.split()) > 30:
         return True
 
-    if len(re.split(r'[.;]', user_input)) > 2:
+    if len(re.split(r"[.;]", user_input)) > 2:
         return True
 
     for pattern in complex_indicators:
@@ -60,6 +61,7 @@ def is_complex_task(user_input: str) -> bool:
 # ---------------------------------------------------------------------------
 # Execution plan display
 # ---------------------------------------------------------------------------
+
 
 def display_task_plan(tasks) -> None:
     """Display the execution plan in a formatted table."""
@@ -85,6 +87,7 @@ def display_task_plan(tasks) -> None:
 # Agent factory
 # ---------------------------------------------------------------------------
 
+
 def _make_agent(agent_type: str, config: Config, **agent_kwargs):
     """Instantiate the requested agent type.
 
@@ -93,21 +96,26 @@ def _make_agent(agent_type: str, config: Config, **agent_kwargs):
     """
     if agent_type == "browser":
         from .agents import BrowserUseAgent
+
         return BrowserUseAgent(config=config, **agent_kwargs)
     if agent_type == "data":
         from .agents import DataAnalysisAgent
+
         return DataAnalysisAgent(config=config, **agent_kwargs)
     if agent_type == "mcp":
         from .agents import MCPAgent
+
         return MCPAgent(config=config, **agent_kwargs)
     # default: manus
     from .agents import ManusAgent
+
     return ManusAgent(config=config, **agent_kwargs)
 
 
 # ---------------------------------------------------------------------------
 # Single-shot and interactive runners
 # ---------------------------------------------------------------------------
+
 
 def _build_analyze_parser() -> argparse.ArgumentParser:
     """Build the argument parser for the `analyze` subcommand."""
@@ -184,16 +192,10 @@ def _run_analyze(
 
         console.print_json(json.dumps({"cve": cve_id, "report": result_text}))
     elif output == "lark":
-        console.print(
-            "[dim]Report delivered to Lark (see create_lark_document output above).[/dim]"
-        )
-        console.print(
-            Panel(result_text, title=f"[bold green]{cve_id}[/bold green]", border_style="green")
-        )
+        console.print("[dim]Report delivered to Lark (see create_lark_document output above).[/dim]")
+        console.print(Panel(result_text, title=f"[bold green]{cve_id}[/bold green]", border_style="green"))
     else:
-        console.print(
-            Panel(result_text, title=f"[bold green]{cve_id}[/bold green]", border_style="green")
-        )
+        console.print(Panel(result_text, title=f"[bold green]{cve_id}[/bold green]", border_style="green"))
 
     return 0
 
@@ -241,6 +243,7 @@ def _append_history(
     }
     with _HISTORY_PATH.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+
 
 # ---------------------------------------------------------------------------
 # manus-use discover
@@ -314,11 +317,7 @@ def _run_discover(
         return 1
 
     since_display = since or "4 weeks ago"
-    console.print(
-        f"[bold blue]Discovering CVEs[/bold blue] "
-        f"since [cyan]{since_display}[/cyan] "
-        f"(min-epss={min_epss})"
-    )
+    console.print(f"[bold blue]Discovering CVEs[/bold blue] since [cyan]{since_display}[/cyan] (min-epss={min_epss})")
     if dry_run:
         console.print("[dim]Dry-run mode: CVEs will NOT be submitted.[/dim]")
 
@@ -366,7 +365,6 @@ def _run_discover(
         )
 
     return 0
-
 
 
 # ---------------------------------------------------------------------------
@@ -493,15 +491,21 @@ def _run_single_shot(
 
         if not workflow_result.success:
             error_msg = f"Task failed: {workflow_result.error}"
-            console.print(Panel(
-                error_msg,
-                title="[bold red]Error[/bold red]",
-                border_style="red",
-            ))
+            console.print(
+                Panel(
+                    error_msg,
+                    title="[bold red]Error[/bold red]",
+                    border_style="red",
+                )
+            )
             if not no_history:
                 _append_history(
-                    task, error_msg,
-                    agent_type=agent_type, mode=mode, success=False, format=fmt,
+                    task,
+                    error_msg,
+                    agent_type=agent_type,
+                    mode=mode,
+                    success=False,
+                    format=fmt,
                 )
             return 1
         result_text = workflow_result.output
@@ -510,8 +514,7 @@ def _run_single_shot(
             # --stream + --format json are incompatible: warn and fall back.
             if fmt == "json":
                 sys.stderr.write(
-                    "[warn] --stream is incompatible with --format json;"
-                    " falling back to buffered JSON output\n"
+                    "[warn] --stream is incompatible with --format json; falling back to buffered JSON output\n"
                 )
 
             # Try to use PrintingCallbackHandler for real-time output.
@@ -548,8 +551,7 @@ def _run_single_shot(
                     result_text = "".join(chunks)
                 else:
                     sys.stderr.write(
-                        "[warn] streaming not supported by this agent/model,"
-                        " falling back to buffered output\n"
+                        "[warn] streaming not supported by this agent/model, falling back to buffered output\n"
                     )
                     result_text = str(response)
         else:
@@ -568,8 +570,12 @@ def _run_single_shot(
             console.print(f"[dim]Output saved to {output}[/dim]")
         if not no_history:
             _append_history(
-                task, result_text,
-                agent_type=agent_type, mode=mode, success=True, format=fmt,
+                task,
+                result_text,
+                agent_type=agent_type,
+                mode=mode,
+                success=True,
+                format=fmt,
             )
         return 0
 
@@ -588,9 +594,7 @@ def _run_single_shot(
         # Rich's print_json adds colours that break pipe consumers; use sys.stdout.
         sys.stdout.write(payload + "\n")
     else:
-        console.print(
-            Panel(result_text, title="[bold green]Result[/bold green]", border_style="green")
-        )
+        console.print(Panel(result_text, title="[bold green]Result[/bold green]", border_style="green"))
 
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -602,8 +606,12 @@ def _run_single_shot(
 
     if not no_history:
         _append_history(
-            task, result_text,
-            agent_type=agent_type, mode=mode, success=True, format=fmt,
+            task,
+            result_text,
+            agent_type=agent_type,
+            mode=mode,
+            success=True,
+            format=fmt,
         )
 
     return 0
@@ -642,9 +650,7 @@ def _run_interactive(
                 console.print("\n[bold blue]Goodbye![/bold blue]")
                 break
 
-            use_multi_agent = mode == "multi" or (
-                mode == "auto" and is_complex_task(user_input)
-            )
+            use_multi_agent = mode == "multi" or (mode == "auto" and is_complex_task(user_input))
 
             if use_multi_agent and orchestrator:
                 console.print("\n[bold green]Orchestrator[/bold green]: Planning execution…\n")
@@ -665,17 +671,21 @@ def _run_interactive(
                     progress.update(_ptask, completed=True)
 
                 if result.success:
-                    console.print(Panel(
-                        result.output,
-                        title="[bold green]Result[/bold green]",
-                        border_style="green",
-                    ))
+                    console.print(
+                        Panel(
+                            result.output,
+                            title="[bold green]Result[/bold green]",
+                            border_style="green",
+                        )
+                    )
                 else:
-                    console.print(Panel(
-                        f"Task failed: {result.error}",
-                        title="[bold red]Error[/bold red]",
-                        border_style="red",
-                    ))
+                    console.print(
+                        Panel(
+                            f"Task failed: {result.error}",
+                            title="[bold red]Error[/bold red]",
+                            border_style="red",
+                        )
+                    )
             else:
                 console.print("\n[bold green]Agent[/bold green]: ", end="")
                 with console.status("Thinking…", spinner="dots"):
@@ -706,18 +716,18 @@ _DEFAULT_CONFIG_PATH = Path.home() / ".manus-use" / "config.toml"
 
 def _cmd_init(args: argparse.Namespace) -> int:  # noqa: C901
     """Guided interactive config generator."""
-    console.print(Panel(
-        "[bold]Welcome to [cyan]manus-use init[/cyan]![/bold]\n"
-        "This wizard will create a [yellow]config.toml[/yellow] for you.",
-        border_style="blue",
-    ))
+    console.print(
+        Panel(
+            "[bold]Welcome to [cyan]manus-use init[/cyan]![/bold]\n"
+            "This wizard will create a [yellow]config.toml[/yellow] for you.",
+            border_style="blue",
+        )
+    )
 
     # Destination path
     dest: Path = args.output or _DEFAULT_CONFIG_PATH
     if dest.exists() and not args.force:
-        overwrite = Confirm.ask(
-            f"[yellow]{dest}[/yellow] already exists. Overwrite?", default=False
-        )
+        overwrite = Confirm.ask(f"[yellow]{dest}[/yellow] already exists. Overwrite?", default=False)
         if not overwrite:
             console.print("[dim]Aborted – existing config left unchanged.[/dim]")
             return 0
@@ -801,12 +811,14 @@ def _cmd_init(args: argparse.Namespace) -> int:  # noqa: C901
     with open(dest, "w", encoding="utf-8") as fh:
         toml.dump(config_data, fh)
 
-    console.print(Panel(
-        f"[green]✓ Config written to[/green] [bold]{dest}[/bold]\n\n"
-        f"Run [cyan]manus-use doctor[/cyan] to verify your setup.",
-        border_style="green",
-        title="[bold green]Done![/bold green]",
-    ))
+    console.print(
+        Panel(
+            f"[green]✓ Config written to[/green] [bold]{dest}[/bold]\n\n"
+            f"Run [cyan]manus-use doctor[/cyan] to verify your setup.",
+            border_style="green",
+            title="[bold green]Done![/bold green]",
+        )
+    )
     return 0
 
 
@@ -833,6 +845,7 @@ _ALWAYS_CHECK: list[tuple[str, str, str]] = [
 def _check_import(package: str) -> bool:
     """Return True if *package* is importable."""
     import importlib
+
     try:
         importlib.import_module(package)
         return True
@@ -842,10 +855,12 @@ def _check_import(package: str) -> bool:
 
 def _cmd_doctor(args: argparse.Namespace) -> int:
     """Check packages, config, and environment variables."""
-    console.print(Panel(
-        "[bold cyan]manus-use doctor[/bold cyan] – environment diagnostics",
-        border_style="blue",
-    ))
+    console.print(
+        Panel(
+            "[bold cyan]manus-use doctor[/bold cyan] – environment diagnostics",
+            border_style="blue",
+        )
+    )
 
     issues: list[str] = []
 
@@ -887,10 +902,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
             issues.append(f"Config parse error: {exc}")
             config = Config()
     else:
-        console.print(
-            "  [yellow]![/yellow] No config file found "
-            "(run [cyan]manus-use init[/cyan] to create one)"
-        )
+        console.print("  [yellow]![/yellow] No config file found (run [cyan]manus-use init[/cyan] to create one)")
         config = Config()
 
     # ------------------------------------------------------------------
@@ -931,10 +943,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
             src = "config" if (not val and in_config) else "env"
             console.print(f"  [green]✓[/green] {env_var} ([dim]{src}[/dim])")
         elif required:
-            console.print(
-                f"  [red]✗[/red] {env_var} not set "
-                "(required – set it or store in config.toml)"
-            )
+            console.print(f"  [red]✗[/red] {env_var} not set (required – set it or store in config.toml)")
             issues.append(f"Missing env var: {env_var}")
         else:
             console.print(f"  [yellow]![/yellow] {env_var} not set (optional for Bedrock)")
@@ -957,9 +966,8 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     # Docker daemon reachable?
     if shutil.which("docker"):
         import subprocess
-        result = subprocess.run(
-            ["docker", "info"], capture_output=True, timeout=5
-        )
+
+        result = subprocess.run(["docker", "info"], capture_output=True, timeout=5)
         if result.returncode == 0:
             console.print("  [green]✓[/green] Docker daemon reachable")
         else:
@@ -970,18 +978,21 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     # ------------------------------------------------------------------
     console.print()
     if not issues:
-        console.print(Panel(
-            "[bold green]All checks passed![/bold green] "
-            "Your environment looks ready.",
-            border_style="green",
-        ))
+        console.print(
+            Panel(
+                "[bold green]All checks passed![/bold green] Your environment looks ready.",
+                border_style="green",
+            )
+        )
         return 0
     else:
         issue_list = "\n".join(f"  • {i}" for i in issues)
-        console.print(Panel(
-            f"[bold red]{len(issues)} issue(s) found:[/bold red]\n{issue_list}",
-            border_style="red",
-        ))
+        console.print(
+            Panel(
+                f"[bold red]{len(issues)} issue(s) found:[/bold red]\n{issue_list}",
+                border_style="red",
+            )
+        )
         return 1
 
 
@@ -1042,11 +1053,11 @@ def _build_run_parser() -> argparse.ArgumentParser:
         epilog=(
             "Examples:\n"
             "  # Single-shot (non-interactive)\n"
-            "  manus-use \"Create a factorial function in Python\"\n"
-            "  manus-use --agent browser \"Find the top 5 trending GitHub repos today\"\n"
-            "  manus-use --output result.txt \"Summarise the latest AI news\"\n"
-            "  manus-use --format json \"List prime numbers up to 50\"\n"
-            "  manus-use --format json \"task\" | jq .result\n\n"
+            '  manus-use "Create a factorial function in Python"\n'
+            '  manus-use --agent browser "Find the top 5 trending GitHub repos today"\n'
+            '  manus-use --output result.txt "Summarise the latest AI news"\n'
+            '  manus-use --format json "List prime numbers up to 50"\n'
+            '  manus-use --format json "task" | jq .result\n\n'
             "  # Interactive REPL\n"
             "  manus-use\n"
             "  manus-use --mode multi\n\n"
@@ -1058,10 +1069,10 @@ def _build_run_parser() -> argparse.ArgumentParser:
             "  # Vulnerability intelligence analysis\n"
             "  manus-use analyze CVE-2025-6554\n"
             "  manus-use analyze CVE-2024-3094 --verify --output json\n"
-            "  \n"\
-            "  # CVE discovery\n"\
-            "  manus-use discover\n"\
-            "  manus-use discover --since 2025-06-01 --min-epss 0.7 --output json\n"\
+            "  \n"
+            "  # CVE discovery\n"
+            "  manus-use discover\n"
+            "  manus-use discover --since 2025-06-01 --min-epss 0.7 --output json\n"
             "  manus-use discover --dry-run\n"
             "  \n"
             "  # CVE remediation guidance\n"
@@ -1214,9 +1225,7 @@ def _cmd_history(args: argparse.Namespace) -> int:
         return 0
 
     if not _HISTORY_PATH.exists():
-        console.print(
-            "[dim]No history yet – run a task with [cyan]manus-use 'task...'[/cyan] first.[/dim]"
-        )
+        console.print("[dim]No history yet – run a task with [cyan]manus-use 'task...'[/cyan] first.[/dim]")
         return 0
 
     records = []
@@ -1305,12 +1314,14 @@ def main() -> None:
         idx = argv.index("analyze")
         analyze_args = _build_analyze_parser().parse_args(argv[idx + 1 :])
         config = Config.from_file(analyze_args.config)
-        sys.exit(_run_analyze(
-            cve_id=analyze_args.cve_id,
-            verify=analyze_args.verify,
-            output=analyze_args.output,
-            config=config,
-        ))
+        sys.exit(
+            _run_analyze(
+                cve_id=analyze_args.cve_id,
+                verify=analyze_args.verify,
+                output=analyze_args.output,
+                config=config,
+            )
+        )
 
     if first_positional == "history":
         idx = argv.index("history")
@@ -1325,23 +1336,27 @@ def main() -> None:
         idx = argv.index("discover")
         discover_args = _build_discover_parser().parse_args(argv[idx + 1 :])
         config = Config.from_file(discover_args.config)
-        sys.exit(_run_discover(
-            since=discover_args.since,
-            min_epss=discover_args.min_epss,
-            output=discover_args.output,
-            dry_run=discover_args.dry_run,
-            config=config,
-        ))
+        sys.exit(
+            _run_discover(
+                since=discover_args.since,
+                min_epss=discover_args.min_epss,
+                output=discover_args.output,
+                dry_run=discover_args.dry_run,
+                config=config,
+            )
+        )
 
     if first_positional == "remediate":
         idx = argv.index("remediate")
         remediate_args = _build_remediate_parser().parse_args(argv[idx + 1 :])
         config = Config.from_file(remediate_args.config)
-        sys.exit(_run_remediate(
-            cve_id=remediate_args.cve_id,
-            output=remediate_args.output,
-            config=config,
-        ))
+        sys.exit(
+            _run_remediate(
+                cve_id=remediate_args.cve_id,
+                output=remediate_args.output,
+                config=config,
+            )
+        )
 
     # Default: run / interactive
     run_parser = _build_run_parser()

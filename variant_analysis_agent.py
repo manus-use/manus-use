@@ -8,6 +8,7 @@ Usage::
 Or via CLI::
     manus-use variants CVE-2024-3094
 """
+
 import sys
 import warnings
 

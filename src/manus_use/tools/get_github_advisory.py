@@ -37,10 +37,7 @@ def get_github_advisory(cve_id: str) -> dict[str, Any]:
     except Exception:
         github_token = os.environ.get("GITHUB_TOKEN")
 
-    headers = {
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28"
-    }
+    headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
     if github_token:
         headers["Authorization"] = f"token {github_token}"
 

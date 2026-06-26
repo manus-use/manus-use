@@ -4,7 +4,6 @@ Strands Agent that uses the workflow tool to handle complex tasks
 with headless=False for browser operations
 """
 
-
 # Import Strands SDK
 from strands import Agent
 
@@ -12,6 +11,7 @@ from strands import Agent
 import manus_use.tools.workflow_tool as workflow_tool
 
 # Create custom tools for the workflow agent
+
 
 class WorkflowAgent:
     """Agent that manages complex workflows using multiple agent types"""
@@ -47,25 +47,22 @@ Always ensure workflows are well-structured and tasks are properly sequenced.
 """
 
         # Initialize the agent with tools
-        self.agent = Agent(
-            model=model_name,
-            system_prompt=self.system_prompt,
-            tools=[workflow_tool]
-        )
+        self.agent = Agent(model=model_name, system_prompt=self.system_prompt, tools=[workflow_tool])
 
     def handle_request(self, request: str) -> str:
         """Handle a user request by creating and executing appropriate workflows"""
         response = self.agent(request)
         return response
 
+
 # Example usage
 def main():
     """Example of using the WorkflowAgent"""
     print("=== Workflow Agent Example ===")
-    #print(f"Workflow directory: {WORKFLOW_DIR}")
+    # print(f"Workflow directory: {WORKFLOW_DIR}")
 
     # Ensure workflow directory exists
-    #os.makedirs(WORKFLOW_DIR, exist_ok=True)
+    # os.makedirs(WORKFLOW_DIR, exist_ok=True)
 
     # Create the agent
     agent = WorkflowAgent()
@@ -83,6 +80,7 @@ if __name__ == "__main__":
     # Check if we're running with a configured model
     try:
         from manus_use.config import Config
+
         config = Config.from_file()
         if config.llm.provider == "bedrock":
             print("Using AWS Bedrock configuration")

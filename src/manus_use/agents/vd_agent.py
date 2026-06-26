@@ -231,9 +231,7 @@ class VulnerabilityDiscoveryAgent:
                     system_prompt=_CAPTURE_SYSTEM_PROMPT,
                     tools=[obtain_cves_mod, submit_cves_mod],
                 )
-                result = agent(
-                    f"Please obtain and submit CVEs in the time slice: {time_slice}"
-                )
+                result = agent(f"Please obtain and submit CVEs in the time slice: {time_slice}")
                 print(f"[capture_cves] Slice agent result: {result}")
 
                 summary: Submission = agent.structured_output(
@@ -311,6 +309,4 @@ class VulnerabilityDiscoveryAgent:
         dry_run: bool = False,
     ) -> str:
         """Convenience wrapper: build the request and run the workflow."""
-        return self.handle_request(
-            self.build_request(since=since, min_epss=min_epss, dry_run=dry_run)
-        )
+        return self.handle_request(self.build_request(since=since, min_epss=min_epss, dry_run=dry_run))
