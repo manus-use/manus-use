@@ -100,6 +100,9 @@ manus-use --output result.txt "Summarise the latest AI news"
 # JSON output for piping into other tools
 manus-use --format json "List the first 10 prime numbers" | jq .result
 
+# Stream output tokens in real time
+manus-use --stream "Write a short story about a robot"
+
 # Interactive REPL (omit the task argument)
 manus-use
 manus-use --mode multi
@@ -114,6 +117,7 @@ manus-use --mode multi
 | `--show-plan` | off | Print the multi-agent plan before running |
 | `--output FILE` | — | Write result to FILE (single-shot only) |
 | `--format {text,json}` | `text` | Output format; `json` is scriptable |
+| `--stream` | off | Stream output tokens in real time (single-shot only) |
 | `--no-history` | off | Skip recording this run in the history log |
 | `--config FILE` | — | Override default config file search path |
 | `--version` | — | Print version and exit |
@@ -157,6 +161,65 @@ manus-use analyze CVE-2025-6554 --output lark
 |------|---------|-------------|
 | `--verify` | off | Run exploit in a Docker sandbox to confirm exploitability |
 | `--output {text,json,lark}` | `text` | Report format |
+| `--config FILE` | — | Override config |
+
+### `manus-use remediate <CVE-ID>` — Remediation guidance
+
+```bash
+# Generate actionable remediation steps for a CVE
+manus-use remediate CVE-2024-3094
+
+# Machine-readable output
+manus-use remediate CVE-2024-3094 --output json
+```
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Report format |
+| `--config FILE` | — | Override config |
+
+### `manus-use variants <CVE-ID>` — Variant analysis
+
+```bash
+# Find similar bugs in related codebases
+manus-use variants CVE-2024-3094
+
+# Machine-readable output
+manus-use variants CVE-2024-3094 --output json
+```
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Report format |
+
+### `manus-use discover` — CVE discovery
+
+```bash
+# Discover recent high-EPSS CVEs and submit them for tracking
+manus-use discover
+
+# Narrow the date window and raise the EPSS threshold
+manus-use discover --since 2025-06-01 --min-epss 0.7
+
+# Preview without submitting
+manus-use discover --dry-run
+
+# JSON output
+manus-use discover --output json
+```
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--since YYYY-MM-DD` | 4 weeks ago | Start date for the discovery window |
+| `--min-epss SCORE` | `0.5` | Minimum EPSS score threshold (0.0–1.0) |
+| `--output {text,json}` | `text` | Report format |
+| `--dry-run` | off | Discover CVEs but do not submit them |
 | `--config FILE` | — | Override config |
 
 ### `manus-use history` — Browse past runs
@@ -292,6 +355,32 @@ result = agent.handle_request("Analyse CVE-2025-6554 and create a comprehensive 
 print(result)
 ```
 
+### Remediation guidance
+
+```python
+from manus_use.agents import RemediationAgent
+from manus_use.config import Config
+
+config = Config.from_file()
+agent = RemediationAgent(config=config)
+
+result = agent.handle_request("Generate remediation steps for CVE-2024-3094")
+print(result)
+```
+
+### Variant analysis
+
+```python
+from manus_use.agents import VariantAnalysisAgent
+from manus_use.config import Config
+
+config = Config.from_file()
+agent = VariantAnalysisAgent(config=config)
+
+result = agent.handle_request("Find variants of CVE-2024-3094 in related codebases")
+print(result)
+```
+
 ### Custom configuration
 
 ```python
@@ -335,6 +424,12 @@ manus-use analyze CVE-2024-3094 --output json | jq .cvss_score
 
 # Verify exploitability in a Docker sandbox, then write a Lark report
 manus-use analyze CVE-2025-6554 --verify --output lark
+
+# Generate remediation steps
+manus-use remediate CVE-2024-3094
+
+# Discover new high-EPSS CVEs from the last 2 weeks
+manus-use discover --since 2025-06-12 --min-epss 0.6
 ```
 
 > **Important:** These tools are designed for defensive security purposes only. Use them for legitimate security research, vulnerability management, and defence.
@@ -354,6 +449,9 @@ manus-use analyze CVE-2025-6554 --verify --output lark
 | MCP | `MCPAgent` | Model Context Protocol tool servers |
 | Multi-agent | `WorkflowAgent` | Complex tasks needing multiple specialists |
 | Vulnerability intel | `VulnerabilityIntelligenceAgent` | CVE analysis, threat intelligence |
+| Remediation | `RemediationAgent` | Actionable fix guidance for CVEs |
+| Variant analysis | `VariantAnalysisAgent` | Finding similar bugs in related codebases |
+| CVE discovery | `VulnerabilityDiscoveryAgent` | High-EPSS CVE triage and tracking |
 
 ### 🛠️ Built-in tools
 
@@ -388,7 +486,7 @@ pip install -e ".[dev,browser,search,visualization]"
 ### Run tests
 
 ```bash
-# All tests
+# All non-integration tests
 pytest tests/ -v
 
 # With coverage
@@ -422,14 +520,17 @@ manus-use/
 │   │   ├── browser_use_agent.py  # BrowserUseAgent (full JS automation)
 │   │   ├── data_analysis.py      # DataAnalysisAgent
 │   │   ├── mcp.py       # MCPAgent
-│   │   └── vi_agent.py  # VulnerabilityIntelligenceAgent
+│   │   ├── vi_agent.py  # VulnerabilityIntelligenceAgent
+│   │   ├── remediation_agent.py  # RemediationAgent
+│   │   ├── variant_agent.py      # VariantAnalysisAgent
+│   │   └── vulnerability_discovery_agent.py  # VulnerabilityDiscoveryAgent
 │   ├── multi_agents/    # Multi-agent orchestration
 │   │   └── workflow_agent.py
 │   ├── tools/           # Individual tool implementations
 │   ├── cli.py           # manus-use CLI entry point
 │   ├── config.py        # Config model (TOML-backed)
 │   └── __init__.py
-├── tests/               # pytest test suite (175+ tests)
+├── tests/               # pytest test suite (375+ tests)
 ├── config/
 │   └── config.example.toml
 ├── examples/            # Runnable usage examples
