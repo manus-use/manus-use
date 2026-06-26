@@ -55,8 +55,8 @@ class VariantAnalysisAgent:
                 import botocore  # noqa: F401
                 from strands.models import BedrockModel
 
-                model_id = getattr(self._config.agent, "model_id", DEFAULT_MODEL_ID) or DEFAULT_MODEL_ID
-                region = getattr(self._config.agent, "aws_region", "us-east-1") or "us-east-1"
+                model_id = self._config.agent.model_id or DEFAULT_MODEL_ID
+                region = self._config.agent.aws_region or "us-east-1"
                 model = BedrockModel(model_id=model_id, region_name=region, max_tokens=8192)
             except Exception:
                 model = None

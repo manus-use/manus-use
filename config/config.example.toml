@@ -118,3 +118,11 @@ api_token = "your-lark-api-token"
 #             long pipelines where the model can judge message relevance.
 # VulnerabilityIntelligenceAgent always uses "agentic" regardless of this setting.
 context_manager = "auto"
+
+# Optional: Override the Bedrock model used by security agents
+# (VariantAnalysisAgent, etc.).  Defaults to the agent's own built-in default.
+# model_id = "us.anthropic.claude-opus-4-20250514-v1:0"
+
+# Optional: AWS region for Bedrock-backed security agents.
+# Defaults to "us-east-1" when not set.
+# aws_region = "us-east-1"
