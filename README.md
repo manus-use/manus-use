@@ -205,6 +205,36 @@ been weaponised or picked up by active threat actors.
 | `--days N` | `30` | Days of EPSS history to retrieve (max 365) |
 | `--output {text,json}` | `text` | Output format; `json` includes the full time-series |
 
+### `manus-use patch-diff <CVE-ID>` — Patch diff summariser
+
+```bash
+# Fetch the fixing commit(s) for a CVE and summarise what changed
+manus-use patch-diff CVE-2024-3094
+
+# Machine-readable output
+manus-use patch-diff CVE-2024-3094 --output json | jq .commit_summaries
+```
+
+Finds the GitHub fixing commit(s) for a CVE (via the
+[GitHub Security Advisory database](https://github.com/advisories) and NVD
+reference links), fetches the raw unified diff, and produces a structured
+summary:
+- **Files and functions changed** — where in the codebase the fix landed
+- **Bug class** — detected from diff keywords (e.g. `auth_bypass`, `sql_injection`,
+  `buffer_overflow`, `use_after_free`, `input_validation`, …)
+- **Reproduction condition hints** — added guard/validation lines that reveal the
+  minimal condition required to trigger the vulnerability
+- **Commit URL** — direct link to the fixing commit on GitHub
+
+Useful for understanding *how* a vulnerability was introduced and fixed without
+having to read the raw diff yourself. Composable with `analyze` and `epss-trend`.
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Output format; `json` includes the full commit summary |
+
 ### `manus-use variants <CVE-ID>` — Variant analysis
 
 ```bash
@@ -455,6 +485,10 @@ manus-use epss-trend CVE-2024-3094
 
 # Check 90-day EPSS history in JSON
 manus-use epss-trend CVE-2025-6554 --days 90 --output json
+
+# Summarise the fixing commit (files changed, bug class, reproduction hints)
+manus-use patch-diff CVE-2024-3094
+manus-use patch-diff CVE-2024-3094 --output json | jq .commit_summaries
 
 # Generate remediation steps
 manus-use remediate CVE-2024-3094
