@@ -1041,7 +1041,18 @@ def _run_variants(argv: list[str]) -> int:
 # main() entry point
 # ---------------------------------------------------------------------------
 
-_SUBCOMMANDS = {"init", "doctor", "analyze", "history", "discover", "remediate", "variants", "epss-trend", "patch-diff", "compare"}
+_SUBCOMMANDS = {
+    "init",
+    "doctor",
+    "analyze",
+    "history",
+    "discover",
+    "remediate",
+    "variants",
+    "epss-trend",
+    "patch-diff",
+    "compare",
+}
 
 
 # ---------------------------------------------------------------------------

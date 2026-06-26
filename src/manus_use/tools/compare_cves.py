@@ -141,8 +141,15 @@ def _extract_cvss(nvd_record: dict[str, Any]) -> dict[str, Any]:
             "user_interaction": None,
         }
 
-    return {"version": None, "score": None, "severity": None, "vector": None,
-            "attack_vector": None, "privileges_required": None, "user_interaction": None}
+    return {
+        "version": None,
+        "score": None,
+        "severity": None,
+        "vector": None,
+        "attack_vector": None,
+        "privileges_required": None,
+        "user_interaction": None,
+    }
 
 
 def _extract_cwe(nvd_record: dict[str, Any]) -> list[str]:
@@ -268,10 +275,19 @@ def _build_cve_profile(cve_id: str) -> dict[str, Any]:
         epss_data = epss_future.result()
 
     has_nvd_error = "error" in nvd_data
-    cvss = _extract_cvss(nvd_data) if not has_nvd_error else {
-        "version": None, "score": None, "severity": None, "vector": None,
-        "attack_vector": None, "privileges_required": None, "user_interaction": None,
-    }
+    cvss = (
+        _extract_cvss(nvd_data)
+        if not has_nvd_error
+        else {
+            "version": None,
+            "score": None,
+            "severity": None,
+            "vector": None,
+            "attack_vector": None,
+            "privileges_required": None,
+            "user_interaction": None,
+        }
+    )
     cwe = _extract_cwe(nvd_data) if not has_nvd_error else []
     affected = _extract_affected(nvd_data) if not has_nvd_error else "Unknown"
     published = _extract_published(nvd_data) if not has_nvd_error else "Unknown"
@@ -285,7 +301,9 @@ def _build_cve_profile(cve_id: str) -> dict[str, Any]:
         "epss": {
             "epss": epss_data.get("epss"),
             "percentile": epss_data.get("percentile"),
-        } if not epss_data.get("error") else {},
+        }
+        if not epss_data.get("error")
+        else {},
         "cwe": cwe,
         "affected": affected,
         "published": published,
@@ -338,8 +356,7 @@ def _build_comparison(
     else:
         confidence = "tie"
         recommendation = (
-            "Both CVEs score equally. Review manually using CVSS vector, "
-            "EPSS trajectory, and operational context."
+            "Both CVEs score equally. Review manually using CVSS vector, EPSS trajectory, and operational context."
         )
 
     return {
@@ -397,22 +414,30 @@ def _render_text(comparison: dict[str, Any]) -> str:
     lines.append(row("EPSS score", _fmt_epss(pa.get("epss", {})), _fmt_epss(pb.get("epss", {}))))
     lines.append(row("CISA KEV", _fmt_kev(pa.get("kev", {})), _fmt_kev(pb.get("kev", {}))))
     lines.append(row("CWE", ", ".join(pa.get("cwe", [])) or "N/A", ", ".join(pb.get("cwe", [])) or "N/A"))
-    lines.append(row(
-        "Attack vector",
-        pa.get("cvss", {}).get("attack_vector") or "N/A",
-        pb.get("cvss", {}).get("attack_vector") or "N/A",
-    ))
-    lines.append(row(
-        "Privileges req.",
-        pa.get("cvss", {}).get("privileges_required") or "N/A",
-        pb.get("cvss", {}).get("privileges_required") or "N/A",
-    ))
-    lines.append(row(
-        "User interaction",
-        pa.get("cvss", {}).get("user_interaction") or "N/A",
-        pb.get("cvss", {}).get("user_interaction") or "N/A",
-    ))
-    lines.append(row("Priority score", str(int(comparison["priority_score_a"])), str(int(comparison["priority_score_b"]))))
+    lines.append(
+        row(
+            "Attack vector",
+            pa.get("cvss", {}).get("attack_vector") or "N/A",
+            pb.get("cvss", {}).get("attack_vector") or "N/A",
+        )
+    )
+    lines.append(
+        row(
+            "Privileges req.",
+            pa.get("cvss", {}).get("privileges_required") or "N/A",
+            pb.get("cvss", {}).get("privileges_required") or "N/A",
+        )
+    )
+    lines.append(
+        row(
+            "User interaction",
+            pa.get("cvss", {}).get("user_interaction") or "N/A",
+            pb.get("cvss", {}).get("user_interaction") or "N/A",
+        )
+    )
+    lines.append(
+        row("Priority score", str(int(comparison["priority_score_a"])), str(int(comparison["priority_score_b"])))
+    )
     lines.append(f"{sep}\n")
     lines.append(f"\n  RECOMMENDATION\n  {comparison['recommendation']}\n")
 

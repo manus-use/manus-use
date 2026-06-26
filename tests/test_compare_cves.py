@@ -36,15 +36,7 @@ MOCK_NVD_LOG4SHELL = {
     },
     "weaknesses": [{"description": [{"lang": "en", "value": "CWE-917"}]}],
     "configurations": [
-        {
-            "nodes": [
-                {
-                    "cpeMatch": [
-                        {"criteria": "cpe:2.3:a:apache:log4j:*:*:*:*:*:*:*:*", "vulnerable": True}
-                    ]
-                }
-            ]
-        }
+        {"nodes": [{"cpeMatch": [{"criteria": "cpe:2.3:a:apache:log4j:*:*:*:*:*:*:*:*", "vulnerable": True}]}]}
     ],
 }
 
@@ -69,15 +61,7 @@ MOCK_NVD_XZ = {
     },
     "weaknesses": [{"description": [{"lang": "en", "value": "CWE-506"}]}],
     "configurations": [
-        {
-            "nodes": [
-                {
-                    "cpeMatch": [
-                        {"criteria": "cpe:2.3:a:tukaani:xz_utils:*:*:*:*:*:*:*:*", "vulnerable": True}
-                    ]
-                }
-            ]
-        }
+        {"nodes": [{"cpeMatch": [{"criteria": "cpe:2.3:a:tukaani:xz_utils:*:*:*:*:*:*:*:*", "vulnerable": True}]}]}
     ],
 }
 
