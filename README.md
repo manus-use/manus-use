@@ -251,6 +251,40 @@ manus-use variants CVE-2024-3094 --output json
 |------|---------|-------------|
 | `--output {text,json}` | `text` | Report format |
 
+### `manus-use compare <CVE-A> <CVE-B>` — Side-by-side CVE comparison
+
+```bash
+# Compare two CVEs and get a prioritisation recommendation
+manus-use compare CVE-2024-3094 CVE-2021-44228
+
+# Machine-readable output
+manus-use compare CVE-2024-3094 CVE-2021-44228 --output json | jq .higher_priority
+```
+
+Fetches NVD, EPSS, and CISA KEV data for both CVEs in parallel and produces a
+structured side-by-side comparison across:
+
+- **CVSS score and severity** (v3.1 preferred, falls back to v3.0 then v2)
+- **EPSS exploitation probability** (current score and percentile)
+- **CISA KEV membership** (confirmed active exploitation)
+- **CWE weakness class**
+- **Attack vector, privileges required, user interaction** (exploitability factors)
+- **Affected vendor / product**
+
+Each CVE is assigned a composite priority score using a weighted rubric (KEV
+membership: +10, Critical CVSS: +8, high EPSS: +8, network attack vector: +3,
+etc.) and the output includes a plain-English recommendation with confidence
+level: *strong*, *moderate*, or *weak*.
+
+Useful for triage: quickly answer "should I patch A or B first?" without manually
+cross-referencing three data sources.
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Output format; `json` includes the full comparison |
+
 ### `manus-use discover` — CVE discovery
 
 ```bash
@@ -492,6 +526,10 @@ manus-use patch-diff CVE-2024-3094 --output json | jq .commit_summaries
 
 # Generate remediation steps
 manus-use remediate CVE-2024-3094
+
+# Compare two CVEs side-by-side for triage prioritisation
+manus-use compare CVE-2024-3094 CVE-2021-44228
+manus-use compare CVE-2024-3094 CVE-2021-44228 --output json | jq .higher_priority
 
 # Discover new high-EPSS CVEs from the last 2 weeks
 manus-use discover --since 2025-06-12 --min-epss 0.6
