@@ -98,8 +98,7 @@ class RemediationAgent:
             from strands import Agent
         except ImportError as exc:  # pragma: no cover
             raise ImportError(
-                "strands-agents is required for RemediationAgent. "
-                "Install it with: pip install strands-agents"
+                "strands-agents is required for RemediationAgent. Install it with: pip install strands-agents"
             ) from exc
 
         self.config = config or Config.from_file()
@@ -145,9 +144,7 @@ class RemediationAgent:
         # Context management — use agentic mode when the SDK supports it.
         context_manager = getattr(self.config, "agent", None)
         context_manager_val = (
-            getattr(context_manager, "context_manager", "agentic")
-            if context_manager is not None
-            else "agentic"
+            getattr(context_manager, "context_manager", "agentic") if context_manager is not None else "agentic"
         )
 
         agent_kwargs: dict[str, Any] = {
@@ -208,6 +205,7 @@ class RemediationAgent:
 # ---------------------------------------------------------------------------
 # Thin backwards-compatible entry point (mirrors root remediation_agent.py)
 # ---------------------------------------------------------------------------
+
 
 def _main() -> None:
     """CLI entry-point kept for backwards compatibility.

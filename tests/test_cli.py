@@ -215,6 +215,7 @@ def test_run_single_shot_no_output_file(tmp_path):
 # --format flag (CLI parsing)
 # ---------------------------------------------------------------------------
 
+
 def test_format_default_is_text():
     """fmt defaults to 'text' when --format is not passed."""
     captured = _invoke_main(["some task"])
@@ -248,6 +249,7 @@ def test_no_history_flag():
 # ---------------------------------------------------------------------------
 # --format json in _run_single_shot (output to stdout/file)
 # ---------------------------------------------------------------------------
+
 
 def test_run_single_shot_json_format_stdout(tmp_path, capsys):
     """--format json writes a valid JSON object to stdout."""
@@ -311,6 +313,7 @@ def test_run_single_shot_json_format_writes_json_to_file(tmp_path):
 # ---------------------------------------------------------------------------
 # _append_history
 # ---------------------------------------------------------------------------
+
 
 def test_append_history_creates_file(tmp_path):
     """_append_history creates the history file and writes a valid JSON record."""
@@ -418,6 +421,7 @@ def test_history_flag_calls_append(tmp_path):
 # ---------------------------------------------------------------------------
 # manus-use history subcommand
 # ---------------------------------------------------------------------------
+
 
 def _invoke_history(argv):
     """Call cli.main() with history subcommand argv."""

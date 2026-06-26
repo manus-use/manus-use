@@ -217,9 +217,7 @@ def test_stream_true_uses_printing_callback_handler():
     with mock.patch("manus_use.cli._make_agent", side_effect=capturing_make_agent):
         with mock.patch("manus_use.cli._append_history"):
             with mock.patch("sys.stdout", StringIO()):
-                with mock.patch(
-                    "strands.handlers.PrintingCallbackHandler", mock_handler_class
-                ):
+                with mock.patch("strands.handlers.PrintingCallbackHandler", mock_handler_class):
                     cli._run_single_shot(
                         "task",
                         mode="single",
@@ -312,6 +310,7 @@ def test_stream_generator_result_iterates_chunks():
     stderr_capture = StringIO()
 
     import builtins
+
     real_import = builtins.__import__
 
     def mock_import(name, *args, **kwargs):
@@ -447,6 +446,7 @@ def test_stream_fallback_buffered_warning_for_non_iterable():
     stderr_capture = StringIO()
 
     import builtins
+
     real_import = builtins.__import__
 
     def mock_import(name, *args, **kwargs):

@@ -206,9 +206,7 @@ def test_run_discover_calls_handle_request():
     from manus_use.agents.vd_agent import VulnerabilityDiscoveryAgent
 
     with mock.patch.object(VulnerabilityDiscoveryAgent, "__init__", return_value=None):
-        with mock.patch.object(
-            VulnerabilityDiscoveryAgent, "handle_request", return_value="RESULTS"
-        ) as m_handle:
+        with mock.patch.object(VulnerabilityDiscoveryAgent, "handle_request", return_value="RESULTS") as m_handle:
             rc = cli._run_discover(
                 since="2025-06-01",
                 min_epss=0.5,
@@ -247,9 +245,7 @@ def test_run_discover_output_json():
     json_calls = []
 
     with mock.patch.object(VulnerabilityDiscoveryAgent, "__init__", return_value=None):
-        with mock.patch.object(
-            VulnerabilityDiscoveryAgent, "handle_request", return_value="RESULT"
-        ):
+        with mock.patch.object(VulnerabilityDiscoveryAgent, "handle_request", return_value="RESULT"):
             with mock.patch.object(cli.console, "print_json", side_effect=json_calls.append):
                 rc = cli._run_discover(
                     since="2025-06-01",

@@ -97,11 +97,12 @@ TOOL_SPEC = {
                 "cwe_info",
                 "cvss_score",
                 "recommendations",
-                "background"
+                "background",
             ],
         }
     },
 }
+
 
 def create_lark_document(tool: ToolUse, **kwargs: Any) -> ToolResult:
     tool_use_id = tool["toolUseId"]
@@ -110,22 +111,25 @@ def create_lark_document(tool: ToolUse, **kwargs: Any) -> ToolResult:
     default_is_openclaw = os.environ.get("OPENCLAW", "").lower() == "true"
     tool["input"]["is_openclaw"] = tool["input"].get("is_openclaw", default_is_openclaw)
     import requests
+
     config = Config.from_file()
-    url = getattr(getattr(config, 'lark', None), 'document_url', None)
+    url = getattr(getattr(config, "lark", None), "document_url", None)
     if not url:
         url = os.environ.get("LARK_DOCUMENT_URL")
     if not url:
-        raise ValueError("Lark document API URL not set in config or environment. Please set [lark] document_url in your config.toml or the LARK_DOCUMENT_URL environment variable.")
-    api_token = getattr(getattr(config, 'lark', None), 'api_token', None)
+        raise ValueError(
+            "Lark document API URL not set in config or environment. Please set [lark] document_url in your config.toml or the LARK_DOCUMENT_URL environment variable."
+        )
+    api_token = getattr(getattr(config, "lark", None), "api_token", None)
     if not api_token:
         api_token = os.environ.get("LARK_API_TOKEN")
     if not api_token:
-        raise ValueError("Lark API token not set in config or environment. Please set [lark] api_token in your config.toml or the LARK_API_TOKEN environment variable.")
-    headers = {
-        "Authorization": f"Bearer {api_token}"
-    }
+        raise ValueError(
+            "Lark API token not set in config or environment. Please set [lark] api_token in your config.toml or the LARK_API_TOKEN environment variable."
+        )
+    headers = {"Authorization": f"Bearer {api_token}"}
     try:
-        response = requests.post(url, headers=headers, json=tool['input'])
+        response = requests.post(url, headers=headers, json=tool["input"])
         response.raise_for_status()  # Raises an HTTPError if the response status code is 4XX/5XX
         print(response.text)
         return {
@@ -134,14 +138,14 @@ def create_lark_document(tool: ToolUse, **kwargs: Any) -> ToolResult:
             "content": [{"text": f"Created lark document at {title}"}],
         }
     except requests.exceptions.HTTPError as http_err:
-        print(f'HTTP error occurred: {http_err}')
+        print(f"HTTP error occurred: {http_err}")
         return {
             "toolUseId": tool_use_id,
             "status": "error",
             "content": [{"text": f"Failed to create lark document: {http_err}"}],
         }
     except Exception as err:
-        print(f'Other error occurred: {err}')
+        print(f"Other error occurred: {err}")
         return {
             "toolUseId": tool_use_id,
             "status": "error",
