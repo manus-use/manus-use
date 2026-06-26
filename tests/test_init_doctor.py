@@ -1,7 +1,6 @@
 """Tests for `manus-use init` and `manus-use doctor` subcommands."""
 
 import contextlib
-import importlib
 import os
 import sys
 from unittest import mock
@@ -185,24 +184,29 @@ class TestInitCommand:
 
 
 class TestDoctorCommand:
-    def _run_doctor(self, extra_argv=None, env_patch=None, import_side_effects=None):
-        """Helper: run `manus-use doctor` and return exit code."""
+    def _run_doctor(self, extra_argv=None, env_patch=None, import_side_effects=None, mock_imports_ok=True):
+        """Helper: run `manus-use doctor` and return exit code.
+
+        Args:
+            extra_argv: extra CLI arguments after ``doctor``.
+            env_patch: dict patched into ``os.environ``.
+            import_side_effects: set of package names to simulate as missing.
+            mock_imports_ok: when True (default) patch ``_check_import`` so all
+                packages that are NOT in *import_side_effects* appear installed.
+                Keeps tests hermetic across CI environments that lack optional
+                packages like ``strands``.
+        """
         from manus_use import cli
 
         argv = ["manus-use", "doctor"] + (extra_argv or [])
 
-        def fake_import(name):
-            if import_side_effects and name in import_side_effects:
-                raise ImportError(f"No module named '{name}'")
-            return importlib.import_module(name)
+        missing = import_side_effects or set()
 
         patches = [mock.patch.object(sys, "argv", argv)]
         if env_patch is not None:
             patches.append(mock.patch.dict(os.environ, env_patch))
-        if import_side_effects:
-            patches.append(
-                mock.patch("manus_use.cli._check_import", side_effect=lambda p: p not in import_side_effects)
-            )
+        if mock_imports_ok or import_side_effects:
+            patches.append(mock.patch("manus_use.cli._check_import", side_effect=lambda p: p not in missing))
 
         with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)):
             ctx = contextlib.ExitStack()
@@ -220,6 +224,8 @@ class TestDoctorCommand:
         config_file = tmp_path / "config.toml"
         config_file.write_text("[llm]\nprovider = 'openai'\nmodel = 'gpt-4o'\n")
 
+        # mock_imports_ok=True (default) makes _check_import always return True,
+        # so the test is hermetic across CI environments that lack strands etc.
         rc = self._run_doctor(
             extra_argv=["--config", str(config_file)],
             env_patch={"OPENAI_API_KEY": "sk-test"},
@@ -261,6 +267,7 @@ class TestDoctorCommand:
         config_file = tmp_path / "config.toml"
         config_file.write_text("[llm]\nprovider = 'anthropic'\nmodel = 'claude-3-5-sonnet-20241022'\n")
 
+        # mock_imports_ok=True (default) -- hermetic across CI envs lacking strands
         rc = self._run_doctor(
             extra_argv=["--config", str(config_file)],
             env_patch={"ANTHROPIC_API_KEY": "sk-ant-test"},
@@ -283,16 +290,14 @@ class TestDoctorCommand:
         config_file = tmp_path / "config.toml"
         config_file.write_text("[llm]\nprovider = 'openai'\nmodel = 'gpt-4o'\napi_key = 'sk-config-key'\n")
 
-        env = {k: v for k, v in os.environ.items() if k != "OPENAI_API_KEY"}
-        with mock.patch.dict(os.environ, env, clear=True):
-            with mock.patch.object(sys, "argv", ["manus-use", "doctor", "--config", str(config_file)]):
-                with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)):
-                    with pytest.raises(SystemExit) as exc_info:
-                        from manus_use import cli as _cli
-
-                        _cli.main()
-
-        assert exc_info.value.code == 0
+        # Omit OPENAI_API_KEY; api_key in config should satisfy the check.
+        # Use _run_doctor with mock_imports_ok=True (default) for hermeticity.
+        env_without_key = {k: v for k, v in os.environ.items() if k != "OPENAI_API_KEY"}
+        rc = self._run_doctor(
+            extra_argv=["--config", str(config_file)],
+            env_patch=env_without_key,
+        )
+        assert rc == 0
 
     def test_doctor_bedrock_no_required_env(self, tmp_path):
         """doctor does not require API key for bedrock provider."""

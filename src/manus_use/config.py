@@ -159,10 +159,7 @@ class AgentConfig(BaseModel):
     )
     aws_region: str | None = Field(
         default=None,
-        description=(
-            "AWS region for Bedrock-backed security agents. "
-            "Defaults to 'us-east-1' when not set."
-        ),
+        description=("AWS region for Bedrock-backed security agents. Defaults to 'us-east-1' when not set."),
     )
 
 
