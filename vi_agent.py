@@ -1,60 +1,9 @@
 #!/usr/bin/env python3
-"""Vulnerability Intelligence agent entry point.
+"""Backwards-compat shim — delegates to va_agent.py.
 
-The :class:`VulnerabilityIntelligenceAgent` implementation lives in
-``manus_use.agents.vi_agent``. This script is a thin command-line entry point
-so existing ``python vi_agent.py CVE-...`` workflows keep working.
-
-The agent runs an 8-step analysis pipeline for each CVE:
-
-1. NVD data + GitHub advisory
-2. CISA KEV check + OTX threat intel
-3. PoC hunt — trickest/cve index, PoC Week community digest,
-   ExploitDB, Packetstorm, GitHub search
-4. URL verification (browser fallback)
-5. Deep PoC static code analysis
-6. CWE analysis
-7. Threat actor feed query
-8. Lark document report
+``python vi_agent.py CVE-...`` is equivalent to ``python va_agent.py CVE-...``.
+This file exists only so existing scripts that reference vi_agent.py keep working.
 """
-
-import os
-import sys
-import warnings
-from pathlib import Path
-
-warnings.filterwarnings("ignore")
-os.environ.setdefault("BYPASS_TOOL_CONSENT", "True")
-
-# Add the src directory to Python path for in-tree execution.
-sys.path.insert(0, str(Path(__file__).parent / "src"))
-
-from manus_use.agents.vi_agent import VulnerabilityIntelligenceAgent  # noqa: E402
-
-
-def main() -> None:
-    """Run a vulnerability intelligence analysis from the command line."""
-    print("=== Vulnerability Intelligence Agent ===")
-
-    cve_id = sys.argv[1] if len(sys.argv) > 1 else "CVE-2025-6554"
-    if len(sys.argv) <= 1:
-        print(f"No CVE provided. Using example: {cve_id}")
-
-    try:
-        from manus_use.config import Config
-
-        config = Config.from_file()
-    except Exception as exc:
-        print(f"Could not load config ({exc}); using defaults.")
-        config = None
-
-    agent = VulnerabilityIntelligenceAgent(config=config)
-
-    print(f"\n--- Sending analysis request to agent for: {cve_id} ---")
-    result = agent.analyze(cve_id)
-    print("\n--- Final Response from Agent ---")
-    print(result)
-
-
-if __name__ == "__main__":
-    main()
+import runpy, sys  # noqa: E401
+sys.argv[0] = "va_agent.py"
+runpy.run_path(__file__.replace("vi_agent.py", "va_agent.py"), run_name="__main__")
