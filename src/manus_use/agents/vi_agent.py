@@ -86,13 +86,21 @@ Your process is optimized to build a comprehensive picture from authoritative, f
     - Based on your analysis, classify the PoC. Is it a confirmed RCE? A DoS? A simple vulnerability checker?
     - In your final report, create a dedicated section for this analysis, clearly stating your confidence in the PoC's functionality and impact.
 
-**Step 6: Analyze Weakness**
+**Step 6: Patch Diff Analysis**
+- Call `get_patch_diff` with the CVE ID. If a fixing commit is found, include in the report:
+  - Which files and functions were modified.
+  - The primary bug class identified from the diff (e.g. `auth_bypass`, `sql_injection`, `buffer_overflow`).
+  - The reproduction condition hints extracted from the added lines.
+  - A direct link to the commit on GitHub.
+  If no commit is found (private repo or non-GitHub), note this and proceed.
+
+**Step 7: Analyze Weakness**
 - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
-**Step 7: Final Threat Intelligence Check**
+**Step 8: Final Threat Intelligence Check**
 - Use `query_threat_intelligence_feeds` to see if the CVE is being discussed by threat actors, which provides context beyond whether it is just "exploited".
 
-**Step 8: Final Quality Assurance and Report Generation**
+**Step 9: Final Quality Assurance and Report Generation**
 - **Data Completeness Check**: Verify all critical fields are populated.
 - **Information Consistency**: Ensure the technical description, CVSS vector, and exploitability analysis are consistent.
 - **Generate Report**: Once all checks pass, use the `create_lark_document` tool to synthesize all validated findings. Keep `technical_details` concise and focused on vulnerability mechanics, affected components, exploitation prerequisites or scenarios, impact, and detection guidance. Structure `technical_details` with these exact Markdown subsection headers where the corresponding content is present: `### Detection guidance`, `### Exploitability Analysis`, `### Expected impact`, and `### Affected conditions`. Prefix those subsection headers with `### ` exactly, and do not render those labels as plain text or bold-only labels. Avoid one large paragraph; use short paragraphs separated by blank lines, and use bullet points when listing components, prerequisites, impacts, or detection indicators. Use Markdown syntax only when needed, especially the required `### ` subsection headers and inline code for files, functions, variables, commands, CVE/CWE identifiers, or other technical names; avoid decorative formatting such as bold-only section labels. The report must include a dedicated section on Exploitability Analysis and a Sources section listing all URLs. Recommendations section must consist of concise, actionable, and purely proactive technical steps for remediation or mitigation. Each step should be a bullet point starting with an asterisk "*" and ending with a new line character "\\n", without using full sentences or terminal punctuation. Recommendations section should exclude all non-technical actions, such as policy reviews, procedural updates, or post-implementation verification and validation steps. Do not include any passive recommendations.
@@ -178,6 +186,7 @@ class VulnerabilityIntelligenceAgent:
 
             from manus_use.tools.get_epss_trend import get_epss_trend
             from manus_use.tools.get_github_advisory import get_github_advisory
+            from manus_use.tools.get_patch_diff import get_patch_diff
             from manus_use.tools.get_poc_week import get_poc_week
             from manus_use.tools.get_trickest_pocs import get_trickest_pocs
         except ImportError as exc:  # pragma: no cover - depends on env
@@ -230,6 +239,7 @@ class VulnerabilityIntelligenceAgent:
             get_github_advisory,
             "manus_use.tools.verify_exploit",
             get_epss_trend,
+            get_patch_diff,
         ]
         if use_browser is not None:
             tools.append(use_browser)

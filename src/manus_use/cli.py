@@ -1041,7 +1041,7 @@ def _run_variants(argv: list[str]) -> int:
 # main() entry point
 # ---------------------------------------------------------------------------
 
-_SUBCOMMANDS = {"init", "doctor", "analyze", "history", "discover", "remediate", "variants", "epss-trend"}
+_SUBCOMMANDS = {"init", "doctor", "analyze", "history", "discover", "remediate", "variants", "epss-trend", "patch-diff"}
 
 
 # ---------------------------------------------------------------------------
@@ -1139,6 +1139,74 @@ def _run_epss_trend(argv: list[str]) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# patch-diff subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_patch_diff_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-use patch-diff",
+        description=(
+            "Fetch the fixing-commit diff for a CVE from GitHub and produce a\n"
+            "structured summary: files changed, functions touched, bug class,\n"
+            "and reproduction condition hints."
+        ),
+        add_help=True,
+    )
+    p.add_argument("cve_id", metavar="CVE-ID", help="CVE identifier, e.g. CVE-2024-3094")
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return p
+
+
+def _run_patch_diff(argv: list[str]) -> int:
+    parser = _build_patch_diff_parser()
+    args = parser.parse_args(argv)
+    cve_id = args.cve_id.strip()
+    if not cve_id:
+        parser.error("CVE-ID is required")
+
+    try:
+        from manus_use.tools.get_patch_diff import fetch_and_summarise
+    except ImportError as exc:
+        print(f"[error] missing dependencies: {exc}", file=sys.stderr)
+        return 1
+
+    payload = fetch_and_summarise(cve_id)
+
+    if args.output == "json":
+        import json
+
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    # --- text output ---
+    print(payload["message"])
+    if payload["not_found"]:
+        return 0
+
+    for idx, s in enumerate(payload["commit_summaries"], 1):
+        print(f"\nCommit {idx}: {s['commit_url']}")
+        if s["files_changed"]:
+            print(f"  Files changed    : {', '.join(s['files_changed'][:8])}")
+        if s["functions_touched"]:
+            print(f"  Functions touched: {', '.join(s['functions_touched'][:8])}")
+        print(f"  Lines +{s['added_lines']} / -{s['removed_lines']}")
+        print(f"  Primary bug class: {s['primary_bug_class']}")
+        if len(s["matched_bug_classes"]) > 1:
+            print(f"  All bug classes  : {', '.join(s['matched_bug_classes'])}")
+        if s["reproduction_condition_hints"]:
+            print("  Reproduction hints:")
+            for hint in s["reproduction_condition_hints"]:
+                print(f"    • {hint}")
+    return 0
+
+
 def _build_run_parser() -> argparse.ArgumentParser:
     """Build the top-level run/interactive parser."""
     parser = argparse.ArgumentParser(
@@ -1164,6 +1232,10 @@ def _build_run_parser() -> argparse.ArgumentParser:
             "  # EPSS trend analysis\n"
             "  manus-use epss-trend CVE-2024-3094\n"
             "  manus-use epss-trend CVE-2024-3094 --days 90 --output json\n"
+            "\n"
+            "  # Patch diff summariser (fixing-commit analysis)\n"
+            "  manus-use patch-diff CVE-2024-3094\n"
+            "  manus-use patch-diff CVE-2024-3094 --output json\n"
             "\n"
             "  # Vulnerability intelligence analysis\n"
             "  manus-use analyze CVE-2025-6554\n"
@@ -1434,6 +1506,10 @@ def main() -> None:
     if first_positional == "epss-trend":
         idx = argv.index("epss-trend")
         sys.exit(_run_epss_trend(argv[idx + 1 :]))
+
+    if first_positional == "patch-diff":
+        idx = argv.index("patch-diff")
+        sys.exit(_run_patch_diff(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")
