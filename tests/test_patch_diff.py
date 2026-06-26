@@ -229,10 +229,7 @@ class TestSummariseDiff:
     def test_files_changed_capped_at_20(self):
         from manus_use.tools.get_patch_diff import _summarise_diff
 
-        many_files_diff = "\n".join(
-            f"diff --git a/file{i}.py b/file{i}.py\nindex 000..111 100644\n"
-            for i in range(25)
-        )
+        many_files_diff = "\n".join(f"diff --git a/file{i}.py b/file{i}.py\nindex 000..111 100644\n" for i in range(25))
         result = _summarise_diff(many_files_diff, "owner", "repo", "abc1234")
         assert len(result["files_changed"]) <= 20
 
