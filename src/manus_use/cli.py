@@ -1041,7 +1041,102 @@ def _run_variants(argv: list[str]) -> int:
 # main() entry point
 # ---------------------------------------------------------------------------
 
-_SUBCOMMANDS = {"init", "doctor", "analyze", "history", "discover", "remediate", "variants"}
+_SUBCOMMANDS = {"init", "doctor", "analyze", "history", "discover", "remediate", "variants", "epss-trend"}
+
+
+# ---------------------------------------------------------------------------
+# epss-trend subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_epss_trend_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-use epss-trend",
+        description=(
+            "Fetch EPSS (Exploit Prediction Scoring System) score history for a CVE \n"
+            "and flag significant spikes that indicate new exploitation activity."
+        ),
+        add_help=True,
+    )
+    p.add_argument("cve_id", metavar="CVE-ID", help="CVE identifier, e.g. CVE-2024-3094")
+    p.add_argument(
+        "--days",
+        type=int,
+        default=30,
+        metavar="N",
+        help="Days of EPSS history to retrieve (default: 30, max: 365)",
+    )
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return p
+
+
+def _run_epss_trend(argv: list[str]) -> int:
+    parser = _build_epss_trend_parser()
+    args = parser.parse_args(argv)
+    cve_id = args.cve_id.strip()
+    if not cve_id:
+        parser.error("CVE-ID is required")
+
+    try:
+        from manus_use.tools.get_epss_trend import _analyse_series, _fetch_epss_time_series
+    except ImportError as exc:  # pragma: no cover
+        print(f"[error] missing dependencies: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        raw = _fetch_epss_time_series(cve_id, args.days)
+    except Exception as exc:
+        print(f"[error] EPSS API request failed: {exc}", file=sys.stderr)
+        return 1
+
+    data_entries = raw.get("data", [])
+    if not data_entries:
+        print(f"[error] No EPSS data found for {cve_id.upper()}", file=sys.stderr)
+        return 1
+
+    entry = data_entries[0]
+    time_series = list(entry.get("time-series", []))
+    current_point = {
+        "date": entry.get("date", ""),
+        "epss": entry.get("epss", "0"),
+        "percentile": entry.get("percentile", "0"),
+    }
+    if current_point["date"] and not any(p["date"] == current_point["date"] for p in time_series):
+        time_series = [current_point] + time_series
+
+    analysis = _analyse_series(time_series)
+
+    if args.output == "json":
+        import json
+
+        print(json.dumps({"cve_id": cve_id.upper(), "analysis": analysis}, indent=2))
+        return 0
+
+    # Text output
+    spike_flag = "\u26a0\ufe0f  SPIKE DETECTED" if analysis["spike_detected"] else "\u2705  No significant spike"
+    current_pct = float(analysis.get("current_percentile", 0))
+    print(f"EPSS trend for {cve_id.upper()}  ({len(analysis['points'])} days)")
+    print(f"  Current score   : {analysis.get('current_epss', 'N/A'):.4f}  (percentile {current_pct:.1%})")
+    print(f"  Oldest score    : {analysis.get('oldest_epss', 'N/A'):.4f}  (date: {analysis.get('oldest_date', 'N/A')})")
+    print(f"  Latest date     : {analysis.get('latest_date', 'N/A')}")
+    print(f"  Trend           : {analysis['trend']}")
+    print(
+        f"  Max 7-day jump  : {analysis['max_7d_jump']:.4f}"
+        + (f"  (peaked {analysis['max_7d_jump_end_date']})" if analysis["max_7d_jump_end_date"] else "")
+    )
+    print(f"  {spike_flag}")
+    if analysis["points"]:
+        print()
+        print("  Date         EPSS     Percentile")
+        print("  ----------   ------   ----------")
+        for pt in analysis["points"][-15:]:  # show last 15 rows
+            print(f"  {pt['date']}   {pt['epss']:.4f}   {pt['percentile']:.4f}")
+    return 0
 
 
 def _build_run_parser() -> argparse.ArgumentParser:
@@ -1065,6 +1160,10 @@ def _build_run_parser() -> argparse.ArgumentParser:
             "  manus-use init           # create ~/.manus-use/config.toml interactively\n"
             "  manus-use doctor         # check packages, config, and API keys\n"
             "  manus-use history        # show recent runs (use --help for filters)\n"
+            "\n"
+            "  # EPSS trend analysis\n"
+            "  manus-use epss-trend CVE-2024-3094\n"
+            "  manus-use epss-trend CVE-2024-3094 --days 90 --output json\n"
             "\n"
             "  # Vulnerability intelligence analysis\n"
             "  manus-use analyze CVE-2025-6554\n"
@@ -1331,6 +1430,10 @@ def main() -> None:
     if first_positional == "variants":
         idx = argv.index("variants")
         sys.exit(_run_variants(argv[idx + 1 :]))
+
+    if first_positional == "epss-trend":
+        idx = argv.index("epss-trend")
+        sys.exit(_run_epss_trend(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")

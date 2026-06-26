@@ -180,6 +180,31 @@ manus-use remediate CVE-2024-3094 --output json
 | `--output {text,json}` | `text` | Report format |
 | `--config FILE` | — | Override config |
 
+### `manus-use epss-trend <CVE-ID>` — EPSS score history
+
+```bash
+# Show 30-day EPSS score history and detect exploitation spikes
+manus-use epss-trend CVE-2024-3094
+
+# Show 90 days of history
+manus-use epss-trend CVE-2024-3094 --days 90
+
+# Machine-readable output
+manus-use epss-trend CVE-2024-3094 --output json | jq .analysis.spike_detected
+```
+
+Fetches daily EPSS (Exploit Prediction Scoring System) scores from the
+[FIRST.org API](https://www.first.org/epss/) and detects significant jumps.
+A spike of ≥ 0.10 in a 7-day window indicates the vulnerability has recently
+been weaponised or picked up by active threat actors.
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--days N` | `30` | Days of EPSS history to retrieve (max 365) |
+| `--output {text,json}` | `text` | Output format; `json` includes the full time-series |
+
 ### `manus-use variants <CVE-ID>` — Variant analysis
 
 ```bash
@@ -424,6 +449,12 @@ manus-use analyze CVE-2024-3094 --output json | jq .cvss_score
 
 # Verify exploitability in a Docker sandbox, then write a Lark report
 manus-use analyze CVE-2025-6554 --verify --output lark
+
+# Check 30-day EPSS trend and detect exploitation spikes
+manus-use epss-trend CVE-2024-3094
+
+# Check 90-day EPSS history in JSON
+manus-use epss-trend CVE-2025-6554 --days 90 --output json
 
 # Generate remediation steps
 manus-use remediate CVE-2024-3094
