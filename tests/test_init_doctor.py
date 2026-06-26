@@ -239,13 +239,15 @@ class TestDoctorCommand:
         config_file = tmp_path / "config.toml"
         config_file.write_text("[llm]\nprovider = 'openai'\nmodel = 'gpt-4o'\n")
 
-        # Remove OPENAI_API_KEY from env
-        env = {k: v for k, v in os.environ.items() if k != "OPENAI_API_KEY"}
+        # Remove OPENAI_API_KEY and any MANUS_ overrides so doctor sees a truly
+        # missing API key — env-var config loading could otherwise backfill it.
+        env = {k: v for k, v in os.environ.items() if k not in ("OPENAI_API_KEY",) and not k.startswith("MANUS_LLM")}
         with mock.patch.dict(os.environ, env, clear=True):
             with mock.patch.object(sys, "argv", ["manus-use", "doctor", "--config", str(config_file)]):
                 with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)):
-                    with pytest.raises(SystemExit) as exc_info:
-                        cli.main()
+                    with mock.patch("manus_use.cli._check_import", return_value=True):
+                        with pytest.raises(SystemExit) as exc_info:
+                            cli.main()
 
         assert exc_info.value.code == 1
 
@@ -304,15 +306,17 @@ class TestDoctorCommand:
         config_file = tmp_path / "config.toml"
         config_file.write_text("[llm]\nprovider = 'bedrock'\nmodel = 'us.anthropic.claude-3-5-sonnet-20241022-v2:0'\n")
 
-        # Strip all AWS env vars
-        env = {k: v for k, v in os.environ.items() if not k.startswith("AWS_")}
+        # Strip all AWS env vars and MANUS_ overrides so doctor sees a clean
+        # bedrock config with no AWS creds — this should still exit 0.
+        env = {k: v for k, v in os.environ.items() if not k.startswith("AWS_") and not k.startswith("MANUS_LLM")}
         with mock.patch.dict(os.environ, env, clear=True):
             with mock.patch.object(sys, "argv", ["manus-use", "doctor", "--config", str(config_file)]):
                 with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)):
-                    with pytest.raises(SystemExit) as exc_info:
-                        from manus_use import cli as _cli
+                    with mock.patch("manus_use.cli._check_import", return_value=True):
+                        with pytest.raises(SystemExit) as exc_info:
+                            from manus_use import cli as _cli
 
-                        _cli.main()
+                            _cli.main()
 
         # Missing optional AWS env vars should not cause exit 1
         assert exc_info.value.code == 0
