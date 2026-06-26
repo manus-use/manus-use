@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-"""Vulnerability analysis agent entry point (with optional exploit verification).
+"""Vulnerability Intelligence agent entry point (backwards-compat wrapper).
 
 The :class:`VulnerabilityIntelligenceAgent` implementation lives in
-``manus_use.agents.vi_agent``. This script is a thin command-line entry point
-so existing ``python va_agent.py CVE-... [--verify]`` workflows keep working.
+``manus_use.agents.vi_agent``. This script is a thin command-line shim so
+existing ``python va_agent.py CVE-... [--verify]`` and
+``python vi_agent.py CVE-...`` workflows keep working without changes.
+
+Prefer the CLI for new workflows::
+
+    manus-use analyze CVE-2024-3094
+    manus-use analyze CVE-2024-3094 --verify
 
 The agent runs an 8-step analysis pipeline for each CVE:
 
@@ -36,9 +42,10 @@ from manus_use.agents.vi_agent import VulnerabilityIntelligenceAgent  # noqa: E4
 def main() -> None:
     """Run a vulnerability intelligence analysis from the command line.
 
-    Usage:
-      python va_agent.py CVE-2024-3094            # analysis only
-      python va_agent.py CVE-2024-3094 --verify   # analysis + exploit verification
+    Usage::
+
+        python va_agent.py CVE-2024-3094            # analysis only
+        python va_agent.py CVE-2024-3094 --verify   # analysis + exploit verification
     """
     print("=== Vulnerability Intelligence Assessment Agent ===")
 
