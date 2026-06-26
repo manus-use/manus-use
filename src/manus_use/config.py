@@ -150,6 +150,20 @@ class AgentConfig(BaseModel):
             "VulnerabilityIntelligenceAgent always uses 'agentic'."
         ),
     )
+    model_id: str | None = Field(
+        default=None,
+        description=(
+            "Override Bedrock model ID for security agents (VariantAnalysisAgent). "
+            "Defaults to the agent's built-in default when not set."
+        ),
+    )
+    aws_region: str | None = Field(
+        default=None,
+        description=(
+            "AWS region for Bedrock-backed security agents. "
+            "Defaults to 'us-east-1' when not set."
+        ),
+    )
 
 
 class Config(BaseModel):

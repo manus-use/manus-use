@@ -89,8 +89,6 @@ cli = [
 
 [project.scripts]
 manus-use = "manus_use.cli:main"
-manus-use-v2 = "manus_use.cli_v2:main"
-manus-use-enhanced = "manus_use.cli_enhanced:main"
 
 [tool.hatch.envs.default]
 features = ["dev", "browser", "search", "visualization"]
