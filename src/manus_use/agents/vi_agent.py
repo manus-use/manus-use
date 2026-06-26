@@ -50,9 +50,10 @@ Your process is optimized to build a comprehensive picture from authoritative, f
 - Immediately call the `get_nvd_data` tool to get foundational information from the NVD. This will provide the official description, CVSS score, and CWE.
 - Call `get_github_advisory` to get advisory information from GitHub.
 
-**Step 2: Check for Known Exploitation**
+**Step 2: Check for Known Exploitation and EPSS Trend**
 - Call `check_cisa_kev` to determine if the vulnerability is on the CISA Known Exploited Vulnerabilities (KEV) list.
 - Call `get_otx_cve_details` to check for threat intelligence information from AlienVault OTX, such as associated pulses and IoCs.
+- Call `get_epss_trend` with the CVE ID (default 30 days of history). A `spike_detected=true` result (>0.10 jump in 7 days) indicates the vulnerability has recently been weaponised or discovered by attackers — flag this prominently in the report with the spike date and magnitude.
 
 **Step 3: Gather Public Exploits and Advisories**
 - First, call `get_poc_week` (no arguments) to check if the CVE appears in recent PoC Week digests. A high mention_rank (low number) means the security community considers it high-priority this week — note this in your analysis.
@@ -175,6 +176,7 @@ class VulnerabilityIntelligenceAgent:
             from strands import Agent
             from strands_tools import current_time
 
+            from manus_use.tools.get_epss_trend import get_epss_trend
             from manus_use.tools.get_github_advisory import get_github_advisory
             from manus_use.tools.get_poc_week import get_poc_week
             from manus_use.tools.get_trickest_pocs import get_trickest_pocs
@@ -227,6 +229,7 @@ class VulnerabilityIntelligenceAgent:
             "manus_use.tools.query_threat_intelligence_feeds",
             get_github_advisory,
             "manus_use.tools.verify_exploit",
+            get_epss_trend,
         ]
         if use_browser is not None:
             tools.append(use_browser)
