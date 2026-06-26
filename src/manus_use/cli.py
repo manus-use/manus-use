@@ -1041,7 +1041,7 @@ def _run_variants(argv: list[str]) -> int:
 # main() entry point
 # ---------------------------------------------------------------------------
 
-_SUBCOMMANDS = {"init", "doctor", "analyze", "history", "discover", "remediate", "variants", "epss-trend", "patch-diff"}
+_SUBCOMMANDS = {"init", "doctor", "analyze", "history", "discover", "remediate", "variants", "epss-trend", "patch-diff", "compare"}
 
 
 # ---------------------------------------------------------------------------
@@ -1204,6 +1204,80 @@ def _run_patch_diff(argv: list[str]) -> int:
             print("  Reproduction hints:")
             for hint in s["reproduction_condition_hints"]:
                 print(f"    • {hint}")
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# compare subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_compare_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-use compare",
+        description=(
+            "Compare two CVEs side-by-side across CVSS, EPSS, CISA KEV, CWE,\n"
+            "attack vector, and other dimensions.  Outputs a prioritisation\n"
+            "recommendation: which CVE poses the greater immediate risk and why."
+        ),
+        add_help=True,
+    )
+    p.add_argument("cve_id_a", metavar="CVE-ID-A", help="First CVE identifier, e.g. CVE-2024-3094")
+    p.add_argument("cve_id_b", metavar="CVE-ID-B", help="Second CVE identifier, e.g. CVE-2021-44228")
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return p
+
+
+def _run_compare(argv: list[str]) -> int:
+    parser = _build_compare_parser()
+    args = parser.parse_args(argv)
+
+    cve_id_a = args.cve_id_a.strip()
+    cve_id_b = args.cve_id_b.strip()
+
+    for cid in (cve_id_a, cve_id_b):
+        if not cid.upper().startswith("CVE-"):
+            print(f"[error] Invalid CVE ID '{cid}'. Must be like 'CVE-YYYY-NNNN'.", file=sys.stderr)
+            return 1
+
+    try:
+        from manus_use.tools.compare_cves import (
+            _build_comparison,
+            _build_cve_profile,
+            _fetch_kev,
+            _render_text,
+        )
+    except ImportError as exc:  # pragma: no cover
+        print(f"[error] missing dependencies: {exc}", file=sys.stderr)
+        return 1
+
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        future_a = executor.submit(_build_cve_profile, cve_id_a)
+        future_b = executor.submit(_build_cve_profile, cve_id_b)
+        future_kev_a = executor.submit(_fetch_kev, cve_id_a)
+        future_kev_b = executor.submit(_fetch_kev, cve_id_b)
+        profile_a = future_a.result()
+        profile_b = future_b.result()
+        kev_a = future_kev_a.result()
+        kev_b = future_kev_b.result()
+
+    comparison = _build_comparison(profile_a, kev_a, profile_b, kev_b)
+
+    if args.output == "json":
+        import json
+
+        print(json.dumps(comparison, indent=2))
+        return 0
+
+    # Text output
+    print(_render_text(comparison))
     return 0
 
 
@@ -1510,6 +1584,10 @@ def main() -> None:
     if first_positional == "patch-diff":
         idx = argv.index("patch-diff")
         sys.exit(_run_patch_diff(argv[idx + 1 :]))
+
+    if first_positional == "compare":
+        idx = argv.index("compare")
+        sys.exit(_run_compare(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")
