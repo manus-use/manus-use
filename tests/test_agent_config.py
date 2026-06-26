@@ -6,6 +6,7 @@ This test suite verifies:
 3. VariantAnalysisAgent._build_agent() uses the config fields (not getattr fallbacks).
 4. Dead CLI modules (cli_v2, cli_enhanced) have been removed.
 """
+
 from __future__ import annotations
 
 import sys
@@ -78,10 +79,7 @@ def test_agent_config_all_fields_together():
 def test_config_from_file_agent_model_id(tmp_path):
     """Config.from_file() reads [agent].model_id from a TOML config file."""
     config_file = tmp_path / "config.toml"
-    config_file.write_text(
-        "[agent]\n"
-        'model_id = "us.anthropic.claude-opus-4-20250514-v1:0"\n'
-    )
+    config_file.write_text('[agent]\nmodel_id = "us.anthropic.claude-opus-4-20250514-v1:0"\n')
     from manus_use.config import Config
 
     cfg = Config.from_file(config_file)
@@ -91,7 +89,7 @@ def test_config_from_file_agent_model_id(tmp_path):
 def test_config_from_file_agent_aws_region(tmp_path):
     """Config.from_file() reads [agent].aws_region from a TOML config file."""
     config_file = tmp_path / "config.toml"
-    config_file.write_text("[agent]\naws_region = \"eu-central-1\"\n")
+    config_file.write_text('[agent]\naws_region = "eu-central-1"\n')
     from manus_use.config import Config
 
     cfg = Config.from_file(config_file)
@@ -118,7 +116,7 @@ def test_config_from_file_agent_full_section(tmp_path):
 def test_config_from_file_agent_defaults_when_absent(tmp_path):
     """Config.from_file() uses AgentConfig defaults when [agent] section is absent."""
     config_file = tmp_path / "config.toml"
-    config_file.write_text("[llm]\nprovider = \"openai\"\n")
+    config_file.write_text('[llm]\nprovider = "openai"\n')
     from manus_use.config import Config
 
     cfg = Config.from_file(config_file)
@@ -130,7 +128,7 @@ def test_config_from_file_agent_defaults_when_absent(tmp_path):
 def test_config_from_file_agent_partial_section(tmp_path):
     """Config.from_file() handles partial [agent] sections (only one field set)."""
     config_file = tmp_path / "config.toml"
-    config_file.write_text("[agent]\naws_region = \"ap-northeast-1\"\n")
+    config_file.write_text('[agent]\naws_region = "ap-northeast-1"\n')
     from manus_use.config import Config
 
     cfg = Config.from_file(config_file)
@@ -178,6 +176,7 @@ def _reload_variant_agent():
         if "manus_use.agents.variant_agent" in key:
             del sys.modules[key]
     from manus_use.agents.variant_agent import VariantAnalysisAgent
+
     return VariantAnalysisAgent
 
 
@@ -234,6 +233,7 @@ def test_variant_agent_falls_back_to_default_model_id_when_not_set():
     ):
         agent_cls = _reload_variant_agent()
         from manus_use.agents.variant_agent import DEFAULT_MODEL_ID
+
         agent = agent_cls(config=cfg)
         agent._build_agent()
 
