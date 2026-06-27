@@ -1052,6 +1052,7 @@ _SUBCOMMANDS = {
     "epss-trend",
     "patch-diff",
     "compare",
+    "vendor-response",
 }
 
 
@@ -1289,6 +1290,116 @@ def _run_compare(argv: list[str]) -> int:
 
     # Text output
     print(_render_text(comparison))
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# vendor-response subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_vendor_response_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-use vendor-response",
+        description=(
+            "Track a vendor's patch response to a CVE.\n"
+            "Consults NVD references, GitHub Security Advisories (GHSA),\n"
+            "CISA KEV, and the repository's security advisory tab to classify\n"
+            "patch status as: patch_available / patch_backported / wont_fix /\n"
+            "investigating / no_patch / unknown."
+        ),
+        add_help=True,
+    )
+    p.add_argument("cve_id", metavar="CVE-ID", help="CVE identifier, e.g. CVE-2024-3094")
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return p
+
+
+def _run_vendor_response(argv: list[str]) -> int:
+    parser = _build_vendor_response_parser()
+    args = parser.parse_args(argv)
+
+    cve_id = args.cve_id.strip()
+    if not cve_id.upper().startswith("CVE-"):
+        print(f"[error] Invalid CVE ID '{cve_id}'. Must be like 'CVE-YYYY-NNNN'.", file=sys.stderr)
+        return 1
+
+    try:
+        from manus_use.tools.track_vendor_response import (
+            _build_summary,
+            _classify,
+            _extract_github_repo_from_refs,
+            _fetch_cisa_kev,
+            _fetch_ghsa,
+            _fetch_nvd,
+            _nvd_affected_vendor_product,
+            _nvd_references,
+            _search_github_repo_advisories,
+        )
+    except ImportError as exc:  # pragma: no cover
+        print(f"[error] missing dependencies: {exc}", file=sys.stderr)
+        return 1
+
+    cve_id = cve_id.upper()
+
+    nvd_cve = _fetch_nvd(cve_id)
+    if "_error" in nvd_cve:
+        nvd_refs: list[str] = []
+        vendor, product = "", ""
+    else:
+        nvd_refs = _nvd_references(nvd_cve)
+        vendor, product = _nvd_affected_vendor_product(nvd_cve)
+
+    ghsa_result = _fetch_ghsa(cve_id)
+    ghsa_advisories = ghsa_result.get("advisories", [])
+
+    kev_entry = _fetch_cisa_kev(cve_id)
+
+    repo_advisories: list = []
+    gh_repo = _extract_github_repo_from_refs(nvd_refs)
+    if gh_repo:
+        owner, repo = gh_repo
+        repo_advisories = _search_github_repo_advisories(owner, repo, cve_id)
+
+    status, confidence, evidence_urls = _classify(nvd_refs, ghsa_advisories, kev_entry, repo_advisories)
+
+    summary = _build_summary(
+        cve_id=cve_id,
+        status=status,
+        confidence=confidence,
+        evidence_urls=evidence_urls,
+        vendor=vendor,
+        product=product,
+        kev_entry=kev_entry,
+        ghsa_count=len(ghsa_advisories) + len(repo_advisories),
+    )
+
+    if args.output == "json":
+        output = {
+            "cve_id": cve_id,
+            "status": status,
+            "confidence": confidence,
+            "vendor": vendor,
+            "product": product,
+            "evidence_urls": evidence_urls,
+            "ghsa_advisories_found": len(ghsa_advisories),
+            "repo_advisories_found": len(repo_advisories),
+            "in_cisa_kev": bool(kev_entry),
+            "cisa_required_action": kev_entry.get("requiredAction", ""),
+            "cisa_due_date": kev_entry.get("dueDate", ""),
+            "summary": summary,
+        }
+        import json
+
+        print(json.dumps(output, indent=2))
+        return 0
+
+    print(summary)
     return 0
 
 
@@ -1599,6 +1710,10 @@ def main() -> None:
     if first_positional == "compare":
         idx = argv.index("compare")
         sys.exit(_run_compare(argv[idx + 1 :]))
+
+    if first_positional == "vendor-response":
+        idx = argv.index("vendor-response")
+        sys.exit(_run_vendor_response(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")

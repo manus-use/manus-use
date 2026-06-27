@@ -94,6 +94,12 @@ Your process is optimized to build a comprehensive picture from authoritative, f
   - A direct link to the commit on GitHub.
   If no commit is found (private repo or non-GitHub), note this and proceed.
 
+**Step 6b: Vendor Response Tracking**
+- Call `track_vendor_response` with the CVE ID to determine the vendor's patch status.
+  - Include the classification (`patch_available`, `patch_backported`, `wont_fix`, `investigating`, `no_patch`, `unknown`) and its confidence level in the report.
+  - If `wont_fix` or `no_patch` is returned, emphasise this in the Recommendations section — users should apply mitigations or consider alternative products.
+  - List the evidence URLs returned by the tool under a **Vendor Response** subsection.
+
 **Step 7: Analyze Weakness**
 - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -189,6 +195,7 @@ class VulnerabilityIntelligenceAgent:
             from manus_use.tools.get_patch_diff import get_patch_diff
             from manus_use.tools.get_poc_week import get_poc_week
             from manus_use.tools.get_trickest_pocs import get_trickest_pocs
+            from manus_use.tools.track_vendor_response import track_vendor_response
         except ImportError as exc:  # pragma: no cover - depends on env
             raise ImportError(
                 "VulnerabilityIntelligenceAgent requires the optional 'strands' "
@@ -240,6 +247,7 @@ class VulnerabilityIntelligenceAgent:
             "manus_use.tools.verify_exploit",
             get_epss_trend,
             get_patch_diff,
+            track_vendor_response,
         ]
         if use_browser is not None:
             tools.append(use_browser)
