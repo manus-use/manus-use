@@ -19,7 +19,9 @@ def _make_tool_use(cve_id: str) -> dict:
     return {"toolUseId": "test-id-001", "input": {"cve_id": cve_id}}
 
 
-def _nvd_response(cve_id: str, *, refs: list[str] | None = None, vendor: str = "testvendor", product: str = "testpkg") -> dict:
+def _nvd_response(
+    cve_id: str, *, refs: list[str] | None = None, vendor: str = "testvendor", product: str = "testpkg"
+) -> dict:
     """Minimal NVD API response payload."""
     cpe = f"cpe:2.3:a:{vendor}:{product}:1.0:*:*:*:*:*:*:*"
     return {
@@ -28,17 +30,7 @@ def _nvd_response(cve_id: str, *, refs: list[str] | None = None, vendor: str = "
                 "cve": {
                     "id": cve_id,
                     "references": [{"url": u} for u in (refs or [])],
-                    "configurations": [
-                        {
-                            "nodes": [
-                                {
-                                    "cpeMatch": [
-                                        {"criteria": cpe, "vulnerable": True}
-                                    ]
-                                }
-                            ]
-                        }
-                    ],
+                    "configurations": [{"nodes": [{"cpeMatch": [{"criteria": cpe, "vulnerable": True}]}]}],
                 }
             }
         ]
@@ -192,7 +184,12 @@ def test_fetch_ghsa_returns_advisories_from_list():
     from manus_use.tools.track_vendor_response import _fetch_ghsa
 
     fake_advisories = [
-        {"ghsaId": "GHSA-xxxx-yyyy-zzzz", "cveId": "CVE-2024-0001", "state": "published", "html_url": "https://github.com/advisories/GHSA-xxxx-yyyy-zzzz"}
+        {
+            "ghsaId": "GHSA-xxxx-yyyy-zzzz",
+            "cveId": "CVE-2024-0001",
+            "state": "published",
+            "html_url": "https://github.com/advisories/GHSA-xxxx-yyyy-zzzz",
+        }
     ]
     with patch("manus_use.tools.track_vendor_response.requests.get") as mock_get:
         mock_get.return_value = MagicMock(
@@ -360,7 +357,14 @@ def test_classify_patch_backported():
         "https://github.com/acme/widget/commit/abc123def456789012",
         "https://github.com/acme/widget/releases/tag/v1.8.5-lts",
     ]
-    ghsa = [{"state": "draft", "description": "backport for legacy version included", "references": [], "vulnerabilities": []}]
+    ghsa = [
+        {
+            "state": "draft",
+            "description": "backport for legacy version included",
+            "references": [],
+            "vulnerabilities": [],
+        }
+    ]
     status, _, _ = _classify(refs, ghsa, {}, [])
     assert status == "patch_backported"
 
@@ -368,7 +372,14 @@ def test_classify_patch_backported():
 def test_classify_investigating():
     from manus_use.tools.track_vendor_response import _classify
 
-    ghsa = [{"state": "draft", "description": "Vendor is aware and investigating the reported issue.", "references": [], "vulnerabilities": []}]
+    ghsa = [
+        {
+            "state": "draft",
+            "description": "Vendor is aware and investigating the reported issue.",
+            "references": [],
+            "vulnerabilities": [],
+        }
+    ]
     status, confidence, _ = _classify([], ghsa, {}, [])
     assert status == "investigating"
     assert confidence == "moderate"
@@ -544,7 +555,9 @@ def test_track_vendor_response_includes_kev_fields():
 
     nvd = _nvd_response("CVE-2024-0001")
     kev = {"vulnerabilities": [{"cveID": "CVE-2024-0001", "requiredAction": "Update now.", "dueDate": "2025-03-01"}]}
-    with patch("manus_use.tools.track_vendor_response.requests.get", side_effect=_make_requests_mock(nvd, kev_payload=kev)):
+    with patch(
+        "manus_use.tools.track_vendor_response.requests.get", side_effect=_make_requests_mock(nvd, kev_payload=kev)
+    ):
         result = track_vendor_response(_make_tool_use("CVE-2024-0001"))
 
     data = result["content"][0]["json"]
@@ -685,15 +698,26 @@ def test_run_vendor_response_json_has_all_expected_fields(capsys):
         product="widget",
     )
     kev = {"vulnerabilities": [{"cveID": "CVE-2024-0001", "requiredAction": "Patch it.", "dueDate": "2025-01-01"}]}
-    with patch("manus_use.tools.track_vendor_response.requests.get", side_effect=_make_requests_mock(nvd, kev_payload=kev)):
+    with patch(
+        "manus_use.tools.track_vendor_response.requests.get", side_effect=_make_requests_mock(nvd, kev_payload=kev)
+    ):
         _run_vendor_response(["CVE-2024-0001", "--output", "json"])
 
     captured = capsys.readouterr()
     data = json.loads(captured.out)
     required_fields = [
-        "cve_id", "status", "confidence", "vendor", "product",
-        "evidence_urls", "ghsa_advisories_found", "repo_advisories_found",
-        "in_cisa_kev", "cisa_required_action", "cisa_due_date", "summary",
+        "cve_id",
+        "status",
+        "confidence",
+        "vendor",
+        "product",
+        "evidence_urls",
+        "ghsa_advisories_found",
+        "repo_advisories_found",
+        "in_cisa_kev",
+        "cisa_required_action",
+        "cisa_due_date",
+        "summary",
     ]
     for field in required_fields:
         assert field in data, f"Missing field: {field}"

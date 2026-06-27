@@ -339,9 +339,7 @@ def _classify(
     investigating_hits = _keywords_match(combined_text, _INVESTIGATING_KEYWORDS)
 
     # GHSA published or repo advisory published = strong patch signal
-    ghsa_published = any(
-        (a.get("state", "").lower() == "published") for a in (ghsa_advisories + repo_advisories)
-    )
+    ghsa_published = any((a.get("state", "").lower() == "published") for a in (ghsa_advisories + repo_advisories))
     # GHSA with explicit patched_versions = very strong patch signal
     has_patched_versions = any(
         vuln.get("patched_versions", "") not in ("", "*", "unknown")
