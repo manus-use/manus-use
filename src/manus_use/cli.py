@@ -1326,7 +1326,7 @@ def _run_exploit_complexity(argv: list[str]) -> int:
     try:
         from manus_use.tools.score_exploit_complexity import _render_text, _run_scoring
     except ImportError as exc:  # pragma: no cover
-        print(f"Error: failed to import score_exploit_complexity: {exc}", file=__import__('sys').stderr)
+        print(f"Error: failed to import score_exploit_complexity: {exc}", file=__import__("sys").stderr)
         return 1
 
     result = _run_scoring(cve_id)
