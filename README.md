@@ -285,6 +285,45 @@ cross-referencing three data sources.
 |------|---------|-------------|
 | `--output {text,json}` | `text` | Output format; `json` includes the full comparison |
 
+### `manus-use vendor-response <CVE-ID>` — Vendor patch response tracker
+
+```bash
+# Check whether a vendor has patched a CVE
+manus-use vendor-response CVE-2024-3094
+
+# Machine-readable output
+manus-use vendor-response CVE-2024-3094 --output json | jq .status
+```
+
+Queries NVD reference links, the [GitHub Security Advisory database](https://github.com/advisories)
+(GHSA), CISA KEV, and the affected repository's own security-advisory tab to determine
+the vendor's current patch status for a CVE.\n
+Classifies patch status as:
+
+| Status | Meaning |
+|--------|----------|
+| `patch_available` | A fix has been confirmed (commit, release, or advisory with patched versions) |
+| `patch_backported` | Fix was backported to an older/LTS branch in addition to the main line |
+| `wont_fix` | Vendor has explicitly stated they will not release a fix |
+| `investigating` | Vendor has acknowledged the issue but no fix is available yet |
+| `no_patch` | No evidence of any fix found in public sources |
+| `unknown` | Insufficient public information to determine status |
+
+Also reports:
+- CISA KEV membership and required action / due date
+- Number of GitHub security advisories found
+- Evidence URLs (commit links, release tags, advisory pages)
+- Confidence level: *high*, *moderate*, or *low*
+
+Useful for answering the first question in any vulnerability triage workflow:
+**"Is there a fix, and has the vendor responded?"**
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Output format; `json` includes full classification and evidence |
+
 ### `manus-use discover` — CVE discovery
 
 ```bash
@@ -530,6 +569,10 @@ manus-use remediate CVE-2024-3094
 # Compare two CVEs side-by-side for triage prioritisation
 manus-use compare CVE-2024-3094 CVE-2021-44228
 manus-use compare CVE-2024-3094 CVE-2021-44228 --output json | jq .higher_priority
+
+# Check vendor patch status: has the vendor released a fix?
+manus-use vendor-response CVE-2024-3094
+manus-use vendor-response CVE-2024-3094 --output json | jq .status
 
 # Discover new high-EPSS CVEs from the last 2 weeks
 manus-use discover --since 2025-06-12 --min-epss 0.6
