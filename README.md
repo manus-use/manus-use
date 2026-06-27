@@ -285,6 +285,42 @@ cross-referencing three data sources.
 |------|---------|-------------|
 | `--output {text,json}` | `text` | Output format; `json` includes the full comparison |
 
+### `manus-use exploit-complexity <CVE-ID>` — Exploit complexity scorer
+
+```bash
+# Score how hard it is for an attacker to exploit a CVE (1=trivial, 5=very hard)
+manus-use exploit-complexity CVE-2024-3094
+
+# Machine-readable output
+manus-use exploit-complexity CVE-2024-3094 --output json | jq .complexity_score
+```
+
+Analyses the CVE's NVD CVSS vector and, when available, the PoC source code from
+the [Trickest CVE index](https://github.com/trickest/cve) to score the practical
+effort required to exploit the vulnerability across five dimensions:
+
+| Dimension | What it measures |
+|-----------|------------------|
+| Lines of code | How much exploit code an attacker needs to write / adapt |
+| Authentication required | Credentials, tokens, or privilege level needed |
+| Network hops | How many services the exploit must reach |
+| OS/platform dependencies | Platform-specific syscalls, kernel structs, gadgets |
+| Exploit chain length | Number of discrete attack stages |
+
+Each dimension is scored 1–5 (1 = easy for the attacker). The weighted overall
+`complexity_score` (1–5) is accompanied by a human-readable label
+(*trivial / low / moderate / high / very_high*) and an `attacker_friendly`
+boolean (True when score ≤ 2.5).
+
+Use this alongside `epss-trend` and `compare` to answer: *"this CVE is CVSS 9.8
+— but is it actually easy to exploit right now?"*
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Output format; `json` includes per-dimension scores and metadata |
+
 ### `manus-use discover` — CVE discovery
 
 ```bash
@@ -530,6 +566,10 @@ manus-use remediate CVE-2024-3094
 # Compare two CVEs side-by-side for triage prioritisation
 manus-use compare CVE-2024-3094 CVE-2021-44228
 manus-use compare CVE-2024-3094 CVE-2021-44228 --output json | jq .higher_priority
+
+# Score how hard it is for an attacker to exploit a CVE (1=trivial, 5=very hard)
+manus-use exploit-complexity CVE-2024-3094
+manus-use exploit-complexity CVE-2024-3094 --output json | jq .attacker_friendly
 
 # Discover new high-EPSS CVEs from the last 2 weeks
 manus-use discover --since 2025-06-12 --min-epss 0.6
