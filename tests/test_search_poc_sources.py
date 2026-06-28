@@ -280,7 +280,9 @@ class TestFetchVulncheckKev:
     def test_returns_empty_when_no_matching_cve(self):
         from manus_use.tools.search_poc_sources import _fetch_vulncheck_kev
 
-        payload = {"data": [{"cveID": "CVE-2024-9999", "dateAdded": "2024-01-01", "sources": [], "ransomwareUse": False}]}
+        payload = {
+            "data": [{"cveID": "CVE-2024-9999", "dateAdded": "2024-01-01", "sources": [], "ransomwareUse": False}]
+        }
         with patch.dict(os.environ, {"VULNCHECK_API_KEY": "testkey"}):
             with _patch_urlopen(payload):
                 results = _fetch_vulncheck_kev("CVE-2024-3094")
@@ -326,10 +328,19 @@ class TestFetchExploitdb:
     def test_returns_match(self, tmp_path):
         from manus_use.tools.search_poc_sources import _fetch_exploitdb
 
-        csv_data = self._make_csv_content([
-            {"id": "42", "description": "XZ Utils backdoor", "date_published": "2024-04-01",
-             "author": "researcher", "type": "remote", "platform": "linux", "codes": "CVE-2024-3094"},
-        ])
+        csv_data = self._make_csv_content(
+            [
+                {
+                    "id": "42",
+                    "description": "XZ Utils backdoor",
+                    "date_published": "2024-04-01",
+                    "author": "researcher",
+                    "type": "remote",
+                    "platform": "linux",
+                    "codes": "CVE-2024-3094",
+                },
+            ]
+        )
         cache = str(tmp_path / "exploitdb_cache.csv")
         with open(cache, "wb") as f:
             f.write(csv_data)
@@ -345,10 +356,19 @@ class TestFetchExploitdb:
     def test_no_match_returns_empty(self, tmp_path):
         from manus_use.tools.search_poc_sources import _fetch_exploitdb
 
-        csv_data = self._make_csv_content([
-            {"id": "1", "description": "Other vuln", "date_published": "2024-01-01",
-             "author": "x", "type": "local", "platform": "windows", "codes": "CVE-2020-0001"},
-        ])
+        csv_data = self._make_csv_content(
+            [
+                {
+                    "id": "1",
+                    "description": "Other vuln",
+                    "date_published": "2024-01-01",
+                    "author": "x",
+                    "type": "local",
+                    "platform": "windows",
+                    "codes": "CVE-2020-0001",
+                },
+            ]
+        )
         cache = str(tmp_path / "exploitdb_cache.csv")
         with open(cache, "wb") as f:
             f.write(csv_data)
@@ -362,10 +382,19 @@ class TestFetchExploitdb:
         from manus_use.tools.search_poc_sources import _ensure_exploitdb_cache
 
         cache = str(tmp_path / "missing.csv")
-        csv_data = self._make_csv_content([
-            {"id": "99", "description": "test", "date_published": "2024-01-01",
-             "author": "a", "type": "remote", "platform": "linux", "codes": "CVE-2024-3094"},
-        ])
+        csv_data = self._make_csv_content(
+            [
+                {
+                    "id": "99",
+                    "description": "test",
+                    "date_published": "2024-01-01",
+                    "author": "a",
+                    "type": "remote",
+                    "platform": "linux",
+                    "codes": "CVE-2024-3094",
+                },
+            ]
+        )
         mock_resp = MagicMock()
         mock_resp.read.return_value = csv_data
         mock_resp.__enter__ = lambda s: s
@@ -463,9 +492,14 @@ class TestFetchGithub:
             m = MagicMock()
             return m
 
-        with patch.dict(os.environ, {"GITHUB_TOKEN": "mytoken"}), \
-             patch("manus_use.tools.search_poc_sources.urllib.request.Request", side_effect=capturing_request), \
-             patch("manus_use.tools.search_poc_sources.urllib.request.urlopen", return_value=_make_url_response({"items": []})):
+        with (
+            patch.dict(os.environ, {"GITHUB_TOKEN": "mytoken"}),
+            patch("manus_use.tools.search_poc_sources.urllib.request.Request", side_effect=capturing_request),
+            patch(
+                "manus_use.tools.search_poc_sources.urllib.request.urlopen",
+                return_value=_make_url_response({"items": []}),
+            ),
+        ):
             _fetch_github("CVE-2024-3094")
 
         assert req_calls, "Request was not called"
@@ -589,6 +623,7 @@ class TestAggregatePocResults:
     def _run_with_mocked(self, results_by_source: dict, cve_id: str = "CVE-2024-3094"):
         """Run aggregate_poc_results with all individual _fetch_* functions mocked."""
         from manus_use.tools.search_poc_sources import aggregate_poc_results
+
         all_src = ["trickest", "vulncheck_kev", "exploitdb", "github", "nvd"]
         patches = [
             patch(
@@ -607,64 +642,183 @@ class TestAggregatePocResults:
 
     def test_deduplication_by_normalized_url(self):
         url = "https://github.com/user/repo"
-        r1 = {"source": "trickest", "url": url, "title": "t1", "published": None, "author": None, "tags": [], "exploited_in_wild": False}
-        r2 = {"source": "github", "url": url + "/", "title": "t2", "published": None, "author": None, "tags": [], "exploited_in_wild": False}
+        r1 = {
+            "source": "trickest",
+            "url": url,
+            "title": "t1",
+            "published": None,
+            "author": None,
+            "tags": [],
+            "exploited_in_wild": False,
+        }
+        r2 = {
+            "source": "github",
+            "url": url + "/",
+            "title": "t2",
+            "published": None,
+            "author": None,
+            "tags": [],
+            "exploited_in_wild": False,
+        }
         result = self._run_with_mocked({"trickest": [r1], "github": [r2]})
         assert result["total_found"] == 1
 
     def test_deduplication_strips_git_suffix(self):
         url1 = "https://github.com/user/repo.git"
         url2 = "https://github.com/user/repo"
-        r1 = {"source": "nvd", "url": url1, "title": "t1", "published": None, "author": None, "tags": [], "exploited_in_wild": False}
-        r2 = {"source": "github", "url": url2, "title": "t2", "published": None, "author": None, "tags": [], "exploited_in_wild": False}
+        r1 = {
+            "source": "nvd",
+            "url": url1,
+            "title": "t1",
+            "published": None,
+            "author": None,
+            "tags": [],
+            "exploited_in_wild": False,
+        }
+        r2 = {
+            "source": "github",
+            "url": url2,
+            "title": "t2",
+            "published": None,
+            "author": None,
+            "tags": [],
+            "exploited_in_wild": False,
+        }
         result = self._run_with_mocked({"nvd": [r1], "github": [r2]})
         assert result["total_found"] == 1
 
     def test_exploited_in_wild_flag_merged_on_dedup(self):
         url = "https://github.com/user/repo"
-        r1 = {"source": "github", "url": url, "title": "t1", "published": None, "author": None, "tags": [], "exploited_in_wild": False}
-        r2 = {"source": "vulncheck_kev", "url": url, "title": "t2", "published": None, "author": None, "tags": ["kev"], "exploited_in_wild": True}
+        r1 = {
+            "source": "github",
+            "url": url,
+            "title": "t1",
+            "published": None,
+            "author": None,
+            "tags": [],
+            "exploited_in_wild": False,
+        }
+        r2 = {
+            "source": "vulncheck_kev",
+            "url": url,
+            "title": "t2",
+            "published": None,
+            "author": None,
+            "tags": ["kev"],
+            "exploited_in_wild": True,
+        }
         result = self._run_with_mocked({"github": [r1], "vulncheck_kev": [r2]})
         assert result["total_found"] == 1
         assert result["results"][0]["exploited_in_wild"] is True
 
     def test_sort_kev_first(self):
-        r_kev = {"source": "vulncheck_kev", "url": "https://vulncheck.com/kev/x", "title": "kev", "published": "2020-01-01", "author": None, "tags": ["kev"], "exploited_in_wild": True}
-        r_github = {"source": "github", "url": "https://github.com/u/r", "title": "gh", "published": "2024-04-01", "author": None, "tags": [], "exploited_in_wild": False}
+        r_kev = {
+            "source": "vulncheck_kev",
+            "url": "https://vulncheck.com/kev/x",
+            "title": "kev",
+            "published": "2020-01-01",
+            "author": None,
+            "tags": ["kev"],
+            "exploited_in_wild": True,
+        }
+        r_github = {
+            "source": "github",
+            "url": "https://github.com/u/r",
+            "title": "gh",
+            "published": "2024-04-01",
+            "author": None,
+            "tags": [],
+            "exploited_in_wild": False,
+        }
         result = self._run_with_mocked({"vulncheck_kev": [r_kev], "github": [r_github]})
         assert result["results"][0]["source"] == "vulncheck_kev"
         assert result["exploited_in_wild"] is True
 
     def test_sort_by_date_descending_after_kev(self):
-        r_old = {"source": "github", "url": "https://github.com/u/old", "title": "old", "published": "2020-01-01", "author": None, "tags": [], "exploited_in_wild": False}
-        r_new = {"source": "exploitdb", "url": "https://exploit-db.com/x", "title": "new", "published": "2024-01-01", "author": None, "tags": [], "exploited_in_wild": False}
+        r_old = {
+            "source": "github",
+            "url": "https://github.com/u/old",
+            "title": "old",
+            "published": "2020-01-01",
+            "author": None,
+            "tags": [],
+            "exploited_in_wild": False,
+        }
+        r_new = {
+            "source": "exploitdb",
+            "url": "https://exploit-db.com/x",
+            "title": "new",
+            "published": "2024-01-01",
+            "author": None,
+            "tags": [],
+            "exploited_in_wild": False,
+        }
         result = self._run_with_mocked({"github": [r_old], "exploitdb": [r_new]})
         dates = [r["published"] for r in result["results"]]
         assert dates[0] >= dates[1]
 
     def test_none_dates_sorted_last(self):
-        r_dated = {"source": "github", "url": "https://github.com/u/a", "title": "a", "published": "2024-01-01", "author": None, "tags": [], "exploited_in_wild": False}
-        r_nodated = {"source": "nvd", "url": "https://github.com/u/b", "title": "b", "published": None, "author": None, "tags": [], "exploited_in_wild": False}
+        r_dated = {
+            "source": "github",
+            "url": "https://github.com/u/a",
+            "title": "a",
+            "published": "2024-01-01",
+            "author": None,
+            "tags": [],
+            "exploited_in_wild": False,
+        }
+        r_nodated = {
+            "source": "nvd",
+            "url": "https://github.com/u/b",
+            "title": "b",
+            "published": None,
+            "author": None,
+            "tags": [],
+            "exploited_in_wild": False,
+        }
         result = self._run_with_mocked({"github": [r_dated], "nvd": [r_nodated]})
         last = result["results"][-1]
         assert last["published"] is None
 
     def test_recent_activity_flag(self):
         from datetime import datetime, timezone
+
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        r = {"source": "github", "url": "https://github.com/u/x", "title": "x", "published": today, "author": None, "tags": [], "exploited_in_wild": False}
+        r = {
+            "source": "github",
+            "url": "https://github.com/u/x",
+            "title": "x",
+            "published": today,
+            "author": None,
+            "tags": [],
+            "exploited_in_wild": False,
+        }
         result = self._run_with_mocked({"github": [r]})
         assert result["recent_activity"] is True
 
     def test_no_recent_activity_for_old_dates(self):
-        r = {"source": "nvd", "url": "https://github.com/u/x", "title": "x", "published": "2020-01-01", "author": None, "tags": [], "exploited_in_wild": False}
+        r = {
+            "source": "nvd",
+            "url": "https://github.com/u/x",
+            "title": "x",
+            "published": "2020-01-01",
+            "author": None,
+            "tags": [],
+            "exploited_in_wild": False,
+        }
         result = self._run_with_mocked({"nvd": [r]})
         assert result["recent_activity"] is False
 
     def test_sources_filter(self):
         from manus_use.tools.search_poc_sources import aggregate_poc_results
 
-        with patch("manus_use.tools.search_poc_sources._fetch_trickest", return_value=[]) as mock_t,              patch("manus_use.tools.search_poc_sources._fetch_github", return_value=[]) as mock_g,              patch("manus_use.tools.search_poc_sources._fetch_vulncheck_kev", return_value=[]),              patch("manus_use.tools.search_poc_sources._fetch_exploitdb", return_value=[]),              patch("manus_use.tools.search_poc_sources._fetch_nvd", return_value=[]):
+        with (
+            patch("manus_use.tools.search_poc_sources._fetch_trickest", return_value=[]) as mock_t,
+            patch("manus_use.tools.search_poc_sources._fetch_github", return_value=[]) as mock_g,
+            patch("manus_use.tools.search_poc_sources._fetch_vulncheck_kev", return_value=[]),
+            patch("manus_use.tools.search_poc_sources._fetch_exploitdb", return_value=[]),
+            patch("manus_use.tools.search_poc_sources._fetch_nvd", return_value=[]),
+        ):
             aggregate_poc_results("CVE-2024-3094", sources=["trickest", "github"])
             mock_t.assert_called_once()
             mock_g.assert_called_once()
@@ -672,7 +826,13 @@ class TestAggregatePocResults:
     def test_failed_source_recorded(self):
         from manus_use.tools.search_poc_sources import aggregate_poc_results
 
-        with patch("manus_use.tools.search_poc_sources._fetch_trickest", return_value=[]),              patch("manus_use.tools.search_poc_sources._fetch_vulncheck_kev", return_value=[]),              patch("manus_use.tools.search_poc_sources._fetch_exploitdb", return_value=[]),              patch("manus_use.tools.search_poc_sources._fetch_github", side_effect=RuntimeError("boom")),              patch("manus_use.tools.search_poc_sources._fetch_nvd", return_value=[]):
+        with (
+            patch("manus_use.tools.search_poc_sources._fetch_trickest", return_value=[]),
+            patch("manus_use.tools.search_poc_sources._fetch_vulncheck_kev", return_value=[]),
+            patch("manus_use.tools.search_poc_sources._fetch_exploitdb", return_value=[]),
+            patch("manus_use.tools.search_poc_sources._fetch_github", side_effect=RuntimeError("boom")),
+            patch("manus_use.tools.search_poc_sources._fetch_nvd", return_value=[]),
+        ):
             result = aggregate_poc_results("CVE-2024-3094")
 
         assert "github" in result["sources_failed"]
@@ -707,7 +867,15 @@ class TestSearchPocSourcesTool:
 
         with patch(
             "manus_use.tools.search_poc_sources.aggregate_poc_results",
-            return_value={"cve_id": "CVE-2024-3094", "total_found": 0, "exploited_in_wild": False, "recent_activity": False, "sources_checked": [], "sources_failed": [], "results": []},
+            return_value={
+                "cve_id": "CVE-2024-3094",
+                "total_found": 0,
+                "exploited_in_wild": False,
+                "recent_activity": False,
+                "sources_checked": [],
+                "sources_failed": [],
+                "results": [],
+            },
         ) as mock_agg:
             search_poc_sources(cve_id="CVE-2024-3094")
             mock_agg.assert_called_once_with("CVE-2024-3094", None)
@@ -717,7 +885,15 @@ class TestSearchPocSourcesTool:
 
         with patch(
             "manus_use.tools.search_poc_sources.aggregate_poc_results",
-            return_value={"cve_id": "CVE-2024-3094", "total_found": 0, "exploited_in_wild": False, "recent_activity": False, "sources_checked": [], "sources_failed": [], "results": []},
+            return_value={
+                "cve_id": "CVE-2024-3094",
+                "total_found": 0,
+                "exploited_in_wild": False,
+                "recent_activity": False,
+                "sources_checked": [],
+                "sources_failed": [],
+                "results": [],
+            },
         ) as mock_agg:
             search_poc_sources(cve_id="CVE-2024-3094", sources="trickest,github")
             mock_agg.assert_called_once_with("CVE-2024-3094", ["trickest", "github"])
@@ -727,7 +903,15 @@ class TestSearchPocSourcesTool:
 
         with patch(
             "manus_use.tools.search_poc_sources.aggregate_poc_results",
-            return_value={"cve_id": "CVE-2024-3094", "total_found": 0, "exploited_in_wild": False, "recent_activity": False, "sources_checked": [], "sources_failed": [], "results": []},
+            return_value={
+                "cve_id": "CVE-2024-3094",
+                "total_found": 0,
+                "exploited_in_wild": False,
+                "recent_activity": False,
+                "sources_checked": [],
+                "sources_failed": [],
+                "results": [],
+            },
         ) as mock_agg:
             search_poc_sources(cve_id="CVE-2024-3094", sources="")
             mock_agg.assert_called_once_with("CVE-2024-3094", None)
@@ -737,7 +921,15 @@ class TestSearchPocSourcesTool:
 
         with patch(
             "manus_use.tools.search_poc_sources.aggregate_poc_results",
-            return_value={"cve_id": "CVE-2024-3094", "total_found": 0, "exploited_in_wild": False, "recent_activity": False, "sources_checked": [], "sources_failed": [], "results": []},
+            return_value={
+                "cve_id": "CVE-2024-3094",
+                "total_found": 0,
+                "exploited_in_wild": False,
+                "recent_activity": False,
+                "sources_checked": [],
+                "sources_failed": [],
+                "results": [],
+            },
         ) as mock_agg:
             search_poc_sources(cve_id="  CVE-2024-3094  ")
             call_args = mock_agg.call_args[0][0]
@@ -926,4 +1118,3 @@ class TestViAgentWiring:
         import manus_use.agents.vi_agent as vi
 
         assert "exploited_in_wild" in vi.SYSTEM_PROMPT
-

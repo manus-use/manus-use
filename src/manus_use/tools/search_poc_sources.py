@@ -41,16 +41,12 @@ logger = logging.getLogger(__name__)
 
 _CVE_RE = re.compile(r"^CVE-(\d{4})-\d+$", re.IGNORECASE)
 _EXPLOITDB_CACHE = "/tmp/exploitdb_cache.csv"
-_EXPLOITDB_CSV_URL = (
-    "https://gitlab.com/exploit-database/exploitdb/-/raw/main/files_exploits.csv"
-)
+_EXPLOITDB_CSV_URL = "https://gitlab.com/exploit-database/exploitdb/-/raw/main/files_exploits.csv"
 _EXPLOITDB_CACHE_TTL = 86_400  # 24 hours in seconds
 _GITHUB_API = "https://api.github.com"
 _NVD_API = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 _VULNCHECK_KEV = "https://api.vulncheck.com/v3/index/vulncheck-kev"
-_POC_URL_PATTERNS = re.compile(
-    r"(github\.com|exploit-db\.com|packetstormsecurity\.com)", re.IGNORECASE
-)
+_POC_URL_PATTERNS = re.compile(r"(github\.com|exploit-db\.com|packetstormsecurity\.com)", re.IGNORECASE)
 _REQUEST_TIMEOUT = 20  # seconds
 
 # ---------------------------------------------------------------------------
@@ -112,9 +108,7 @@ def _fetch_trickest(cve_id: str) -> list[dict]:
 
     # Fetch the year subtree (non-recursive — just list CVE folders)
     try:
-        year_tree = _get(
-            f"https://api.github.com/repos/trickest/cve/git/trees/{year_sha}"
-        )
+        year_tree = _get(f"https://api.github.com/repos/trickest/cve/git/trees/{year_sha}")
     except Exception as exc:
         logger.debug("trickest year tree fetch failed: %s", exc)
         return results
@@ -200,9 +194,7 @@ def _ensure_exploitdb_cache() -> str | None:
         pass
 
     try:
-        req = urllib.request.Request(
-            _EXPLOITDB_CSV_URL, headers={"User-Agent": "manus-use"}
-        )
+        req = urllib.request.Request(_EXPLOITDB_CSV_URL, headers={"User-Agent": "manus-use"})
         with urllib.request.urlopen(req, timeout=_REQUEST_TIMEOUT) as resp:
             data = resp.read()
         with open(cache_path, "wb") as fh:
@@ -230,14 +222,8 @@ def _fetch_exploitdb(cve_id: str) -> list[dict]:
                     continue
                 edb_id = (row.get("id") or "").strip()
                 title = (row.get("description") or row.get("title") or "").strip()
-                date_str = (
-                    row.get("date_published") or row.get("date") or ""
-                ).strip()
-                url = (
-                    f"https://www.exploit-db.com/exploits/{edb_id}"
-                    if edb_id
-                    else "https://www.exploit-db.com"
-                )
+                date_str = (row.get("date_published") or row.get("date") or "").strip()
+                url = f"https://www.exploit-db.com/exploits/{edb_id}" if edb_id else "https://www.exploit-db.com"
                 etype = (row.get("type") or "").strip().lower()
                 platform = (row.get("platform") or "").strip().lower()
                 tags = [t for t in [etype, platform] if t]
@@ -266,10 +252,7 @@ def _fetch_exploitdb(cve_id: str) -> list[dict]:
 def _fetch_github(cve_id: str) -> list[dict]:
     """Search GitHub repositories mentioning the CVE ID."""
     query = urllib.parse.quote(cve_id)
-    url = (
-        f"{_GITHUB_API}/search/repositories"
-        f"?q={query}&sort=updated&per_page=5"
-    )
+    url = f"{_GITHUB_API}/search/repositories?q={query}&sort=updated&per_page=5"
     headers = {"Accept": "application/vnd.github+json"}
     gh_token = os.environ.get("GITHUB_TOKEN", "")
     if gh_token:
@@ -355,9 +338,11 @@ _SOURCE_FN_NAMES = {
     "nvd": "_fetch_nvd",
 }
 
+
 def _get_source_fn(source: str):
     """Resolve a source fetcher by name from this module (supports test patching)."""
     import manus_use.tools.search_poc_sources as _self
+
     attr = _SOURCE_FN_NAMES.get(source)
     if attr is None:
         return None
@@ -397,11 +382,7 @@ def aggregate_poc_results(
     sources_failed: list[str] = []
 
     with ThreadPoolExecutor(max_workers=max(1, len(sources))) as pool:
-        futures = {
-            pool.submit(_get_source_fn(s), cve_id): s
-            for s in sources
-            if _get_source_fn(s) is not None
-        }
+        futures = {pool.submit(_get_source_fn(s), cve_id): s for s in sources if _get_source_fn(s) is not None}
         for future in as_completed(futures):
             src = futures[future]
             sources_checked.append(src)

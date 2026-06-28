@@ -1368,8 +1368,7 @@ def _build_poc_search_parser() -> argparse.ArgumentParser:
         default="",
         metavar="LIST",
         help=(
-            "Comma-separated sources to query "
-            "(default: all). Valid values: trickest,vulncheck_kev,exploitdb,github,nvd"
+            "Comma-separated sources to query (default: all). Valid values: trickest,vulncheck_kev,exploitdb,github,nvd"
         ),
     )
     return p
@@ -1436,13 +1435,7 @@ def _run_poc_search(argv: list[str]) -> int:  # noqa: C901
     col_date = 12
     col_url = 70
 
-    header = (
-        f"{'Source':<{col_src}}  "
-        f"{'Exploited?':<{col_eaw}}  "
-        f"{'Title':<{col_title}}  "
-        f"{'Date':<{col_date}}  "
-        f"URL"
-    )
+    header = f"{'Source':<{col_src}}  {'Exploited?':<{col_eaw}}  {'Title':<{col_title}}  {'Date':<{col_date}}  URL"
     print(header)
     print("-" * (col_src + col_eaw + col_title + col_date + col_url + 8))
 
@@ -1452,13 +1445,7 @@ def _run_poc_search(argv: list[str]) -> int:  # noqa: C901
         title = (r.get("title") or "")[:col_title]
         date = (r.get("published") or "")[:col_date]
         url = (r.get("url") or "")[:col_url]
-        print(
-            f"{src:<{col_src}}  "
-            f"{eaw_flag:<{col_eaw}}  "
-            f"{title:<{col_title}}  "
-            f"{date:<{col_date}}  "
-            f"{url}"
-        )
+        print(f"{src:<{col_src}}  {eaw_flag:<{col_eaw}}  {title:<{col_title}}  {date:<{col_date}}  {url}")
 
     return 0
 
