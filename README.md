@@ -235,6 +235,41 @@ having to read the raw diff yourself. Composable with `analyze` and `epss-trend`
 |------|---------|-------------|
 | `--output {text,json}` | `text` | Output format; `json` includes the full commit summary |
 
+### `manus-use poc-freshness <CVE-ID>` — PoC repository freshness check
+
+```bash
+# Check whether PoC repos for a CVE are still actively maintained
+manus-use poc-freshness CVE-2024-3094
+
+# Override the "active" threshold (default: 90 days)
+manus-use poc-freshness CVE-2024-3094 --days 30
+
+# Machine-readable output
+manus-use poc-freshness CVE-2024-3094 --output json
+```
+
+For each discovered PoC repository (sources: trickest/cve index + NVD references),
+reports one of six states:
+
+| Status | Meaning |
+|--------|---------|
+| `active` | Commits within the last `--days` days — attacker is still maintaining it |
+| `framework` | ≥5 contributors, ≥50 commits, ≥10 watchers — grew into a full exploit toolkit |
+| `stale` | Exists but no recent activity |
+| `archived` | Explicitly archived by the owner |
+| `deleted` | 404 / gone |
+| `non_github` | Non-GitHub URL; HTTP status checked |
+
+Active or framework repos trigger a `WARNING: ACTIVE PoC ACTIVITY DETECTED` banner.
+Set `GITHUB_TOKEN` / `GH_TOKEN` for higher GitHub API rate limits.
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--days N` | `90` | Days within which a last commit counts as active |
+| `--output {text,json}` | `text` | Output format |
+
 ### `manus-use variants <CVE-ID>` — Variant analysis
 
 ```bash
