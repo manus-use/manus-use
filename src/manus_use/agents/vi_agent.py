@@ -94,6 +94,13 @@ Your process is optimized to build a comprehensive picture from authoritative, f
   - A direct link to the commit on GitHub.
   If no commit is found (private repo or non-GitHub), note this and proceed.
 
+**Step 6b: PoC Freshness Check**
+- Call `check_poc_freshness` with the CVE ID (default active_days=90). Include in the report:
+  - How many PoC repos are **active** (commits in last 90 days), **stale**, **archived**, **deleted**, or have grown into a **framework**.
+  - If any repos are active or framework-status, flag this prominently as **ACTIVE PoC ACTIVITY** — it signals the attacker community is still investing in weaponising the bug.
+  - List the per-repo status table (url, status, last_commit_date, stars).
+  If no PoC repos are found, note the absence and proceed.
+
 **Step 7: Analyze Weakness**
 - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -184,6 +191,7 @@ class VulnerabilityIntelligenceAgent:
             from strands import Agent
             from strands_tools import current_time
 
+            from manus_use.tools.check_poc_freshness import check_poc_freshness
             from manus_use.tools.get_epss_trend import get_epss_trend
             from manus_use.tools.get_github_advisory import get_github_advisory
             from manus_use.tools.get_patch_diff import get_patch_diff
@@ -240,6 +248,7 @@ class VulnerabilityIntelligenceAgent:
             "manus_use.tools.verify_exploit",
             get_epss_trend,
             get_patch_diff,
+            check_poc_freshness,
         ]
         if use_browser is not None:
             tools.append(use_browser)

@@ -1052,6 +1052,7 @@ _SUBCOMMANDS = {
     "epss-trend",
     "patch-diff",
     "compare",
+    "poc-freshness",
 }
 
 
@@ -1289,6 +1290,57 @@ def _run_compare(argv: list[str]) -> int:
 
     # Text output
     print(_render_text(comparison))
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# poc-freshness subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_poc_freshness_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="manus-use poc-freshness",
+        description=(
+            "Check the freshness of all known public PoC repositories for a CVE. "
+            "Reports per-repo status: active / stale / archived / deleted / framework."
+        ),
+    )
+    parser.add_argument("cve_id", metavar="CVE-ID", help="CVE identifier, e.g. CVE-2024-3094")
+    parser.add_argument(
+        "--days",
+        dest="active_days",
+        type=int,
+        default=90,
+        help="Days within which a last commit counts as active (default: 90)",
+    )
+    parser.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return parser
+
+
+def _run_poc_freshness(argv: list[str]) -> int:
+    parser = _build_poc_freshness_parser()
+    args = parser.parse_args(argv)
+    cve_id: str = args.cve_id.strip().upper()
+    try:
+        from manus_use.tools.check_poc_freshness import check_poc_freshness
+    except ImportError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    result = check_poc_freshness(cve_id=cve_id, active_days=args.active_days)
+    if args.output == "json":
+        import json
+
+        # Parse the text report and emit a JSON summary
+        # The tool returns structured text; wrap it for JSON consumers
+        print(json.dumps({"cve_id": cve_id, "active_days": args.active_days, "report": result}))
+    else:
+        print(result)
     return 0
 
 
@@ -1599,6 +1651,10 @@ def main() -> None:
     if first_positional == "compare":
         idx = argv.index("compare")
         sys.exit(_run_compare(argv[idx + 1 :]))
+
+    if first_positional == "poc-freshness":
+        idx = argv.index("poc-freshness")
+        sys.exit(_run_poc_freshness(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")
