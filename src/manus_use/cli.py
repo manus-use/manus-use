@@ -1055,6 +1055,7 @@ _SUBCOMMANDS = {
     "exploit-complexity",
     "poc-search",
     "changelog",
+    "blast-radius",
 }
 
 
@@ -1686,6 +1687,178 @@ def _run_changelog_generate(args: argparse.Namespace, root: "_Path") -> int:  # 
     return 0
 
 
+# ---------------------------------------------------------------------------
+# blast-radius subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_blast_radius_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-use blast-radius",
+        description=(
+            "Estimate the downstream blast radius of a vulnerable package or CVE.\n"
+            "Given a package spec (requests@2.28.0, npm:axios@1.6.0, CVE-2021-44228),\n"
+            "reports dependent-package counts and download stats for all affected packages."
+        ),
+        add_help=True,
+    )
+    p.add_argument(
+        "spec",
+        metavar="SPEC",
+        help=(
+            "Package spec (name@version, ecosystem:name@version) or CVE ID. "
+            "Examples: requests@2.28.0  npm:lodash@4.17.20  CVE-2021-44228"
+        ),
+    )
+    p.add_argument(
+        "--max-packages",
+        type=int,
+        default=10,
+        metavar="N",
+        help="Maximum number of affected packages to enrich with stats (default: 10)",
+    )
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return p
+
+
+def _run_blast_radius(argv: list[str]) -> int:
+    import json as _json
+
+    parser = _build_blast_radius_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        from manus_use.tools.get_dependency_blast_radius import (
+            _ECOSYSTEM_LABEL,
+            _blast_score,
+            _enrich_package,
+            _fetch_ghsa_affected,
+            _fetch_nvd_affected,
+            _fetch_osv_affected,
+            _parse_input,
+        )
+    except ImportError as exc:  # pragma: no cover
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    spec = args.spec.strip()
+    max_packages = args.max_packages
+
+    try:
+        parsed = _parse_input(spec)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    all_packages: list[dict] = []
+    cve_id_label = ""
+
+    if parsed["kind"] == "cve":
+        cve_id_label = parsed["cve_id"]
+        nvd_pkgs = _fetch_nvd_affected(cve_id_label)
+        osv_pkgs = _fetch_osv_affected(cve_id_label)
+        ghsa_pkgs = _fetch_ghsa_affected(cve_id_label)
+
+        seen: dict[tuple, dict] = {}
+        for pkg in osv_pkgs + ghsa_pkgs + nvd_pkgs:
+            key = (pkg["name"].lower(), (pkg.get("ecosystem") or "").lower())
+            if key not in seen:
+                seen[key] = pkg
+        all_packages = list(seen.values())[:max_packages]
+    else:
+        all_packages = [
+            {
+                "name": parsed["name"],
+                "ecosystem": parsed["ecosystem"] or "",
+                "version_range": parsed["version"] or "all",
+                "source": "direct",
+            }
+        ]
+
+    if not all_packages:
+        print(f"No affected package records found for {spec!r}.")
+        return 1
+
+    enriched: list[dict] = []
+    for pkg in all_packages:
+        stats = _enrich_package(pkg["name"], pkg.get("ecosystem", ""))
+        stats["version_range"] = pkg.get("version_range", "")
+        stats["source"] = pkg.get("source", "")
+        stats["blast_radius"] = _blast_score(stats)
+        enriched.append(stats)
+
+    _sev = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "UNKNOWN": 4}
+    enriched.sort(key=lambda r: _sev.get(r.get("blast_radius", "UNKNOWN"), 4))
+
+    if args.output == "json":
+        out = {
+            "spec": spec,
+            "cve_id": cve_id_label or None,
+            "packages": enriched,
+            "summary": {
+                "highest_blast_radius": enriched[0].get("blast_radius") if enriched else None,
+                "total_packages": len(enriched),
+                "total_weekly_downloads": sum(
+                    r.get("weekly_downloads") or 0 for r in enriched if r.get("weekly_downloads") is not None
+                ),
+                "total_dependent_packages": sum(r.get("dependent_packages_count") or 0 for r in enriched),
+            },
+        }
+        print(_json.dumps(out, indent=2))
+        return 0
+
+    # Text output
+    title = cve_id_label or spec
+    print()
+    print(f"Dependency Blast Radius — {title}")
+    print("=" * 60)
+    print(f"Affected packages found: {len(enriched)}")
+    print()
+
+    for i, r in enumerate(enriched):
+        eco = r.get("ecosystem") or "Unknown"
+        eco_label = _ECOSYSTEM_LABEL.get(eco, eco)
+        pkg_name = r.get("package_name") or r.get("name", "unknown")
+        blast = r.get("blast_radius", "UNKNOWN")
+        ver_range = r.get("version_range", "")
+
+        print(f"[{i + 1}] {pkg_name}  ({eco_label})")
+        print(f"    Blast radius:     {blast}")
+        if ver_range:
+            print(f"    Vulnerable range: {ver_range}")
+        if r.get("dependent_packages_count") is not None:
+            print(f"    npm dependents:   {r['dependent_packages_count']:,}")
+        if r.get("weekly_downloads") is not None:
+            print(f"    Weekly downloads: {r['weekly_downloads']:,}")
+        if r.get("monthly_downloads") is not None:
+            print(f"    Monthly downloads:{r['monthly_downloads']:,}")
+        if r.get("latest_version"):
+            print(f"    Latest version:   {r['latest_version']}")
+        if r.get("full_id"):
+            print(f"    Maven artifact:   {r['full_id']}")
+        if r.get("description"):
+            print(f"    Description:      {r['description'][:80]}")
+        print()
+
+    # Summary
+    top_blast = enriched[0].get("blast_radius", "UNKNOWN") if enriched else "UNKNOWN"
+    top_pkg = enriched[0].get("package_name", "") if enriched else ""
+    print(f"Summary: highest blast radius is {top_blast} ({top_pkg})")
+    total_weekly = sum(r.get("weekly_downloads") or 0 for r in enriched if r.get("weekly_downloads") is not None)
+    total_dep = sum(r.get("dependent_packages_count") or 0 for r in enriched)
+    if total_weekly:
+        print(f"         Total weekly downloads: {total_weekly:,}")
+    if total_dep:
+        print(f"         Total npm dependents:   {total_dep:,}")
+
+    return 0
+
+
 def _build_run_parser() -> argparse.ArgumentParser:
     """Build the top-level run/interactive parser."""
     parser = argparse.ArgumentParser(
@@ -2011,6 +2184,10 @@ def main() -> None:
     if first_positional == "changelog":
         idx = argv.index("changelog")
         sys.exit(_run_changelog(argv[idx + 1 :]))
+
+    if first_positional == "blast-radius":
+        idx = argv.index("blast-radius")
+        sys.exit(_run_blast_radius(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")

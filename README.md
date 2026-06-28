@@ -425,6 +425,55 @@ CLI subcommands are tracked in open PRs and will merge shortly.
 | `manus-use cluster-variants <CVE-ID>` | [#67](https://github.com/manus-use/manus-use/pull/67) | CVE variant cluster analysis — groups related CVEs by same component, same CWE, and same researcher/disclosure domain |
 
 
+### `manus-use blast-radius <SPEC>` — Dependency blast radius
+
+```bash
+# Estimate exposure for a specific package version
+manus-use blast-radius requests@2.28.0
+
+# Qualify the ecosystem explicitly
+manus-use blast-radius pypi:urllib3@1.26.5
+manus-use blast-radius npm:lodash@4.17.20
+manus-use blast-radius maven:log4j-core@2.14.1
+
+# Start from a CVE — auto-discovers all affected packages
+manus-use blast-radius CVE-2021-44228
+
+# Machine-readable output
+manus-use blast-radius CVE-2021-44228 --output json | jq .summary
+manus-use blast-radius CVE-2021-44228 --output json | jq '.packages[0].blast_radius'
+```
+
+For a given package or CVE, this command estimates how broadly a vulnerability
+can propagate by measuring downstream exposure:
+
+| Metric | Source |
+|---|---|
+| npm dependent packages | npm search API (no key required) |
+| npm weekly / monthly downloads | npm downloads API |
+| PyPI package metadata + downloads | PyPI JSON API + pypistats.org |
+| Maven artifact metadata | Maven Central Solr search |
+| Affected packages / version ranges | NVD + OSV.dev + GitHub Advisory DB |
+
+Blast-radius labels:
+
+| Label | Weekly downloads or npm dependents |
+|---|---|
+| **CRITICAL** | ≥ 5 M downloads or ≥ 50 K dependents |
+| **HIGH** | ≥ 500 K downloads or ≥ 5 K dependents |
+| **MEDIUM** | ≥ 50 K downloads or ≥ 500 dependents |
+| **LOW** | any measurable signal |
+| **UNKNOWN** | no data available |
+
+Composable with `epss-trend`, `exploit-complexity`, and `analyze` to answer:
+*"CVSS 9.8 + EPSS spike + CRITICAL blast radius = patch immediately."*
+
+| Flag | Default | Description |
+|---|---|---|
+| `--max-packages N` | 10 | Max affected packages to enrich |
+| `--output {text,json}` | `text` | Output format |
+
+
 ### `manus-use history` — Browse past runs
 
 ```bash
@@ -652,6 +701,11 @@ manus-use exploit-complexity CVE-2024-3094 --output json | jq .attacker_friendly
 # Find PoC exploits across five public sources in parallel
 manus-use poc-search CVE-2024-3094
 manus-use poc-search CVE-2024-3094 --output json | jq .exploited_in_wild
+
+# Estimate how many downstream packages are exposed to a CVE
+manus-use blast-radius CVE-2021-44228
+manus-use blast-radius requests@2.28.0
+manus-use blast-radius CVE-2021-44228 --output json | jq .summary
 
 # Discover new high-EPSS CVEs from the last 2 weeks
 manus-use discover --since 2025-06-12 --min-epss 0.6

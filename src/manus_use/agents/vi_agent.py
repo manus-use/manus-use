@@ -111,6 +111,15 @@ Your process is optimized to build a comprehensive picture from authoritative, f
   - Whether the score was derived from PoC code analysis or NVD CVSS vector only.
   This score contextualises raw CVSS severity: a CVSS 9.8 with complexity_score=1.5 is far more urgent than the same CVSS with complexity_score=4.5.
 
+
+**Step 6c: Dependency Blast Radius**
+- Call `get_dependency_blast_radius` with the CVE ID. Include in the report:
+  - The blast-radius label (CRITICAL / HIGH / MEDIUM / LOW) for each affected package.
+  - The total weekly downloads and dependent-package count for the most-exposed package.
+  - The ecosystems affected (PyPI, npm, Maven, etc.).
+  Use this to answer: *"how many downstream projects are exposed to this vulnerability?"*
+  A CRITICAL blast radius (>5M weekly downloads or >50K npm dependents) should be flagged prominently.
+
 **Step 7: Analyze Weakness**
 - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -207,6 +216,7 @@ class VulnerabilityIntelligenceAgent:
             from manus_use.tools.get_poc_week import get_poc_week
             from manus_use.tools.get_trickest_pocs import get_trickest_pocs
             from manus_use.tools.get_vulncheck_data import get_vulncheck_data
+            from manus_use.tools.get_dependency_blast_radius import get_dependency_blast_radius
             from manus_use.tools.score_exploit_complexity import score_exploit_complexity
             from manus_use.tools.search_poc_sources import search_poc_sources
         except ImportError as exc:  # pragma: no cover - depends on env
@@ -263,6 +273,7 @@ class VulnerabilityIntelligenceAgent:
             score_exploit_complexity,
             get_vulncheck_data,
             search_poc_sources,
+            get_dependency_blast_radius,
         ]
         if use_browser is not None:
             tools.append(use_browser)
