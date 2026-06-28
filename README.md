@@ -383,6 +383,70 @@ confirms the CVE is actively exploited in the wild.
 | `--sources LIST` | all | Comma-separated subset: `trickest,vulncheck_kev,exploitdb,github,nvd` |
 
 
+### `manus-use sbom-scan <SBOM_FILE>` — SBOM vulnerability scanner
+
+```bash
+# Scan a CycloneDX JSON SBOM for known CVEs
+manus-use sbom-scan bom.json
+
+# Scan a CycloneDX XML SBOM
+manus-use sbom-scan bom.xml
+
+# SPDX JSON format is also supported
+manus-use sbom-scan sbom.spdx.json
+
+# Machine-readable output
+manus-use sbom-scan bom.json --output json | jq '.findings[] | select(.in_kev)'
+
+# Limit output to top 20 findings
+manus-use sbom-scan bom.json --max-findings 20
+```
+
+Parses every component in your SBOM, queries **OSV.dev** for known
+vulnerabilities, enriches results with **EPSS** exploitation-probability
+scores, and cross-references the **CISA KEV** catalog for active-exploitation
+status. Findings are ranked by criticality: KEV hits first, then by EPSS score.
+
+**Supported SBOM formats:**
+
+| Format | Detection |
+|---|---|
+| CycloneDX JSON | `bomFormat: "CycloneDX"` or `components` key |
+| CycloneDX XML | `<bom>` root element with any CycloneDX namespace |
+| SPDX 2.x JSON | `spdxVersion` or `packages` key |
+
+**Output fields per finding:**
+
+| Field | Description |
+|---|---|
+| `component` | `name@version` string |
+| `purl` | Package URL from the SBOM |
+| `cve_ids` | CVE IDs associated with this component |
+| `epss_max` | Highest EPSS score among all CVEs (0–1) |
+| `in_kev` | `true` if any CVE is in CISA KEV |
+| `severity_label` | `CRITICAL` / `HIGH` / `MEDIUM` / `LOW` / `INFO` |
+| `osv_ids` | Raw OSV IDs (GHSA-..., PYSEC-...) including those without a CVE |
+
+**Severity classification:**
+
+| Label | Condition |
+|---|---|
+| `CRITICAL` | `in_kev = true` OR `epss ≥ 0.50` |
+| `HIGH` | `epss ≥ 0.10` |
+| `MEDIUM` | `epss ≥ 0.01` |
+| `LOW` | `epss ≥ 0.001` |
+| `INFO` | No EPSS data or below threshold |
+
+All three data sources are queried without authentication:
+[OSV.dev](https://osv.dev), [FIRST EPSS](https://api.first.org/data/v1/epss),
+[CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog).
+
+| Flag | Default | Description |
+|---|---|---|
+| `--output {text,json}` | `text` | Output format |
+| `--max-findings N` | `50` | Maximum findings to display |
+
+
 ### `manus-use history` — Browse past runs
 
 ```bash

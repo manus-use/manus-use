@@ -1054,6 +1054,7 @@ _SUBCOMMANDS = {
     "compare",
     "exploit-complexity",
     "poc-search",
+    "sbom-scan",
 }
 
 
@@ -1450,6 +1451,87 @@ def _run_poc_search(argv: list[str]) -> int:  # noqa: C901
     return 0
 
 
+# ---------------------------------------------------------------------------
+# sbom-scan subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_sbom_scan_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-use sbom-scan",
+        description=(
+            "Scan a Software Bill of Materials (SBOM) for known vulnerabilities.\n"
+            "Supports CycloneDX JSON/XML and SPDX JSON formats.\n\n"
+            "Components are checked against OSV.dev, EPSS scores are fetched from\n"
+            "api.first.org, and CISA KEV is used to flag actively-exploited CVEs.\n"
+            "Findings are ranked by EPSS score (highest = most likely exploited)."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=True,
+    )
+    p.add_argument(
+        "sbom_file",
+        metavar="SBOM_FILE",
+        help="Path to the SBOM file (CycloneDX JSON/XML or SPDX JSON)",
+    )
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    p.add_argument(
+        "--max-findings",
+        type=int,
+        default=50,
+        metavar="N",
+        help="Maximum number of findings to display (default: 50)",
+    )
+    return p
+
+
+def _run_sbom_scan(argv: list[str]) -> int:
+    import json as _json
+    import sys as _sys
+    from pathlib import Path
+
+    parser = _build_sbom_scan_parser()
+    args = parser.parse_args(argv)
+
+    sbom_path = Path(args.sbom_file)
+    if not sbom_path.exists():
+        print(f"Error: SBOM file not found: {sbom_path}", file=_sys.stderr)
+        return 1
+
+    try:
+        sbom_content = sbom_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"Error reading SBOM file: {exc}", file=_sys.stderr)
+        return 1
+
+    try:
+        from manus_use.tools.scan_sbom import _render_text, _run_scan
+    except ImportError as exc:  # pragma: no cover
+        print(f"Error: {exc}", file=_sys.stderr)
+        return 1
+
+    try:
+        result = _run_scan(sbom_content, max_findings=args.max_findings)
+    except ValueError as exc:
+        print(f"Error parsing SBOM: {exc}", file=_sys.stderr)
+        return 1
+    except Exception as exc:  # noqa: BLE001
+        print(f"Scan failed: {exc}", file=_sys.stderr)
+        return 1
+
+    if args.output == "json":
+        print(_json.dumps(result, indent=2))
+        return 0
+
+    print(_render_text(result))
+    return 0
+
+
 def _build_run_parser() -> argparse.ArgumentParser:
     """Build the top-level run/interactive parser."""
     parser = argparse.ArgumentParser(
@@ -1492,6 +1574,11 @@ def _build_run_parser() -> argparse.ArgumentParser:
             "  # CVE remediation guidance\n"
             "  manus-use remediate CVE-2024-3094\n"
             "  manus-use remediate CVE-2024-3094 --output json\n"
+            "\n"
+            "  # SBOM vulnerability scan\n"
+            "  manus-use sbom-scan bom.json\n"
+            "  manus-use sbom-scan bom.xml --output json\n"
+            "  manus-use sbom-scan bom.json --max-findings 20\n"
         ),
     )
     parser.add_argument(
@@ -1765,6 +1852,10 @@ def main() -> None:
     if first_positional == "poc-search":
         idx = argv.index("poc-search")
         sys.exit(_run_poc_search(argv[idx + 1 :]))
+
+    if first_positional == "sbom-scan":
+        idx = argv.index("sbom-scan")
+        sys.exit(_run_sbom_scan(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")

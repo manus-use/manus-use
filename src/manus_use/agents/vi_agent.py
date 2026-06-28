@@ -111,6 +111,9 @@ Your process is optimized to build a comprehensive picture from authoritative, f
   - Whether the score was derived from PoC code analysis or NVD CVSS vector only.
   This score contextualises raw CVSS severity: a CVSS 9.8 with complexity_score=1.5 is far more urgent than the same CVSS with complexity_score=4.5.
 
+**Step 6c: SBOM Exposure Check (optional)**
+- If the user has provided an SBOM file or its contents alongside the CVE request, call `scan_sbom` with the SBOM content. This shows which components in the target project are directly exposed to the CVE. Include in the report: total components scanned, vulnerable component count, and any CISA KEV hits. If no SBOM is provided, skip this step.
+
 **Step 7: Analyze Weakness**
 - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -207,6 +210,7 @@ class VulnerabilityIntelligenceAgent:
             from manus_use.tools.get_poc_week import get_poc_week
             from manus_use.tools.get_trickest_pocs import get_trickest_pocs
             from manus_use.tools.get_vulncheck_data import get_vulncheck_data
+            from manus_use.tools.scan_sbom import scan_sbom
             from manus_use.tools.score_exploit_complexity import score_exploit_complexity
             from manus_use.tools.search_poc_sources import search_poc_sources
         except ImportError as exc:  # pragma: no cover - depends on env
@@ -263,6 +267,7 @@ class VulnerabilityIntelligenceAgent:
             score_exploit_complexity,
             get_vulncheck_data,
             search_poc_sources,
+            scan_sbom,
         ]
         if use_browser is not None:
             tools.append(use_browser)
