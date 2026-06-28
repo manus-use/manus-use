@@ -94,6 +94,14 @@ Your process is optimized to build a comprehensive picture from authoritative, f
   - A direct link to the commit on GitHub.
   If no commit is found (private repo or non-GitHub), note this and proceed.
 
+**Step 6b: Exploit Complexity Scoring**
+- Call `score_exploit_complexity` with the CVE ID. Include in the report:
+  - The overall complexity score (1–5) and label (trivial / low / moderate / high / very_high).
+  - The `attacker_friendly` flag — if True, flag prominently that this CVE is easy to weaponise.
+  - Per-dimension breakdown: lines of code, authentication required, network hops, OS/platform dependencies, exploit chain length.
+  - Whether the score was derived from PoC code analysis or NVD CVSS vector only.
+  This score contextualises raw CVSS severity: a CVSS 9.8 with complexity_score=1.5 is far more urgent than the same CVSS with complexity_score=4.5.
+
 **Step 7: Analyze Weakness**
 - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -189,6 +197,7 @@ class VulnerabilityIntelligenceAgent:
             from manus_use.tools.get_patch_diff import get_patch_diff
             from manus_use.tools.get_poc_week import get_poc_week
             from manus_use.tools.get_trickest_pocs import get_trickest_pocs
+            from manus_use.tools.score_exploit_complexity import score_exploit_complexity
         except ImportError as exc:  # pragma: no cover - depends on env
             raise ImportError(
                 "VulnerabilityIntelligenceAgent requires the optional 'strands' "
@@ -240,6 +249,7 @@ class VulnerabilityIntelligenceAgent:
             "manus_use.tools.verify_exploit",
             get_epss_trend,
             get_patch_diff,
+            score_exploit_complexity,
         ]
         if use_browser is not None:
             tools.append(use_browser)

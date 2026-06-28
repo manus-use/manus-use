@@ -1052,6 +1052,7 @@ _SUBCOMMANDS = {
     "epss-trend",
     "patch-diff",
     "compare",
+    "exploit-complexity",
 }
 
 
@@ -1289,6 +1290,54 @@ def _run_compare(argv: list[str]) -> int:
 
     # Text output
     print(_render_text(comparison))
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# exploit-complexity subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_exploit_complexity_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="manus-use exploit-complexity",
+        description="Score the practical complexity of exploiting a CVE (1=trivial, 5=very hard).",
+    )
+    parser.add_argument("cve_id", metavar="CVE-ID", help="CVE identifier (e.g. CVE-2024-3094)")
+    parser.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return parser
+
+
+def _run_exploit_complexity(argv: list[str]) -> int:
+    parser = _build_exploit_complexity_parser()
+    args = parser.parse_args(argv)
+
+    cve_id: str = args.cve_id.strip()
+    import re as _re
+
+    if not _re.match(r"CVE-\d{4}-\d+", cve_id, _re.IGNORECASE):
+        parser.error(f"Invalid CVE ID: {cve_id!r}. Expected format: CVE-YYYY-NNNNN")
+
+    try:
+        from manus_use.tools.score_exploit_complexity import _render_text, _run_scoring
+    except ImportError as exc:  # pragma: no cover
+        print(f"Error: failed to import score_exploit_complexity: {exc}", file=__import__("sys").stderr)
+        return 1
+
+    result = _run_scoring(cve_id)
+
+    if args.output == "json":
+        import json as _json
+
+        print(_json.dumps(result, indent=2))
+        return 0
+
+    print(_render_text(result))
     return 0
 
 
@@ -1599,6 +1648,10 @@ def main() -> None:
     if first_positional == "compare":
         idx = argv.index("compare")
         sys.exit(_run_compare(argv[idx + 1 :]))
+
+    if first_positional == "exploit-complexity":
+        idx = argv.index("exploit-complexity")
+        sys.exit(_run_exploit_complexity(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")
