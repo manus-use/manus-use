@@ -3,7 +3,7 @@
 This module provides :class:`VulnerabilityIntelligenceAgent`, a Strands-based
 agent that produces a comprehensive, actionable vulnerability report for a given
 CVE identifier using free, public data sources (NVD, CISA KEV, OTX, GitHub
-advisories, Exploit-DB, PacketStorm, …) and optional Docker-based exploit
+advisories, Exploit-DB, PacketStorm, â¦) and optional Docker-based exploit
 verification.
 
 The module is written so it can be *imported* without the optional heavy
@@ -27,7 +27,7 @@ __all__ = ["VulnerabilityIntelligenceAgent", "DEFAULT_MODEL_ID"]
 # Kept as a single named constant rather than scattered literals.
 DEFAULT_MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 
-# Repository root (…/manus-use) — used to locate bundled skills.
+# Repository root (â¦/manus-use) â used to locate bundled skills.
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 SYSTEM_PROMPT = """
@@ -52,22 +52,23 @@ Your process is optimized to build a comprehensive picture from authoritative, f
 
 **Step 1b: VulnCheck Enrichment**
 - Call `get_vulncheck_data` for the CVE. This provides two critical enrichments:
-  - **VulnCheck KEV**: exploitation status aggregated from 100+ sources (FBI Flash, CERT advisories, threat-intel feeds) — far broader than CISA KEV's ~1200 entries.
-  - **VulnCheck NVD2**: enriched CPE matching — use `nvd2.cpe_matches` to improve version range analysis in Step 3 and beyond.
-- If `kev.in_kev = True`: prepend **🚨 ACTIVELY EXPLOITED (VulnCheck KEV)** to the analysis and list all sources from `kev.sources`.
-- If `kev.ransomware_use = True`: add **⚠️ RANSOMWARE ASSOCIATED** warning prominently in the report.
+  - **VulnCheck KEV**: exploitation status aggregated from 100+ sources (FBI Flash, CERT advisories, threat-intel feeds) â far broader than CISA KEV's ~1200 entries.
+  - **VulnCheck NVD2**: enriched CPE matching â use `nvd2.cpe_matches` to improve version range analysis in Step 3 and beyond.
+- If `kev.in_kev = True`: prepend **ð¨ ACTIVELY EXPLOITED (VulnCheck KEV)** to the analysis and list all sources from `kev.sources`.
+- If `kev.ransomware_use = True`: add **â ï¸ RANSOMWARE ASSOCIATED** warning prominently in the report.
 - If `available = False` (no API key): note that VulnCheck enrichment is unavailable and continue with other sources.
 
 **Step 2: Check for Known Exploitation and EPSS Trend**
 - Call `check_cisa_kev` to determine if the vulnerability is on the CISA Known Exploited Vulnerabilities (KEV) list.
 - Call `get_otx_cve_details` to check for threat intelligence information from AlienVault OTX, such as associated pulses and IoCs.
-- Call `get_epss_trend` with the CVE ID (default 30 days of history). A `spike_detected=true` result (>0.10 jump in 7 days) indicates the vulnerability has recently been weaponised or discovered by attackers — flag this prominently in the report with the spike date and magnitude.
+- Call `get_epss_trend` with the CVE ID (default 30 days of history). A `spike_detected=true` result (>0.10 jump in 7 days) indicates the vulnerability has recently been weaponised or discovered by attackers â flag this prominently in the report with the spike date and magnitude.
 
 **Step 3: Gather Public Exploits and Advisories**
-- First, call `get_poc_week` (no arguments) to check if the CVE appears in recent PoC Week digests. A high mention_rank (low number) means the security community considers it high-priority this week — note this in your analysis.
+- First, call `get_poc_week` (no arguments) to check if the CVE appears in recent PoC Week digests. A high mention_rank (low number) means the security community considers it high-priority this week â note this in your analysis.
 - Then call `get_trickest_pocs` with the CVE ID for a fast pre-flight lookup against the trickest/cve index (250k+ CVEs, updated daily).
 - Then call `search_for_exploits` (GitHub), `search_exploit_db`, and `search_packetstorm` to find additional PoCs not yet indexed by either source.
 - Merge all results, deduplicating URLs.
+- Also call `search_poc_sources` with the CVE ID to run a parallel multi-source search across trickest/cve, VulnCheck KEV, Exploit-DB, GitHub, and NVD references. If `exploited_in_wild=True` in the result, prepend ⚠️ EXPLOITED IN WILD to the report. If `recent_activity=True`, note that fresh PoC activity was observed in the last 30 days.
 
 **Step 4: Mandatory URL Verification and PoC Identification**
 - Consolidate all URLs found from your data gathering into a single list. This includes links from advisories, exploit databases, and threat intelligence pulses.
@@ -104,8 +105,8 @@ Your process is optimized to build a comprehensive picture from authoritative, f
 
 **Step 6b: Exploit Complexity Scoring**
 - Call `score_exploit_complexity` with the CVE ID. Include in the report:
-  - The overall complexity score (1–5) and label (trivial / low / moderate / high / very_high).
-  - The `attacker_friendly` flag — if True, flag prominently that this CVE is easy to weaponise.
+  - The overall complexity score (1â5) and label (trivial / low / moderate / high / very_high).
+  - The `attacker_friendly` flag â if True, flag prominently that this CVE is easy to weaponise.
   - Per-dimension breakdown: lines of code, authentication required, network hops, OS/platform dependencies, exploit chain length.
   - Whether the score was derived from PoC code analysis or NVD CVSS vector only.
   This score contextualises raw CVSS severity: a CVSS 9.8 with complexity_score=1.5 is far more urgent than the same CVSS with complexity_score=4.5.
@@ -207,6 +208,7 @@ class VulnerabilityIntelligenceAgent:
             from manus_use.tools.get_trickest_pocs import get_trickest_pocs
             from manus_use.tools.get_vulncheck_data import get_vulncheck_data
             from manus_use.tools.score_exploit_complexity import score_exploit_complexity
+            from manus_use.tools.search_poc_sources import search_poc_sources
         except ImportError as exc:  # pragma: no cover - depends on env
             raise ImportError(
                 "VulnerabilityIntelligenceAgent requires the optional 'strands' "
@@ -260,6 +262,7 @@ class VulnerabilityIntelligenceAgent:
             get_patch_diff,
             score_exploit_complexity,
             get_vulncheck_data,
+            search_poc_sources,
         ]
         if use_browser is not None:
             tools.append(use_browser)

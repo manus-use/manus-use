@@ -1053,6 +1053,7 @@ _SUBCOMMANDS = {
     "patch-diff",
     "compare",
     "exploit-complexity",
+    "poc-search",
 }
 
 
@@ -1338,6 +1339,114 @@ def _run_exploit_complexity(argv: list[str]) -> int:
         return 0
 
     print(_render_text(result))
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# poc-search subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_poc_search_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-use poc-search",
+        description=(
+            "Search multiple public sources for PoC exploits related to a CVE.\n"
+            "Sources: trickest/cve, VulnCheck KEV, Exploit-DB, GitHub, NVD refs."
+        ),
+        add_help=True,
+    )
+    p.add_argument("cve_id", metavar="CVE-ID", help="CVE identifier, e.g. CVE-2024-3094")
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    p.add_argument(
+        "--sources",
+        default="",
+        metavar="LIST",
+        help=(
+            "Comma-separated sources to query (default: all). Valid values: trickest,vulncheck_kev,exploitdb,github,nvd"
+        ),
+    )
+    return p
+
+
+def _run_poc_search(argv: list[str]) -> int:  # noqa: C901
+    import json as _json
+    import re as _re
+
+    parser = _build_poc_search_parser()
+    args = parser.parse_args(argv)
+    cve_id: str = args.cve_id.strip()
+
+    if not _re.match(r"CVE-\d{4}-\d+", cve_id, _re.IGNORECASE):
+        parser.error(f"Invalid CVE ID: {cve_id!r}. Expected format: CVE-YYYY-NNNNN")
+
+    try:
+        from manus_use.tools.search_poc_sources import aggregate_poc_results
+    except ImportError as exc:  # pragma: no cover
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    source_list = None
+    if args.sources.strip():
+        source_list = [s.strip() for s in args.sources.split(",") if s.strip()]
+
+    result = aggregate_poc_results(cve_id, source_list)
+
+    if args.output == "json":
+        print(_json.dumps(result, indent=2))
+        return 0
+
+    # ---- text output ----
+    total = result.get("total_found", 0)
+    eaw = result.get("exploited_in_wild", False)
+    recent = result.get("recent_activity", False)
+    sources_checked = result.get("sources_checked", [])
+    sources_failed = result.get("sources_failed", [])
+    results = result.get("results", [])
+
+    if eaw:
+        print()
+        print("  ⚠️  EXPLOITED IN WILD  ⚠️")
+        print("  VulnCheck KEV confirms active exploitation in the wild.")
+        print()
+
+    print(f"PoC Search: {cve_id.upper()}")
+    print(f"  Sources checked : {', '.join(sorted(sources_checked)) or '—'}")
+    if sources_failed:
+        print(f"  Sources failed  : {', '.join(sorted(sources_failed))}")
+    print(f"  Results found   : {total}")
+    if recent:
+        print("  ⚡ Recent activity (last 30 days) detected")
+    print()
+
+    if not results:
+        print("No PoC results found.")
+        return 0
+
+    # Table header
+    col_src = 14
+    col_eaw = 10
+    col_title = 30
+    col_date = 12
+    col_url = 70
+
+    header = f"{'Source':<{col_src}}  {'Exploited?':<{col_eaw}}  {'Title':<{col_title}}  {'Date':<{col_date}}  URL"
+    print(header)
+    print("-" * (col_src + col_eaw + col_title + col_date + col_url + 8))
+
+    for r in results:
+        src = (r.get("source") or "")[:col_src]
+        eaw_flag = "YES ⚠️" if r.get("exploited_in_wild") else "no"
+        title = (r.get("title") or "")[:col_title]
+        date = (r.get("published") or "")[:col_date]
+        url = (r.get("url") or "")[:col_url]
+        print(f"{src:<{col_src}}  {eaw_flag:<{col_eaw}}  {title:<{col_title}}  {date:<{col_date}}  {url}")
+
     return 0
 
 
@@ -1652,6 +1761,10 @@ def main() -> None:
     if first_positional == "exploit-complexity":
         idx = argv.index("exploit-complexity")
         sys.exit(_run_exploit_complexity(argv[idx + 1 :]))
+
+    if first_positional == "poc-search":
+        idx = argv.index("poc-search")
+        sys.exit(_run_poc_search(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")
