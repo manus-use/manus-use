@@ -347,6 +347,42 @@ manus-use discover --output json
 | `--dry-run` | off | Discover CVEs but do not submit them |
 | `--config FILE` | — | Override config |
 
+### `manus-use poc-search <CVE-ID>` — Multi-source PoC aggregator
+
+```bash
+# Search all sources for PoC exploits for a CVE
+manus-use poc-search CVE-2024-3094
+
+# Filter to specific sources
+manus-use poc-search CVE-2024-3094 --sources trickest,exploitdb,github
+
+# Machine-readable output
+manus-use poc-search CVE-2024-3094 --output json | jq .exploited_in_wild
+```
+
+Queries five public PoC sources **in parallel** and returns a unified,
+deduplicated result set sorted by exploited-in-wild status and publication date:
+
+| Source | What it provides |
+|---|---|
+| `trickest` | [trickest/cve](https://github.com/trickest/cve) — 250k+ CVE PoC index |
+| `vulncheck_kev` | [VulnCheck KEV](https://vulncheck.com) — exploited-in-wild signal from 100+ intel sources (requires `VULNCHECK_API_KEY`) |
+| `exploitdb` | [Exploit-DB](https://www.exploit-db.com) CSV — cached 24 h |
+| `github` | GitHub repo search for repositories mentioning the CVE |
+| `nvd` | NVD references filtered for GitHub / Exploit-DB / PacketStorm URLs |
+
+When `VULNCHECK_API_KEY` is absent the `vulncheck_kev` source is skipped
+gracefully; all other sources are unaffected.
+
+**⚠️ EXPLOITED IN WILD banner** — printed at the top when VulnCheck KEV
+confirms the CVE is actively exploited in the wild.
+
+| Flag | Default | Description |
+|---|---|---|
+| `--output {text,json}` | `text` | Output format |
+| `--sources LIST` | all | Comma-separated subset: `trickest,vulncheck_kev,exploitdb,github,nvd` |
+
+
 ### `manus-use history` — Browse past runs
 
 ```bash
