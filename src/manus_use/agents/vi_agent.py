@@ -50,6 +50,14 @@ Your process is optimized to build a comprehensive picture from authoritative, f
 - Immediately call the `get_nvd_data` tool to get foundational information from the NVD. This will provide the official description, CVSS score, and CWE.
 - Call `get_github_advisory` to get advisory information from GitHub.
 
+**Step 1b: VulnCheck Enrichment**
+- Call `get_vulncheck_data` for the CVE. This provides two critical enrichments:
+  - **VulnCheck KEV**: exploitation status aggregated from 100+ sources (FBI Flash, CERT advisories, threat-intel feeds) — far broader than CISA KEV's ~1200 entries.
+  - **VulnCheck NVD2**: enriched CPE matching — use `nvd2.cpe_matches` to improve version range analysis in Step 3 and beyond.
+- If `kev.in_kev = True`: prepend **🚨 ACTIVELY EXPLOITED (VulnCheck KEV)** to the analysis and list all sources from `kev.sources`.
+- If `kev.ransomware_use = True`: add **⚠️ RANSOMWARE ASSOCIATED** warning prominently in the report.
+- If `available = False` (no API key): note that VulnCheck enrichment is unavailable and continue with other sources.
+
 **Step 2: Check for Known Exploitation and EPSS Trend**
 - Call `check_cisa_kev` to determine if the vulnerability is on the CISA Known Exploited Vulnerabilities (KEV) list.
 - Call `get_otx_cve_details` to check for threat intelligence information from AlienVault OTX, such as associated pulses and IoCs.
@@ -197,6 +205,7 @@ class VulnerabilityIntelligenceAgent:
             from manus_use.tools.get_patch_diff import get_patch_diff
             from manus_use.tools.get_poc_week import get_poc_week
             from manus_use.tools.get_trickest_pocs import get_trickest_pocs
+            from manus_use.tools.get_vulncheck_data import get_vulncheck_data
             from manus_use.tools.score_exploit_complexity import score_exploit_complexity
         except ImportError as exc:  # pragma: no cover - depends on env
             raise ImportError(
@@ -250,6 +259,7 @@ class VulnerabilityIntelligenceAgent:
             get_epss_trend,
             get_patch_diff,
             score_exploit_complexity,
+            get_vulncheck_data,
         ]
         if use_browser is not None:
             tools.append(use_browser)
