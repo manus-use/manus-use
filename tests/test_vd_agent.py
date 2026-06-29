@@ -103,7 +103,7 @@ def test_build_request_normal_mode():
 
 
 def test_discover_help_exits_zero():
-    """`manus-use discover --help` prints help and exits 0."""
+    """`manus-agent discover --help` prints help and exits 0."""
     from manus_use import cli
 
     parser = cli._build_discover_parser()
@@ -113,7 +113,7 @@ def test_discover_help_exits_zero():
 
 
 def test_discover_defaults():
-    """`manus-use discover` with no args has expected defaults."""
+    """`manus-agent discover` with no args has expected defaults."""
     from manus_use import cli
 
     parser = cli._build_discover_parser()
@@ -161,7 +161,7 @@ def test_discover_dry_run_flag():
 
 
 def test_discover_registered_in_main():
-    """`manus-use discover` routes to `_run_discover`, not the task runner."""
+    """`manus-agent discover` routes to `_run_discover`, not the task runner."""
     from manus_use import cli
 
     captured = {}
@@ -171,7 +171,7 @@ def test_discover_registered_in_main():
         return 0
 
     argv = [
-        "manus-use",
+        "manus-agent",
         "discover",
         "--since",
         "2025-06-01",

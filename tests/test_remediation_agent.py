@@ -243,7 +243,7 @@ def test_main_dispatches_remediate_subcommand(monkeypatch):
     """main() routes 'remediate CVE-...' to _run_remediate."""
     from manus_use import cli
 
-    monkeypatch.setattr(sys, "argv", ["manus-use", "remediate", "CVE-2024-3094"])
+    monkeypatch.setattr(sys, "argv", ["manus-agent", "remediate", "CVE-2024-3094"])
 
     with mock.patch("manus_use.cli._run_remediate", return_value=0) as mock_run:
         with pytest.raises(SystemExit) as exc_info:
@@ -260,7 +260,7 @@ def test_main_dispatches_remediate_with_json_flag(monkeypatch):
     """main() passes --output json through to _run_remediate."""
     from manus_use import cli
 
-    monkeypatch.setattr(sys, "argv", ["manus-use", "remediate", "CVE-2024-3094", "--output", "json"])
+    monkeypatch.setattr(sys, "argv", ["manus-agent", "remediate", "CVE-2024-3094", "--output", "json"])
 
     with mock.patch("manus_use.cli._run_remediate", return_value=0) as mock_run:
         with pytest.raises(SystemExit) as exc_info:
@@ -275,7 +275,7 @@ def test_main_remediate_missing_cve_id_exits_nonzero(monkeypatch):
     """main() with 'remediate' but no CVE-ID exits non-zero."""
     from manus_use import cli
 
-    monkeypatch.setattr(sys, "argv", ["manus-use", "remediate"])
+    monkeypatch.setattr(sys, "argv", ["manus-agent", "remediate"])
 
     with pytest.raises(SystemExit) as exc_info:
         cli.main()

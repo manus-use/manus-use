@@ -1,4 +1,4 @@
-"""Tests for the `manus-use changelog` subcommand and scripts/release.py.
+"""Tests for the `manus-agent changelog` subcommand and scripts/release.py.
 
 All git operations are fully mocked — no real git calls occur.
 All file I/O uses tmp_path fixtures so the source tree is never touched.
@@ -23,7 +23,7 @@ def _invoke_changelog(argv: list[str]) -> tuple[int, str, str]:
     """Call cli.main() with `changelog <argv>` and return (rc, stdout, stderr)."""
     from manus_use import cli  # noqa: PLC0415
 
-    with mock.patch.object(sys, "argv", ["manus-use", "changelog", *argv]):
+    with mock.patch.object(sys, "argv", ["manus-agent", "changelog", *argv]):
         import io
 
         out_buf, err_buf = io.StringIO(), io.StringIO()
@@ -65,7 +65,7 @@ class TestChangelogSubcommandRouting:
         from manus_use import cli  # noqa: PLC0415
 
         with pytest.raises(SystemExit) as exc_info:
-            with mock.patch.object(sys, "argv", ["manus-use", "changelog", "--help"]):
+            with mock.patch.object(sys, "argv", ["manus-agent", "changelog", "--help"]):
                 cli.main()
         assert exc_info.value.code == 0
 
@@ -74,7 +74,7 @@ class TestChangelogSubcommandRouting:
         from manus_use import cli  # noqa: PLC0415
 
         with pytest.raises(SystemExit):
-            with mock.patch.object(sys, "argv", ["manus-use", "changelog", "--help"]):
+            with mock.patch.object(sys, "argv", ["manus-agent", "changelog", "--help"]):
                 cli.main()
         out = capsys.readouterr().out
         assert "--generate" in out
@@ -84,7 +84,7 @@ class TestChangelogSubcommandRouting:
         from manus_use import cli  # noqa: PLC0415
 
         with pytest.raises(SystemExit):
-            with mock.patch.object(sys, "argv", ["manus-use", "changelog", "--help"]):
+            with mock.patch.object(sys, "argv", ["manus-agent", "changelog", "--help"]):
                 cli.main()
         out = capsys.readouterr().out
         assert "--version" in out
@@ -95,7 +95,7 @@ class TestChangelogSubcommandRouting:
 
         with mock.patch.object(cli, "_run_changelog", return_value=0) as mock_run:
             with pytest.raises(SystemExit) as exc_info:
-                with mock.patch.object(sys, "argv", ["manus-use", "changelog"]):
+                with mock.patch.object(sys, "argv", ["manus-agent", "changelog"]):
                     cli.main()
         mock_run.assert_called_once()
         assert exc_info.value.code == 0
@@ -105,7 +105,7 @@ class TestChangelogSubcommandRouting:
         from manus_use import cli  # noqa: PLC0415
 
         with pytest.raises(SystemExit):
-            with mock.patch.object(sys, "argv", ["manus-use", "--help"]):
+            with mock.patch.object(sys, "argv", ["manus-agent", "--help"]):
                 cli.main()
         out = capsys.readouterr().out
         assert "changelog" in out

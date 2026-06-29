@@ -44,7 +44,7 @@ def _invoke_main(argv, *, single_shot_rc=0):
         captured["stream"] = stream
         return single_shot_rc
 
-    with mock.patch.object(sys, "argv", ["manus-use"] + argv):
+    with mock.patch.object(sys, "argv", ["manus-agent"] + argv):
         with mock.patch.object(cli, "_run_single_shot", side_effect=fake_single_shot) as m_ss:
             with mock.patch.object(cli, "_run_interactive"):
                 with mock.patch("manus_use.cli.Config") as m_cfg:
