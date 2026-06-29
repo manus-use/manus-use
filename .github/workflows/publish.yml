@@ -2,8 +2,8 @@
 #
 # Uses PyPI Trusted Publishing (OIDC) — no long-lived API tokens needed.
 # To enable, create a Trusted Publisher on https://pypi.org with:
-#   Owner:    manus-use
-#   Repo:     manus-use
+#   Owner:    manus-agent
+#   Repo:     manus-agent
 #   Workflow: publish.yml
 #   Environment: pypi
 #

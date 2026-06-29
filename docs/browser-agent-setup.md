@@ -1,6 +1,6 @@
 # BrowserAgent Setup with browser-use and AWS Bedrock
 
-This guide explains how to use the BrowserAgent with browser-use and AWS Bedrock in manus-use.
+This guide explains how to use the BrowserAgent with browser-use and AWS Bedrock in manus-agent.
 
 ## Prerequisites
 
