@@ -6,7 +6,7 @@ The actual implementation lives in :mod:`manus_agent.agents.variant_agent`.
 Usage::
     python variant_analysis_agent.py CVE-2024-3094
 Or via CLI::
-    manus-use variants CVE-2024-3094
+    manus-agent variants CVE-2024-3094
 """
 
 import sys

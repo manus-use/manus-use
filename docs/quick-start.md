@@ -99,7 +99,7 @@ enabled = true
 
 Run the interactive CLI:
 ```bash
-manus-use
+manus-agent
 ```
 
 Or:

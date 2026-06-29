@@ -8,8 +8,8 @@ existing ``python va_agent.py CVE-... [--verify]`` and
 
 Prefer the CLI for new workflows::
 
-    manus-use analyze CVE-2024-3094
-    manus-use analyze CVE-2024-3094 --verify
+    manus-agent analyze CVE-2024-3094
+    manus-agent analyze CVE-2024-3094 --verify
 
 The agent runs an 8-step analysis pipeline for each CVE:
 
