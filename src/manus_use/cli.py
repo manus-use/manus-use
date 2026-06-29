@@ -246,10 +246,10 @@ def _append_history(
 
 
 # ---------------------------------------------------------------------------
-# manus-use discover
+# manus-agent discover
 # ---------------------------------------------------------------------------
 
-# manus-use discover
+# manus-agent discover
 # ---------------------------------------------------------------------------
 
 
@@ -368,7 +368,7 @@ def _run_discover(
 
 
 # ---------------------------------------------------------------------------
-# manus-use remediate
+# manus-agent remediate
 # ---------------------------------------------------------------------------
 
 
@@ -700,7 +700,7 @@ def _run_interactive(
 
 
 # ---------------------------------------------------------------------------
-# manus-use init
+# manus-agent init
 # ---------------------------------------------------------------------------
 
 # Provider metadata: (display_name, default_model, env_var_for_api_key, needs_api_key)
@@ -718,7 +718,7 @@ def _cmd_init(args: argparse.Namespace) -> int:  # noqa: C901
     """Guided interactive config generator."""
     console.print(
         Panel(
-            "[bold]Welcome to [cyan]manus-use init[/cyan]![/bold]\n"
+            "[bold]Welcome to [cyan]manus-agent init[/cyan]![/bold]\n"
             "This wizard will create a [yellow]config.toml[/yellow] for you.",
             border_style="blue",
         )
@@ -814,7 +814,7 @@ def _cmd_init(args: argparse.Namespace) -> int:  # noqa: C901
     console.print(
         Panel(
             f"[green]✓ Config written to[/green] [bold]{dest}[/bold]\n\n"
-            f"Run [cyan]manus-use doctor[/cyan] to verify your setup.",
+            f"Run [cyan]manus-agent doctor[/cyan] to verify your setup.",
             border_style="green",
             title="[bold green]Done![/bold green]",
         )
@@ -823,7 +823,7 @@ def _cmd_init(args: argparse.Namespace) -> int:  # noqa: C901
 
 
 # ---------------------------------------------------------------------------
-# manus-use doctor
+# manus-agent doctor
 # ---------------------------------------------------------------------------
 
 # (package_import, pip_extra, description)
@@ -857,7 +857,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     """Check packages, config, and environment variables."""
     console.print(
         Panel(
-            "[bold cyan]manus-use doctor[/bold cyan] – environment diagnostics",
+            "[bold cyan]manus-agent doctor[/bold cyan] – environment diagnostics",
             border_style="blue",
         )
     )
@@ -902,7 +902,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
             issues.append(f"Config parse error: {exc}")
             config = Config()
     else:
-        console.print("  [yellow]![/yellow] No config file found (run [cyan]manus-use init[/cyan] to create one)")
+        console.print("  [yellow]![/yellow] No config file found (run [cyan]manus-agent init[/cyan] to create one)")
         config = Config()
 
     # ------------------------------------------------------------------
@@ -1470,10 +1470,10 @@ def _build_changelog_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  manus-use changelog                       # show full CHANGELOG.md\n"
-            "  manus-use changelog --version 0.1.0       # show section for v0.1.0\n"
-            "  manus-use changelog --generate            # preview next release notes\n"
-            "  manus-use changelog --generate --output json\n"
+            "  manus-agent changelog                       # show full CHANGELOG.md\n"
+            "  manus-agent changelog --version 0.1.0       # show section for v0.1.0\n"
+            "  manus-agent changelog --generate            # preview next release notes\n"
+            "  manus-agent changelog --generate --output json\n"
         ),
     )
     p.add_argument(
@@ -1868,45 +1868,45 @@ def _build_run_parser() -> argparse.ArgumentParser:
         epilog=(
             "Examples:\n"
             "  # Single-shot (non-interactive)\n"
-            '  manus-use "Create a factorial function in Python"\n'
-            '  manus-use --agent browser "Find the top 5 trending GitHub repos today"\n'
-            '  manus-use --output result.txt "Summarise the latest AI news"\n'
-            '  manus-use --format json "List prime numbers up to 50"\n'
-            '  manus-use --format json "task" | jq .result\n\n'
+            '  manus-agent "Create a factorial function in Python"\n'
+            '  manus-agent --agent browser "Find the top 5 trending GitHub repos today"\n'
+            '  manus-agent --output result.txt "Summarise the latest AI news"\n'
+            '  manus-agent --format json "List prime numbers up to 50"\n'
+            '  manus-agent --format json "task" | jq .result\n\n'
             "  # Interactive REPL\n"
-            "  manus-use\n"
-            "  manus-use --mode multi\n\n"
+            "  manus-agent\n"
+            "  manus-agent --mode multi\n\n"
             "  # Setup helpers\n"
-            "  manus-use init           # create ~/.manus-use/config.toml interactively\n"
-            "  manus-use doctor         # check packages, config, and API keys\n"
-            "  manus-use history        # show recent runs (use --help for filters)\n"
+            "  manus-agent init           # create ~/.manus-use/config.toml interactively\n"
+            "  manus-agent doctor         # check packages, config, and API keys\n"
+            "  manus-agent history        # show recent runs (use --help for filters)\n"
             "\n"
             "  # EPSS trend analysis\n"
-            "  manus-use epss-trend CVE-2024-3094\n"
-            "  manus-use epss-trend CVE-2024-3094 --days 90 --output json\n"
+            "  manus-agent epss-trend CVE-2024-3094\n"
+            "  manus-agent epss-trend CVE-2024-3094 --days 90 --output json\n"
             "\n"
             "  # Patch diff summariser (fixing-commit analysis)\n"
-            "  manus-use patch-diff CVE-2024-3094\n"
-            "  manus-use patch-diff CVE-2024-3094 --output json\n"
+            "  manus-agent patch-diff CVE-2024-3094\n"
+            "  manus-agent patch-diff CVE-2024-3094 --output json\n"
             "\n"
             "  # Vulnerability intelligence analysis\n"
-            "  manus-use analyze CVE-2025-6554\n"
-            "  manus-use analyze CVE-2024-3094 --verify --output json\n"
+            "  manus-agent analyze CVE-2025-6554\n"
+            "  manus-agent analyze CVE-2024-3094 --verify --output json\n"
             "  \n"
             "  # CVE discovery\n"
-            "  manus-use discover\n"
-            "  manus-use discover --since 2025-06-01 --min-epss 0.7 --output json\n"
-            "  manus-use discover --dry-run\n"
+            "  manus-agent discover\n"
+            "  manus-agent discover --since 2025-06-01 --min-epss 0.7 --output json\n"
+            "  manus-agent discover --dry-run\n"
             "  \n"
             "  # CVE remediation guidance\n"
-            "  manus-use remediate CVE-2024-3094\n"
-            "  manus-use remediate CVE-2024-3094 --output json\n"
+            "  manus-agent remediate CVE-2024-3094\n"
+            "  manus-agent remediate CVE-2024-3094 --output json\n"
             "\n"
             "  # Changelog and release notes\n"
-            "  manus-use changelog                           # show full CHANGELOG.md\n"
-            "  manus-use changelog --version 0.1.0          # show section for v0.1.0\n"
-            "  manus-use changelog --generate               # preview next release notes\n"
-            "  manus-use changelog --generate --output json\n"
+            "  manus-agent changelog                           # show full CHANGELOG.md\n"
+            "  manus-agent changelog --version 0.1.0          # show section for v0.1.0\n"
+            "  manus-agent changelog --generate               # preview next release notes\n"
+            "  manus-agent changelog --generate --output json\n"
         ),
     )
     parser.add_argument(
@@ -1978,7 +1978,7 @@ def _build_init_parser() -> argparse.ArgumentParser:
     """Build the `init` subcommand parser."""
     parser = argparse.ArgumentParser(
         prog="manus-agent init",
-        description="Guided wizard to create a manus-use configuration file.",
+        description="Guided wizard to create a manus-agent configuration file.",
     )
     parser.add_argument(
         "--output",
@@ -1999,7 +1999,7 @@ def _build_doctor_parser() -> argparse.ArgumentParser:
     """Build the `doctor` subcommand parser."""
     parser = argparse.ArgumentParser(
         prog="manus-agent doctor",
-        description="Diagnose your manus-use installation: packages, config file, API keys.",
+        description="Diagnose your manus-agent installation: packages, config file, API keys.",
     )
     parser.add_argument(
         "--config",
@@ -2054,7 +2054,7 @@ def _cmd_history(args: argparse.Namespace) -> int:
         return 0
 
     if not _HISTORY_PATH.exists():
-        console.print("[dim]No history yet – run a task with [cyan]manus-use 'task...'[/cyan] first.[/dim]")
+        console.print("[dim]No history yet – run a task with [cyan]manus-agent 'task...'[/cyan] first.[/dim]")
         return 0
 
     records = []
