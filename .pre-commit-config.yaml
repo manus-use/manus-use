@@ -1,4 +1,4 @@
-# Pre-commit hooks for manus-use.
+# Pre-commit hooks for manus-agent.
 #
 # Install:
 #   pip install pre-commit          # already in [dev] deps
