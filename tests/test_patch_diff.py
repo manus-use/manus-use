@@ -573,7 +573,7 @@ class TestPatchDiffCLI:
 
         with (
             patch("manus_use.tools.get_patch_diff.fetch_and_summarise", return_value=payload),
-            patch("sys.argv", ["manus-use", "patch-diff", "CVE-2024-99999"]),
+            patch("sys.argv", ["manus-agent", "patch-diff", "CVE-2024-99999"]),
             pytest.raises(SystemExit) as exc,
         ):
             cli.main()
@@ -625,4 +625,4 @@ class TestReadmeDocsPatchDiff:
 
     def test_readme_has_patch_diff_example(self):
         readme = self._get_readme()
-        assert "manus-use patch-diff CVE" in readme
+        assert "manus-agent patch-diff CVE" in readme

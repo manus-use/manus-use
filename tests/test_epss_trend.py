@@ -438,4 +438,4 @@ def test_readme_epss_trend_example_commands():
 
     readme = Path(__file__).resolve().parents[1] / "README.md"
     content = readme.read_text()
-    assert "manus-use epss-trend CVE-" in content
+    assert "manus-agent epss-trend CVE-" in content

@@ -316,7 +316,7 @@ def test_main_routes_variants_subcommand():
         captured["argv"] = argv
         return 0
 
-    with mock.patch.object(sys, "argv", ["manus-use", "variants", "CVE-2024-3094"]):
+    with mock.patch.object(sys, "argv", ["manus-agent", "variants", "CVE-2024-3094"]):
         with mock.patch.object(cli, "_run_variants", side_effect=fake_run_variants) as m_rv:
             with pytest.raises(SystemExit) as exc_info:
                 cli.main()
@@ -336,7 +336,7 @@ def test_main_variants_passes_output_flag():
         captured["argv"] = argv
         return 0
 
-    with mock.patch.object(sys, "argv", ["manus-use", "variants", "CVE-2024-3094", "--output", "json"]):
+    with mock.patch.object(sys, "argv", ["manus-agent", "variants", "CVE-2024-3094", "--output", "json"]):
         with mock.patch.object(cli, "_run_variants", side_effect=fake_run_variants):
             with pytest.raises(SystemExit):
                 cli.main()

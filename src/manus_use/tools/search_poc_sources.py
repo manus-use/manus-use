@@ -13,7 +13,7 @@ parallel and returns a unified, deduplicated, and ranked result set:
 The tool is deliberately source-agnostic: all results share a common schema
 so consumers can sort, filter, and display them uniformly.
 
-CLI: ``manus-use poc-search CVE-XXXX-YYYY``
+CLI: ``manus-agent poc-search CVE-XXXX-YYYY``
 """
 
 from __future__ import annotations
@@ -194,7 +194,7 @@ def _ensure_exploitdb_cache() -> str | None:
         pass
 
     try:
-        req = urllib.request.Request(_EXPLOITDB_CSV_URL, headers={"User-Agent": "manus-use"})
+        req = urllib.request.Request(_EXPLOITDB_CSV_URL, headers={"User-Agent": "manus-agent"})
         with urllib.request.urlopen(req, timeout=_REQUEST_TIMEOUT) as resp:
             data = resp.read()
         with open(cache_path, "wb") as fh:

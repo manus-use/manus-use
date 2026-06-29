@@ -1,4 +1,4 @@
-"""Tests for `manus-use init` and `manus-use doctor` subcommands."""
+"""Tests for `manus-agent init` and `manus-agent doctor` subcommands."""
 
 import contextlib
 import os
@@ -23,7 +23,7 @@ def _invoke(argv: list[str], *, inputs: list[str] | None = None):
     exit_code = 0
 
     # Patch Prompt.ask / Confirm.ask so tests don't block on stdin.
-    with mock.patch.object(sys, "argv", ["manus-use"] + argv):
+    with mock.patch.object(sys, "argv", ["manus-agent"] + argv):
         try:
             cli.main()
         except SystemExit as exc:
@@ -63,7 +63,7 @@ class TestInitCommand:
 
         with mock.patch("manus_use.cli.Prompt.ask", side_effect=lambda *a, **kw: next(prompt_responses)):
             with mock.patch("manus_use.cli.Confirm.ask", side_effect=lambda *a, **kw: next(confirm_responses)):
-                with mock.patch.object(sys, "argv", ["manus-use", "init", "--output", str(dest), "--force"]):
+                with mock.patch.object(sys, "argv", ["manus-agent", "init", "--output", str(dest), "--force"]):
                     with pytest.raises(SystemExit) as exc_info:
                         cli.main()
 
@@ -82,7 +82,7 @@ class TestInitCommand:
         original_mtime = dest.stat().st_mtime
 
         with mock.patch("manus_use.cli.Confirm.ask", return_value=False):
-            with mock.patch.object(sys, "argv", ["manus-use", "init", "--output", str(dest)]):
+            with mock.patch.object(sys, "argv", ["manus-agent", "init", "--output", str(dest)]):
                 with pytest.raises(SystemExit) as exc_info:
                     cli.main()
 
@@ -101,7 +101,7 @@ class TestInitCommand:
 
         with mock.patch("manus_use.cli.Prompt.ask", side_effect=lambda *a, **kw: next(prompt_seq)):
             with mock.patch("manus_use.cli.Confirm.ask", side_effect=lambda *a, **kw: next(confirm_seq)):
-                with mock.patch.object(sys, "argv", ["manus-use", "init", "--output", str(dest), "--force"]):
+                with mock.patch.object(sys, "argv", ["manus-agent", "init", "--output", str(dest), "--force"]):
                     with pytest.raises(SystemExit) as exc_info:
                         cli.main()
 
@@ -123,7 +123,7 @@ class TestInitCommand:
         with mock.patch("manus_use.cli.Prompt.ask", side_effect=lambda *a, **kw: next(prompt_seq)):
             with mock.patch("manus_use.cli.Confirm.ask", side_effect=lambda *a, **kw: next(confirm_seq)):
                 with mock.patch.dict(os.environ, env_patch, clear=False):
-                    with mock.patch.object(sys, "argv", ["manus-use", "init", "--output", str(dest), "--force"]):
+                    with mock.patch.object(sys, "argv", ["manus-agent", "init", "--output", str(dest), "--force"]):
                         with pytest.raises(SystemExit) as exc_info:
                             cli.main()
 
@@ -149,7 +149,7 @@ class TestInitCommand:
 
         with mock.patch("manus_use.cli.Prompt.ask", side_effect=lambda *a, **kw: next(prompt_seq)):
             with mock.patch("manus_use.cli.Confirm.ask", side_effect=lambda *a, **kw: next(confirm_seq)):
-                with mock.patch.object(sys, "argv", ["manus-use", "init", "--output", str(dest), "--force"]):
+                with mock.patch.object(sys, "argv", ["manus-agent", "init", "--output", str(dest), "--force"]):
                     with pytest.raises(SystemExit) as exc_info:
                         cli.main()
 
@@ -170,7 +170,7 @@ class TestInitCommand:
 
         with mock.patch("manus_use.cli.Prompt.ask", side_effect=lambda *a, **kw: next(prompt_seq)):
             with mock.patch("manus_use.cli.Confirm.ask", side_effect=lambda *a, **kw: next(confirm_seq)):
-                with mock.patch.object(sys, "argv", ["manus-use", "init", "--output", str(dest), "--force"]):
+                with mock.patch.object(sys, "argv", ["manus-agent", "init", "--output", str(dest), "--force"]):
                     with pytest.raises(SystemExit) as exc_info:
                         cli.main()
 
@@ -185,7 +185,7 @@ class TestInitCommand:
 
 class TestDoctorCommand:
     def _run_doctor(self, extra_argv=None, env_patch=None, import_side_effects=None, mock_imports_ok=True):
-        """Helper: run `manus-use doctor` and return exit code.
+        """Helper: run `manus-agent doctor` and return exit code.
 
         Args:
             extra_argv: extra CLI arguments after ``doctor``.
@@ -198,7 +198,7 @@ class TestDoctorCommand:
         """
         from manus_use import cli
 
-        argv = ["manus-use", "doctor"] + (extra_argv or [])
+        argv = ["manus-agent", "doctor"] + (extra_argv or [])
 
         missing = import_side_effects or set()
 
@@ -243,7 +243,7 @@ class TestDoctorCommand:
         # missing API key — env-var config loading could otherwise backfill it.
         env = {k: v for k, v in os.environ.items() if k not in ("OPENAI_API_KEY",) and not k.startswith("MANUS_LLM")}
         with mock.patch.dict(os.environ, env, clear=True):
-            with mock.patch.object(sys, "argv", ["manus-use", "doctor", "--config", str(config_file)]):
+            with mock.patch.object(sys, "argv", ["manus-agent", "doctor", "--config", str(config_file)]):
                 with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)):
                     with mock.patch("manus_use.cli._check_import", return_value=True):
                         with pytest.raises(SystemExit) as exc_info:
@@ -310,7 +310,7 @@ class TestDoctorCommand:
         # bedrock config with no AWS creds — this should still exit 0.
         env = {k: v for k, v in os.environ.items() if not k.startswith("AWS_") and not k.startswith("MANUS_LLM")}
         with mock.patch.dict(os.environ, env, clear=True):
-            with mock.patch.object(sys, "argv", ["manus-use", "doctor", "--config", str(config_file)]):
+            with mock.patch.object(sys, "argv", ["manus-agent", "doctor", "--config", str(config_file)]):
                 with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)):
                     with mock.patch("manus_use.cli._check_import", return_value=True):
                         with pytest.raises(SystemExit) as exc_info:
@@ -338,7 +338,7 @@ class TestBackwardCompat:
             captured["task"] = task
             return 0
 
-        with mock.patch.object(sys, "argv", ["manus-use", "hello world"]):
+        with mock.patch.object(sys, "argv", ["manus-agent", "hello world"]):
             with mock.patch.object(cli, "_run_single_shot", side_effect=fake_ss):
                 with mock.patch("manus_use.cli.Config") as m_cfg:
                     m_cfg.from_file.return_value = mock.MagicMock()
@@ -352,7 +352,7 @@ class TestBackwardCompat:
         """No positional task → routes to _run_interactive."""
         from manus_use import cli
 
-        with mock.patch.object(sys, "argv", ["manus-use"]):
+        with mock.patch.object(sys, "argv", ["manus-agent"]):
             with mock.patch.object(cli, "_run_interactive") as m_int:
                 with mock.patch("manus_use.cli.Config") as m_cfg:
                     m_cfg.from_file.return_value = mock.MagicMock()
@@ -364,7 +364,7 @@ class TestBackwardCompat:
         """--version still exits 0 and doesn't need subcommand."""
         from manus_use import cli
 
-        with mock.patch.object(sys, "argv", ["manus-use", "--version"]):
+        with mock.patch.object(sys, "argv", ["manus-agent", "--version"]):
             with pytest.raises(SystemExit) as exc_info:
                 cli.main()
 

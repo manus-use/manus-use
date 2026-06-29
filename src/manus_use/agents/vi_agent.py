@@ -27,7 +27,7 @@ __all__ = ["VulnerabilityIntelligenceAgent", "DEFAULT_MODEL_ID"]
 # Kept as a single named constant rather than scattered literals.
 DEFAULT_MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 
-# Repository root (â¦/manus-use) â used to locate bundled skills.
+# Repository root (â¦/manus-agent) â used to locate bundled skills.
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 SYSTEM_PROMPT = """

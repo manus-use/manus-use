@@ -120,7 +120,7 @@ def _make_agent(agent_type: str, config: Config, **agent_kwargs):
 def _build_analyze_parser() -> argparse.ArgumentParser:
     """Build the argument parser for the `analyze` subcommand."""
     parser = argparse.ArgumentParser(
-        prog="manus-use analyze",
+        prog="manus-agent analyze",
         description="Run a vulnerability intelligence analysis for a CVE.",
     )
     parser.add_argument(
@@ -205,7 +205,7 @@ def _run_analyze(
 # History helpers
 # ---------------------------------------------------------------------------
 
-_HISTORY_PATH = Path.home() / ".manus-use" / "history.jsonl"
+_HISTORY_PATH = Path.home() / ".manus-agent" / "history.jsonl"
 
 
 def _append_history(
@@ -219,7 +219,7 @@ def _append_history(
 ) -> None:
     """Append a single-shot run record to the history log.
 
-    The log lives at ``~/.manus-use/history.jsonl`` (one JSON object per line)
+    The log lives at ``~/.manus-agent/history.jsonl`` (one JSON object per line)
     so it can be streamed/grepped without loading the whole file.
 
     Each record has:
@@ -246,17 +246,17 @@ def _append_history(
 
 
 # ---------------------------------------------------------------------------
-# manus-use discover
+# manus-agent discover
 # ---------------------------------------------------------------------------
 
-# manus-use discover
+# manus-agent discover
 # ---------------------------------------------------------------------------
 
 
 def _build_discover_parser() -> argparse.ArgumentParser:
     """Build the argument parser for the `discover` subcommand."""
     parser = argparse.ArgumentParser(
-        prog="manus-use discover",
+        prog="manus-agent discover",
         description="Discover recent high-EPSS CVEs and submit them for tracking.",
     )
     parser.add_argument(
@@ -368,14 +368,14 @@ def _run_discover(
 
 
 # ---------------------------------------------------------------------------
-# manus-use remediate
+# manus-agent remediate
 # ---------------------------------------------------------------------------
 
 
 def _build_remediate_parser() -> argparse.ArgumentParser:
     """Build the argument parser for the ``remediate`` subcommand."""
     parser = argparse.ArgumentParser(
-        prog="manus-use remediate",
+        prog="manus-agent remediate",
         description="Generate actionable remediation guidance for a CVE.",
     )
     parser.add_argument(
@@ -700,7 +700,7 @@ def _run_interactive(
 
 
 # ---------------------------------------------------------------------------
-# manus-use init
+# manus-agent init
 # ---------------------------------------------------------------------------
 
 # Provider metadata: (display_name, default_model, env_var_for_api_key, needs_api_key)
@@ -711,14 +711,14 @@ _PROVIDERS = {
     "ollama": ("Ollama (local)", "llama3.2", None, False),
 }
 
-_DEFAULT_CONFIG_PATH = Path.home() / ".manus-use" / "config.toml"
+_DEFAULT_CONFIG_PATH = Path.home() / ".manus-agent" / "config.toml"
 
 
 def _cmd_init(args: argparse.Namespace) -> int:  # noqa: C901
     """Guided interactive config generator."""
     console.print(
         Panel(
-            "[bold]Welcome to [cyan]manus-use init[/cyan]![/bold]\n"
+            "[bold]Welcome to [cyan]manus-agent init[/cyan]![/bold]\n"
             "This wizard will create a [yellow]config.toml[/yellow] for you.",
             border_style="blue",
         )
@@ -814,7 +814,7 @@ def _cmd_init(args: argparse.Namespace) -> int:  # noqa: C901
     console.print(
         Panel(
             f"[green]✓ Config written to[/green] [bold]{dest}[/bold]\n\n"
-            f"Run [cyan]manus-use doctor[/cyan] to verify your setup.",
+            f"Run [cyan]manus-agent doctor[/cyan] to verify your setup.",
             border_style="green",
             title="[bold green]Done![/bold green]",
         )
@@ -823,7 +823,7 @@ def _cmd_init(args: argparse.Namespace) -> int:  # noqa: C901
 
 
 # ---------------------------------------------------------------------------
-# manus-use doctor
+# manus-agent doctor
 # ---------------------------------------------------------------------------
 
 # (package_import, pip_extra, description)
@@ -857,7 +857,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     """Check packages, config, and environment variables."""
     console.print(
         Panel(
-            "[bold cyan]manus-use doctor[/bold cyan] – environment diagnostics",
+            "[bold cyan]manus-agent doctor[/bold cyan] – environment diagnostics",
             border_style="blue",
         )
     )
@@ -902,7 +902,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
             issues.append(f"Config parse error: {exc}")
             config = Config()
     else:
-        console.print("  [yellow]![/yellow] No config file found (run [cyan]manus-use init[/cyan] to create one)")
+        console.print("  [yellow]![/yellow] No config file found (run [cyan]manus-agent init[/cyan] to create one)")
         config = Config()
 
     # ------------------------------------------------------------------
@@ -998,7 +998,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
 
 def _build_variants_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="manus-use variants",
+        prog="manus-agent variants",
         description="CVE variant analysis — find similar bugs in related codebases",
         add_help=True,
     )
@@ -1066,7 +1066,7 @@ _SUBCOMMANDS = {
 
 def _build_epss_trend_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="manus-use epss-trend",
+        prog="manus-agent epss-trend",
         description=(
             "Fetch EPSS (Exploit Prediction Scoring System) score history for a CVE \n"
             "and flag significant spikes that indicate new exploitation activity."
@@ -1161,7 +1161,7 @@ def _run_epss_trend(argv: list[str]) -> int:
 
 def _build_patch_diff_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="manus-use patch-diff",
+        prog="manus-agent patch-diff",
         description=(
             "Fetch the fixing-commit diff for a CVE from GitHub and produce a\n"
             "structured summary: files changed, functions touched, bug class,\n"
@@ -1229,7 +1229,7 @@ def _run_patch_diff(argv: list[str]) -> int:
 
 def _build_compare_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="manus-use compare",
+        prog="manus-agent compare",
         description=(
             "Compare two CVEs side-by-side across CVSS, EPSS, CISA KEV, CWE,\n"
             "attack vector, and other dimensions.  Outputs a prioritisation\n"
@@ -1303,7 +1303,7 @@ def _run_compare(argv: list[str]) -> int:
 
 def _build_exploit_complexity_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="manus-use exploit-complexity",
+        prog="manus-agent exploit-complexity",
         description="Score the practical complexity of exploiting a CVE (1=trivial, 5=very hard).",
     )
     parser.add_argument("cve_id", metavar="CVE-ID", help="CVE identifier (e.g. CVE-2024-3094)")
@@ -1351,7 +1351,7 @@ def _run_exploit_complexity(argv: list[str]) -> int:
 
 def _build_poc_search_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="manus-use poc-search",
+        prog="manus-agent poc-search",
         description=(
             "Search multiple public sources for PoC exploits related to a CVE.\n"
             "Sources: trickest/cve, VulnCheck KEV, Exploit-DB, GitHub, NVD refs."
@@ -1459,7 +1459,7 @@ def _run_poc_search(argv: list[str]) -> int:  # noqa: C901
 
 def _build_changelog_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="manus-use changelog",
+        prog="manus-agent changelog",
         description=(
             "View CHANGELOG.md or generate release notes from recent git commits.\n"
             "Without --generate, prints the CHANGELOG.md content (or the section\n"
@@ -1470,10 +1470,10 @@ def _build_changelog_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  manus-use changelog                       # show full CHANGELOG.md\n"
-            "  manus-use changelog --version 0.1.0       # show section for v0.1.0\n"
-            "  manus-use changelog --generate            # preview next release notes\n"
-            "  manus-use changelog --generate --output json\n"
+            "  manus-agent changelog                       # show full CHANGELOG.md\n"
+            "  manus-agent changelog --version 0.1.0       # show section for v0.1.0\n"
+            "  manus-agent changelog --generate            # preview next release notes\n"
+            "  manus-agent changelog --generate --output json\n"
         ),
     )
     p.add_argument(
@@ -1694,7 +1694,7 @@ def _run_changelog_generate(args: argparse.Namespace, root: "_Path") -> int:  # 
 
 def _build_blast_radius_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="manus-use blast-radius",
+        prog="manus-agent blast-radius",
         description=(
             "Estimate the downstream blast radius of a vulnerable package or CVE.\n"
             "Given a package spec (requests@2.28.0, npm:axios@1.6.0, CVE-2021-44228),\n"
@@ -1862,57 +1862,57 @@ def _run_blast_radius(argv: list[str]) -> int:
 def _build_run_parser() -> argparse.ArgumentParser:
     """Build the top-level run/interactive parser."""
     parser = argparse.ArgumentParser(
-        prog="manus-use",
+        prog="manus-agent",
         description="ManusUse – Advanced AI Agent Framework",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
             "  # Single-shot (non-interactive)\n"
-            '  manus-use "Create a factorial function in Python"\n'
-            '  manus-use --agent browser "Find the top 5 trending GitHub repos today"\n'
-            '  manus-use --output result.txt "Summarise the latest AI news"\n'
-            '  manus-use --format json "List prime numbers up to 50"\n'
-            '  manus-use --format json "task" | jq .result\n\n'
+            '  manus-agent "Create a factorial function in Python"\n'
+            '  manus-agent --agent browser "Find the top 5 trending GitHub repos today"\n'
+            '  manus-agent --output result.txt "Summarise the latest AI news"\n'
+            '  manus-agent --format json "List prime numbers up to 50"\n'
+            '  manus-agent --format json "task" | jq .result\n\n'
             "  # Interactive REPL\n"
-            "  manus-use\n"
-            "  manus-use --mode multi\n\n"
+            "  manus-agent\n"
+            "  manus-agent --mode multi\n\n"
             "  # Setup helpers\n"
-            "  manus-use init           # create ~/.manus-use/config.toml interactively\n"
-            "  manus-use doctor         # check packages, config, and API keys\n"
-            "  manus-use history        # show recent runs (use --help for filters)\n"
+            "  manus-agent init           # create ~/.manus-agent/config.toml interactively\n"
+            "  manus-agent doctor         # check packages, config, and API keys\n"
+            "  manus-agent history        # show recent runs (use --help for filters)\n"
             "\n"
             "  # EPSS trend analysis\n"
-            "  manus-use epss-trend CVE-2024-3094\n"
-            "  manus-use epss-trend CVE-2024-3094 --days 90 --output json\n"
+            "  manus-agent epss-trend CVE-2024-3094\n"
+            "  manus-agent epss-trend CVE-2024-3094 --days 90 --output json\n"
             "\n"
             "  # Patch diff summariser (fixing-commit analysis)\n"
-            "  manus-use patch-diff CVE-2024-3094\n"
-            "  manus-use patch-diff CVE-2024-3094 --output json\n"
+            "  manus-agent patch-diff CVE-2024-3094\n"
+            "  manus-agent patch-diff CVE-2024-3094 --output json\n"
             "\n"
             "  # Vulnerability intelligence analysis\n"
-            "  manus-use analyze CVE-2025-6554\n"
-            "  manus-use analyze CVE-2024-3094 --verify --output json\n"
+            "  manus-agent analyze CVE-2025-6554\n"
+            "  manus-agent analyze CVE-2024-3094 --verify --output json\n"
             "  \n"
             "  # CVE discovery\n"
-            "  manus-use discover\n"
-            "  manus-use discover --since 2025-06-01 --min-epss 0.7 --output json\n"
-            "  manus-use discover --dry-run\n"
+            "  manus-agent discover\n"
+            "  manus-agent discover --since 2025-06-01 --min-epss 0.7 --output json\n"
+            "  manus-agent discover --dry-run\n"
             "  \n"
             "  # CVE remediation guidance\n"
-            "  manus-use remediate CVE-2024-3094\n"
-            "  manus-use remediate CVE-2024-3094 --output json\n"
+            "  manus-agent remediate CVE-2024-3094\n"
+            "  manus-agent remediate CVE-2024-3094 --output json\n"
             "\n"
             "  # Changelog and release notes\n"
-            "  manus-use changelog                           # show full CHANGELOG.md\n"
-            "  manus-use changelog --version 0.1.0          # show section for v0.1.0\n"
-            "  manus-use changelog --generate               # preview next release notes\n"
-            "  manus-use changelog --generate --output json\n"
+            "  manus-agent changelog                           # show full CHANGELOG.md\n"
+            "  manus-agent changelog --version 0.1.0          # show section for v0.1.0\n"
+            "  manus-agent changelog --generate               # preview next release notes\n"
+            "  manus-agent changelog --generate --output json\n"
         ),
     )
     parser.add_argument(
         "--version",
         action="version",
-        version=f"manus-use {__version__}",
+        version=f"manus-agent {__version__}",
     )
     parser.add_argument(
         "task",
@@ -1977,8 +1977,8 @@ def _build_run_parser() -> argparse.ArgumentParser:
 def _build_init_parser() -> argparse.ArgumentParser:
     """Build the `init` subcommand parser."""
     parser = argparse.ArgumentParser(
-        prog="manus-use init",
-        description="Guided wizard to create a manus-use configuration file.",
+        prog="manus-agent init",
+        description="Guided wizard to create a manus-agent configuration file.",
     )
     parser.add_argument(
         "--output",
@@ -1998,8 +1998,8 @@ def _build_init_parser() -> argparse.ArgumentParser:
 def _build_doctor_parser() -> argparse.ArgumentParser:
     """Build the `doctor` subcommand parser."""
     parser = argparse.ArgumentParser(
-        prog="manus-use doctor",
-        description="Diagnose your manus-use installation: packages, config file, API keys.",
+        prog="manus-agent doctor",
+        description="Diagnose your manus-agent installation: packages, config file, API keys.",
     )
     parser.add_argument(
         "--config",
@@ -2014,7 +2014,7 @@ def _build_doctor_parser() -> argparse.ArgumentParser:
 def _build_history_parser() -> argparse.ArgumentParser:
     """Build the `history` subcommand parser."""
     parser = argparse.ArgumentParser(
-        prog="manus-use history",
+        prog="manus-agent history",
         description="Show past single-shot task runs recorded in the history log.",
     )
     parser.add_argument(
@@ -2054,7 +2054,7 @@ def _cmd_history(args: argparse.Namespace) -> int:
         return 0
 
     if not _HISTORY_PATH.exists():
-        console.print("[dim]No history yet – run a task with [cyan]manus-use 'task...'[/cyan] first.[/dim]")
+        console.print("[dim]No history yet – run a task with [cyan]manus-agent 'task...'[/cyan] first.[/dim]")
         return 0
 
     records = []

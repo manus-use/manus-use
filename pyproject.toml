@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "manus-use"
+name = "manus-agent"
 version = "0.1.0"
 description = "A powerful framework for building advanced AI agents with comprehensive tool support and orchestration capabilities"
 readme = "README.md"
@@ -49,8 +49,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/manus-use/manus-use"
-"Bug Tracker" = "https://github.com/manus-use/manus-use/issues"
+Homepage = "https://github.com/manus-use/manus-agent"
+"Bug Tracker" = "https://github.com/manus-use/manus-agent/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/manus_use"]
@@ -89,7 +89,7 @@ cli = [
 ]
 
 [project.scripts]
-manus-use = "manus_use.cli:main"
+manus-agent = "manus_use.cli:main"
 
 [tool.hatch.envs.default]
 features = ["dev", "browser", "search", "visualization"]

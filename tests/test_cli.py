@@ -32,7 +32,7 @@ def _invoke_main(argv, *, patch_single_shot=True, single_shot_rc=0):
         captured["no_history"] = no_history
         return single_shot_rc
 
-    with mock.patch.object(sys, "argv", ["manus-use"] + argv):
+    with mock.patch.object(sys, "argv", ["manus-agent"] + argv):
         with mock.patch.object(cli, "_run_single_shot", side_effect=fake_single_shot) as m_ss:
             with mock.patch.object(cli, "_run_interactive") as m_int:
                 with mock.patch("manus_use.cli.Config") as m_cfg:
@@ -56,7 +56,7 @@ def test_version_flag():
     """--version prints version string and exits 0."""
     from manus_use import cli
 
-    with mock.patch.object(sys, "argv", ["manus-use", "--version"]):
+    with mock.patch.object(sys, "argv", ["manus-agent", "--version"]):
         with pytest.raises(SystemExit) as exc_info:
             cli.main()
     assert exc_info.value.code == 0
@@ -68,7 +68,7 @@ def test_version_flag():
 
 
 def test_single_shot_dispatches_task():
-    """`manus-use 'do X'` routes to _run_single_shot with correct task."""
+    """`manus-agent 'do X'` routes to _run_single_shot with correct task."""
     captured = _invoke_main(["do X"])
     assert captured["task"] == "do X"
     assert captured["_run_single_shot"].called
@@ -143,7 +143,7 @@ def test_output_without_task_is_error():
     """--output without a task argument should produce an argparse error (exit 2)."""
     from manus_use import cli
 
-    with mock.patch.object(sys, "argv", ["manus-use", "--output", "out.txt"]):
+    with mock.patch.object(sys, "argv", ["manus-agent", "--output", "out.txt"]):
         with mock.patch("manus_use.cli.Config") as m_cfg:
             m_cfg.from_file.return_value = mock.MagicMock()
             with pytest.raises(SystemExit) as exc_info:
@@ -319,7 +319,7 @@ def test_append_history_creates_file(tmp_path):
     """_append_history creates the history file and writes a valid JSON record."""
     from manus_use import cli
 
-    hist_path = tmp_path / ".manus-use" / "history.jsonl"
+    hist_path = tmp_path / ".manus-agent" / "history.jsonl"
 
     with mock.patch.object(cli, "_HISTORY_PATH", hist_path):
         cli._append_history(
@@ -419,7 +419,7 @@ def test_history_flag_calls_append(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# manus-use history subcommand
+# manus-agent history subcommand
 # ---------------------------------------------------------------------------
 
 
@@ -428,7 +428,7 @@ def _invoke_history(argv):
     from manus_use import cli
 
     captured = {}
-    with mock.patch.object(sys, "argv", ["manus-use", "history"] + argv):
+    with mock.patch.object(sys, "argv", ["manus-agent", "history"] + argv):
         with mock.patch.object(cli, "_cmd_history") as m_hist:
             m_hist.return_value = 0
             try:
@@ -440,7 +440,7 @@ def _invoke_history(argv):
 
 
 def test_history_subcommand_dispatches():
-    """manus-use history dispatches to _cmd_history."""
+    """manus-agent history dispatches to _cmd_history."""
     captured = _invoke_history([])
     assert captured["_cmd_history"].called
 
