@@ -1,5 +1,5 @@
 """
-Tests for src/manus_use/tools/get_dependency_blast_radius.py
+Tests for src/manus_agent/tools/get_dependency_blast_radius.py
 
 All external HTTP calls are mocked — no real network I/O.
 100% mocked: NVD, OSV, GHSA, npm, PyPI, pypistats, Maven Central.
@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from manus_use.tools.get_dependency_blast_radius import (
+from manus_agent.tools.get_dependency_blast_radius import (
     _blast_score,
     _enrich_maven,
     _enrich_npm,
@@ -643,31 +643,31 @@ class TestEnrichMaven:
 
 class TestEnrichPackageDispatch:
     def test_npm_ecosystem(self):
-        with patch("manus_use.tools.get_dependency_blast_radius._enrich_npm") as mock_npm:
+        with patch("manus_agent.tools.get_dependency_blast_radius._enrich_npm") as mock_npm:
             mock_npm.return_value = {"ecosystem": "npm", "package_name": "axios"}
             _enrich_package("axios", "npm")
         mock_npm.assert_called_once_with("axios")
 
     def test_javascript_ecosystem_routes_to_npm(self):
-        with patch("manus_use.tools.get_dependency_blast_radius._enrich_npm") as mock_npm:
+        with patch("manus_agent.tools.get_dependency_blast_radius._enrich_npm") as mock_npm:
             mock_npm.return_value = {"ecosystem": "npm", "package_name": "react"}
             _enrich_package("react", "javascript")
         mock_npm.assert_called_once_with("react")
 
     def test_pypi_ecosystem(self):
-        with patch("manus_use.tools.get_dependency_blast_radius._enrich_pypi") as mock_pypi:
+        with patch("manus_agent.tools.get_dependency_blast_radius._enrich_pypi") as mock_pypi:
             mock_pypi.return_value = {"ecosystem": "PyPI", "package_name": "requests"}
             _enrich_package("requests", "PyPI")
         mock_pypi.assert_called_once_with("requests")
 
     def test_python_ecosystem_routes_to_pypi(self):
-        with patch("manus_use.tools.get_dependency_blast_radius._enrich_pypi") as mock_pypi:
+        with patch("manus_agent.tools.get_dependency_blast_radius._enrich_pypi") as mock_pypi:
             mock_pypi.return_value = {"ecosystem": "PyPI", "package_name": "flask"}
             _enrich_package("flask", "python")
         mock_pypi.assert_called_once_with("flask")
 
     def test_maven_ecosystem(self):
-        with patch("manus_use.tools.get_dependency_blast_radius._enrich_maven") as mock_maven:
+        with patch("manus_agent.tools.get_dependency_blast_radius._enrich_maven") as mock_maven:
             mock_maven.return_value = {"ecosystem": "Maven", "package_name": "log4j-core"}
             _enrich_package("log4j-core", "Maven")
         mock_maven.assert_called_once_with("log4j-core")
@@ -705,19 +705,19 @@ class TestGetDependencyBlastRadius:
 
         patches = [
             patch(
-                "manus_use.tools.get_dependency_blast_radius._fetch_nvd_affected",
+                "manus_agent.tools.get_dependency_blast_radius._fetch_nvd_affected",
                 return_value=nvd_pkgs,
             ),
             patch(
-                "manus_use.tools.get_dependency_blast_radius._fetch_osv_affected",
+                "manus_agent.tools.get_dependency_blast_radius._fetch_osv_affected",
                 return_value=osv_pkgs,
             ),
             patch(
-                "manus_use.tools.get_dependency_blast_radius._fetch_ghsa_affected",
+                "manus_agent.tools.get_dependency_blast_radius._fetch_ghsa_affected",
                 return_value=ghsa_pkgs,
             ),
             patch(
-                "manus_use.tools.get_dependency_blast_radius._enrich_package",
+                "manus_agent.tools.get_dependency_blast_radius._enrich_package",
                 return_value=npm_stats,
             ),
         ]
@@ -725,9 +725,9 @@ class TestGetDependencyBlastRadius:
 
     def test_cve_no_packages_found_returns_message(self):
         with (
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_nvd_affected", return_value=[]),
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_osv_affected", return_value=[]),
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_ghsa_affected", return_value=[]),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_nvd_affected", return_value=[]),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_osv_affected", return_value=[]),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_ghsa_affected", return_value=[]),
         ):
             result = get_dependency_blast_radius("CVE-2021-44228")
         assert "No affected package records found" in result
@@ -741,11 +741,11 @@ class TestGetDependencyBlastRadius:
             "weekly_downloads": 130000000,
         }
         with (
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_nvd_affected", return_value=[]),
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_osv_affected", return_value=pkgs),
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_ghsa_affected", return_value=[]),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_nvd_affected", return_value=[]),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_osv_affected", return_value=pkgs),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_ghsa_affected", return_value=[]),
             patch(
-                "manus_use.tools.get_dependency_blast_radius._enrich_package",
+                "manus_agent.tools.get_dependency_blast_radius._enrich_package",
                 return_value=npm_stats,
             ),
         ):
@@ -762,7 +762,7 @@ class TestGetDependencyBlastRadius:
             "weekly_downloads": 130000000,
         }
         with patch(
-            "manus_use.tools.get_dependency_blast_radius._enrich_package",
+            "manus_agent.tools.get_dependency_blast_radius._enrich_package",
             return_value=npm_stats,
         ):
             result = get_dependency_blast_radius("lodash@4.17.20")
@@ -785,11 +785,11 @@ class TestGetDependencyBlastRadius:
             "weekly_downloads": 60000000,
         }
         with (
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_nvd_affected", return_value=[]),
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_osv_affected", return_value=osv_pkgs),
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_ghsa_affected", return_value=ghsa_pkgs),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_nvd_affected", return_value=[]),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_osv_affected", return_value=osv_pkgs),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_ghsa_affected", return_value=ghsa_pkgs),
             patch(
-                "manus_use.tools.get_dependency_blast_radius._enrich_package",
+                "manus_agent.tools.get_dependency_blast_radius._enrich_package",
                 return_value=pypi_stats,
             ) as mock_enrich,
         ):
@@ -810,11 +810,11 @@ class TestGetDependencyBlastRadius:
                 return {"ecosystem": "npm", "package_name": "big-lib", "weekly_downloads": 10_000_000}
 
         with (
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_nvd_affected", return_value=[]),
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_osv_affected", return_value=osv_pkgs),
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_ghsa_affected", return_value=[]),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_nvd_affected", return_value=[]),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_osv_affected", return_value=osv_pkgs),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_ghsa_affected", return_value=[]),
             patch(
-                "manus_use.tools.get_dependency_blast_radius._enrich_package",
+                "manus_agent.tools.get_dependency_blast_radius._enrich_package",
                 side_effect=enrich_side_effect,
             ),
         ):
@@ -831,11 +831,11 @@ class TestGetDependencyBlastRadius:
             "weekly_downloads": 120000000,
         }
         with (
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_nvd_affected", return_value=[]),
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_osv_affected", return_value=[]),
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_ghsa_affected", return_value=pkgs),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_nvd_affected", return_value=[]),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_osv_affected", return_value=[]),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_ghsa_affected", return_value=pkgs),
             patch(
-                "manus_use.tools.get_dependency_blast_radius._enrich_package",
+                "manus_agent.tools.get_dependency_blast_radius._enrich_package",
                 return_value=npm_stats,
             ),
         ):
@@ -854,11 +854,11 @@ class TestGetDependencyBlastRadius:
             return {"ecosystem": "npm", "package_name": name, "weekly_downloads": 100}
 
         with (
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_nvd_affected", return_value=[]),
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_osv_affected", return_value=many_pkgs),
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_ghsa_affected", return_value=[]),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_nvd_affected", return_value=[]),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_osv_affected", return_value=many_pkgs),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_ghsa_affected", return_value=[]),
             patch(
-                "manus_use.tools.get_dependency_blast_radius._enrich_package",
+                "manus_agent.tools.get_dependency_blast_radius._enrich_package",
                 side_effect=enrich_counter,
             ),
         ):
@@ -876,11 +876,11 @@ class TestGetDependencyBlastRadius:
             "release_count": 163,
         }
         with (
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_nvd_affected", return_value=[]),
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_osv_affected", return_value=pkgs),
-            patch("manus_use.tools.get_dependency_blast_radius._fetch_ghsa_affected", return_value=[]),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_nvd_affected", return_value=[]),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_osv_affected", return_value=pkgs),
+            patch("manus_agent.tools.get_dependency_blast_radius._fetch_ghsa_affected", return_value=[]),
             patch(
-                "manus_use.tools.get_dependency_blast_radius._enrich_package",
+                "manus_agent.tools.get_dependency_blast_radius._enrich_package",
                 return_value=pypi_stats,
             ),
         ):
@@ -895,41 +895,41 @@ class TestGetDependencyBlastRadius:
 
 class TestCliParser:
     def test_spec_argument_required(self):
-        from manus_use.cli import _build_blast_radius_parser
+        from manus_agent.cli import _build_blast_radius_parser
 
         parser = _build_blast_radius_parser()
         with pytest.raises(SystemExit):
             parser.parse_args([])
 
     def test_default_output_text(self):
-        from manus_use.cli import _build_blast_radius_parser
+        from manus_agent.cli import _build_blast_radius_parser
 
         parser = _build_blast_radius_parser()
         args = parser.parse_args(["CVE-2021-44228"])
         assert args.output == "text"
 
     def test_output_json(self):
-        from manus_use.cli import _build_blast_radius_parser
+        from manus_agent.cli import _build_blast_radius_parser
 
         parser = _build_blast_radius_parser()
         args = parser.parse_args(["CVE-2021-44228", "--output", "json"])
         assert args.output == "json"
 
     def test_max_packages_default(self):
-        from manus_use.cli import _build_blast_radius_parser
+        from manus_agent.cli import _build_blast_radius_parser
 
         parser = _build_blast_radius_parser()
         args = parser.parse_args(["requests@2.28.0"])
         assert args.max_packages == 10
 
     def test_max_packages_custom(self):
-        from manus_use.cli import _build_blast_radius_parser
+        from manus_agent.cli import _build_blast_radius_parser
 
         parser = _build_blast_radius_parser()
         args = parser.parse_args(["requests@2.28.0", "--max-packages", "20"])
         assert args.max_packages == 20
 
     def test_blast_radius_in_subcommands_set(self):
-        from manus_use.cli import _SUBCOMMANDS
+        from manus_agent.cli import _SUBCOMMANDS
 
         assert "blast-radius" in _SUBCOMMANDS

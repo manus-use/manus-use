@@ -19,7 +19,7 @@ from unittest import mock
 
 def test_agent_config_model_id_default_is_none():
     """AgentConfig.model_id defaults to None when not specified."""
-    from manus_use.config import AgentConfig
+    from manus_agent.config import AgentConfig
 
     cfg = AgentConfig()
     assert cfg.model_id is None
@@ -27,7 +27,7 @@ def test_agent_config_model_id_default_is_none():
 
 def test_agent_config_aws_region_default_is_none():
     """AgentConfig.aws_region defaults to None when not specified."""
-    from manus_use.config import AgentConfig
+    from manus_agent.config import AgentConfig
 
     cfg = AgentConfig()
     assert cfg.aws_region is None
@@ -35,7 +35,7 @@ def test_agent_config_aws_region_default_is_none():
 
 def test_agent_config_context_manager_default():
     """AgentConfig.context_manager defaults to 'auto'."""
-    from manus_use.config import AgentConfig
+    from manus_agent.config import AgentConfig
 
     cfg = AgentConfig()
     assert cfg.context_manager == "auto"
@@ -43,7 +43,7 @@ def test_agent_config_context_manager_default():
 
 def test_agent_config_accepts_model_id():
     """AgentConfig accepts an explicit model_id."""
-    from manus_use.config import AgentConfig
+    from manus_agent.config import AgentConfig
 
     cfg = AgentConfig(model_id="us.anthropic.claude-opus-4-20250514-v1:0")
     assert cfg.model_id == "us.anthropic.claude-opus-4-20250514-v1:0"
@@ -51,7 +51,7 @@ def test_agent_config_accepts_model_id():
 
 def test_agent_config_accepts_aws_region():
     """AgentConfig accepts an explicit aws_region."""
-    from manus_use.config import AgentConfig
+    from manus_agent.config import AgentConfig
 
     cfg = AgentConfig(aws_region="eu-west-1")
     assert cfg.aws_region == "eu-west-1"
@@ -59,7 +59,7 @@ def test_agent_config_accepts_aws_region():
 
 def test_agent_config_all_fields_together():
     """AgentConfig accepts all three fields simultaneously."""
-    from manus_use.config import AgentConfig
+    from manus_agent.config import AgentConfig
 
     cfg = AgentConfig(
         context_manager="agentic",
@@ -80,7 +80,7 @@ def test_config_from_file_agent_model_id(tmp_path):
     """Config.from_file() reads [agent].model_id from a TOML config file."""
     config_file = tmp_path / "config.toml"
     config_file.write_text('[agent]\nmodel_id = "us.anthropic.claude-opus-4-20250514-v1:0"\n')
-    from manus_use.config import Config
+    from manus_agent.config import Config
 
     cfg = Config.from_file(config_file)
     assert cfg.agent.model_id == "us.anthropic.claude-opus-4-20250514-v1:0"
@@ -90,7 +90,7 @@ def test_config_from_file_agent_aws_region(tmp_path):
     """Config.from_file() reads [agent].aws_region from a TOML config file."""
     config_file = tmp_path / "config.toml"
     config_file.write_text('[agent]\naws_region = "eu-central-1"\n')
-    from manus_use.config import Config
+    from manus_agent.config import Config
 
     cfg = Config.from_file(config_file)
     assert cfg.agent.aws_region == "eu-central-1"
@@ -105,7 +105,7 @@ def test_config_from_file_agent_full_section(tmp_path):
         'model_id = "us.anthropic.claude-3-5-haiku-20241022-v1:0"\n'
         'aws_region = "us-west-2"\n'
     )
-    from manus_use.config import Config
+    from manus_agent.config import Config
 
     cfg = Config.from_file(config_file)
     assert cfg.agent.context_manager == "agentic"
@@ -117,7 +117,7 @@ def test_config_from_file_agent_defaults_when_absent(tmp_path):
     """Config.from_file() uses AgentConfig defaults when [agent] section is absent."""
     config_file = tmp_path / "config.toml"
     config_file.write_text('[llm]\nprovider = "openai"\n')
-    from manus_use.config import Config
+    from manus_agent.config import Config
 
     cfg = Config.from_file(config_file)
     assert cfg.agent.model_id is None
@@ -129,7 +129,7 @@ def test_config_from_file_agent_partial_section(tmp_path):
     """Config.from_file() handles partial [agent] sections (only one field set)."""
     config_file = tmp_path / "config.toml"
     config_file.write_text('[agent]\naws_region = "ap-northeast-1"\n')
-    from manus_use.config import Config
+    from manus_agent.config import Config
 
     cfg = Config.from_file(config_file)
     assert cfg.agent.aws_region == "ap-northeast-1"
@@ -173,9 +173,9 @@ def _make_fake_strands_agent():
 def _reload_variant_agent():
     """Force a fresh import of variant_agent from the current sys.modules."""
     for key in list(sys.modules):
-        if "manus_use.agents.variant_agent" in key:
+        if "manus_agent.agents.variant_agent" in key:
             del sys.modules[key]
-    from manus_use.agents.variant_agent import VariantAnalysisAgent
+    from manus_agent.agents.variant_agent import VariantAnalysisAgent
 
     return VariantAnalysisAgent
 
@@ -187,7 +187,7 @@ def _reload_variant_agent():
 
 def test_variant_agent_uses_config_model_id():
     """VariantAnalysisAgent._build_agent() picks up model_id from config.agent."""
-    from manus_use.config import AgentConfig, Config
+    from manus_agent.config import AgentConfig, Config
 
     cfg = Config()
     cfg.agent = AgentConfig(model_id="test-model-override", aws_region="eu-west-1")
@@ -214,7 +214,7 @@ def test_variant_agent_uses_config_model_id():
 
 def test_variant_agent_falls_back_to_default_model_id_when_not_set():
     """VariantAnalysisAgent._build_agent() uses DEFAULT_MODEL_ID when config.agent.model_id is None."""
-    from manus_use.config import AgentConfig, Config
+    from manus_agent.config import AgentConfig, Config
 
     cfg = Config()
     cfg.agent = AgentConfig()  # model_id=None, aws_region=None
@@ -232,7 +232,7 @@ def test_variant_agent_falls_back_to_default_model_id_when_not_set():
         },
     ):
         agent_cls = _reload_variant_agent()
-        from manus_use.agents.variant_agent import DEFAULT_MODEL_ID
+        from manus_agent.agents.variant_agent import DEFAULT_MODEL_ID
 
         agent = agent_cls(config=cfg)
         agent._build_agent()
@@ -243,7 +243,7 @@ def test_variant_agent_falls_back_to_default_model_id_when_not_set():
 
 def test_variant_agent_falls_back_to_default_region_when_not_set():
     """VariantAnalysisAgent falls back to us-east-1 when config.agent.aws_region is None."""
-    from manus_use.config import AgentConfig, Config
+    from manus_agent.config import AgentConfig, Config
 
     cfg = Config()
     cfg.agent = AgentConfig(model_id="some-model", aws_region=None)
@@ -299,19 +299,19 @@ def test_variant_agent_injected_model_skips_bedrock_resolution():
 
 
 def test_cli_v2_removed():
-    """manus_use.cli_v2 must not exist — it was dead code."""
+    """manus_agent.cli_v2 must not exist — it was dead code."""
     import pathlib
 
-    src_root = pathlib.Path(__file__).resolve().parents[1] / "src" / "manus_use"
+    src_root = pathlib.Path(__file__).resolve().parents[1] / "src" / "manus_agent"
     cli_v2_path = src_root / "cli_v2.py"
     assert not cli_v2_path.exists(), f"cli_v2.py still exists at {cli_v2_path}"
 
 
 def test_cli_enhanced_removed():
-    """manus_use.cli_enhanced must not exist — it was dead code."""
+    """manus_agent.cli_enhanced must not exist — it was dead code."""
     import pathlib
 
-    src_root = pathlib.Path(__file__).resolve().parents[1] / "src" / "manus_use"
+    src_root = pathlib.Path(__file__).resolve().parents[1] / "src" / "manus_agent"
     cli_enhanced_path = src_root / "cli_enhanced.py"
     assert not cli_enhanced_path.exists(), f"cli_enhanced.py still exists at {cli_enhanced_path}"
 

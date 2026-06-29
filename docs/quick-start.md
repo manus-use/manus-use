@@ -23,7 +23,7 @@ cp config/config.example.toml config/config.toml
 ### Simple Agent
 
 ```python
-from manus_use import ManusAgent
+from manus_agent import ManusAgent
 
 agent = ManusAgent()
 response = agent("Create a Python function to calculate factorial")
@@ -33,8 +33,8 @@ print(response)
 ### With Custom Tools
 
 ```python
-from manus_use import ManusAgent
-from manus_use.tools import file_read, file_write, code_execute
+from manus_agent import ManusAgent
+from manus_agent.tools import file_read, file_write, code_execute
 
 agent = ManusAgent(tools=[file_read, file_write, code_execute])
 response = agent("Read data.csv and create a summary report")
@@ -43,7 +43,7 @@ response = agent("Read data.csv and create a summary report")
 ### Browser Agent
 
 ```python
-from manus_use import BrowserAgent
+from manus_agent import BrowserAgent
 
 agent = BrowserAgent()
 response = agent("Search for the latest AI news and summarize top 3 stories")
@@ -52,7 +52,7 @@ response = agent("Search for the latest AI news and summarize top 3 stories")
 ### Data Analysis
 
 ```python
-from manus_use import DataAnalysisAgent
+from manus_agent import DataAnalysisAgent
 
 agent = DataAnalysisAgent()
 response = agent("Create a sample dataset and perform statistical analysis")
@@ -61,7 +61,7 @@ response = agent("Create a sample dataset and perform statistical analysis")
 ## Multi-Agent Workflows
 
 ```python
-from manus_use import FlowOrchestrator
+from manus_agent import FlowOrchestrator
 
 flow = FlowOrchestrator()
 result = flow.run(
@@ -104,7 +104,7 @@ manus-use
 
 Or:
 ```bash
-python -m manus_use.cli
+python -m manus_agent.cli
 ```
 
 ## Next Steps

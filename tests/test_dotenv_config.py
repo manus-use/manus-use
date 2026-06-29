@@ -5,7 +5,7 @@ from unittest import mock
 
 import pytest
 
-from manus_use.config import Config, _load_dotenv
+from manus_agent.config import Config, _load_dotenv
 
 # ---------------------------------------------------------------------------
 # _load_dotenv helper

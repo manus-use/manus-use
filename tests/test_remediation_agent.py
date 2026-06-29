@@ -15,19 +15,19 @@ import pytest
 
 def test_remediation_agent_module_imports_without_crashing():
     """The module must be importable even without optional deps installed."""
-    import manus_use.agents.remediation_agent as ra
+    import manus_agent.agents.remediation_agent as ra
 
     assert hasattr(ra, "RemediationAgent")
 
 
 def test_remediation_agent_exported_from_agents_package():
     """RemediationAgent is re-exported from the agents package."""
-    from manus_use.agents import RemediationAgent  # noqa: F401
+    from manus_agent.agents import RemediationAgent  # noqa: F401
 
 
 def test_default_model_id_is_defined():
     """DEFAULT_MODEL_ID is a non-empty string."""
-    from manus_use.agents.remediation_agent import DEFAULT_MODEL_ID
+    from manus_agent.agents.remediation_agent import DEFAULT_MODEL_ID
 
     assert isinstance(DEFAULT_MODEL_ID, str)
     assert DEFAULT_MODEL_ID
@@ -40,7 +40,7 @@ def test_default_model_id_is_defined():
 
 def test_build_request_default_output_is_text():
     """build_request without output kwarg produces a text prompt."""
-    from manus_use.agents.remediation_agent import RemediationAgent
+    from manus_agent.agents.remediation_agent import RemediationAgent
 
     req = RemediationAgent.build_request("CVE-2024-3094")
     assert "CVE-2024-3094" in req
@@ -50,7 +50,7 @@ def test_build_request_default_output_is_text():
 
 def test_build_request_json_output():
     """build_request with output='json' adds JSON envelope instructions."""
-    from manus_use.agents.remediation_agent import RemediationAgent
+    from manus_agent.agents.remediation_agent import RemediationAgent
 
     req = RemediationAgent.build_request("CVE-2024-3094", output="json")
     assert "CVE-2024-3094" in req
@@ -60,7 +60,7 @@ def test_build_request_json_output():
 
 def test_build_request_normalises_cve_id_case():
     """build_request uppercases the CVE ID regardless of input case."""
-    from manus_use.agents.remediation_agent import RemediationAgent
+    from manus_agent.agents.remediation_agent import RemediationAgent
 
     req = RemediationAgent.build_request("cve-2024-3094")
     assert "CVE-2024-3094" in req
@@ -68,7 +68,7 @@ def test_build_request_normalises_cve_id_case():
 
 def test_build_request_strips_whitespace():
     """build_request strips surrounding whitespace from the CVE ID."""
-    from manus_use.agents.remediation_agent import RemediationAgent
+    from manus_agent.agents.remediation_agent import RemediationAgent
 
     req = RemediationAgent.build_request("  CVE-2024-3094  ")
     assert "CVE-2024-3094" in req
@@ -81,10 +81,10 @@ def test_build_request_strips_whitespace():
 
 def test_remediation_agent_handle_request_returns_string():
     """handle_request converts the agent response to a string."""
-    from manus_use.agents.remediation_agent import RemediationAgent
+    from manus_agent.agents.remediation_agent import RemediationAgent
 
     with mock.patch(
-        "manus_use.agents.remediation_agent.RemediationAgent.__init__",
+        "manus_agent.agents.remediation_agent.RemediationAgent.__init__",
         return_value=None,
     ):
         agent = RemediationAgent.__new__(RemediationAgent)
@@ -99,10 +99,10 @@ def test_remediation_agent_handle_request_returns_string():
 
 def test_remediation_agent_remediate_calls_handle_request():
     """remediate() is a convenience wrapper around build_request + handle_request."""
-    from manus_use.agents.remediation_agent import RemediationAgent
+    from manus_agent.agents.remediation_agent import RemediationAgent
 
     with mock.patch(
-        "manus_use.agents.remediation_agent.RemediationAgent.__init__",
+        "manus_agent.agents.remediation_agent.RemediationAgent.__init__",
         return_value=None,
     ):
         agent = RemediationAgent.__new__(RemediationAgent)
@@ -121,10 +121,10 @@ def test_remediation_agent_remediate_calls_handle_request():
 
 def test_remediation_agent_remediate_json_mode():
     """remediate(output='json') passes the correct JSON prompt to the agent."""
-    from manus_use.agents.remediation_agent import RemediationAgent
+    from manus_agent.agents.remediation_agent import RemediationAgent
 
     with mock.patch(
-        "manus_use.agents.remediation_agent.RemediationAgent.__init__",
+        "manus_agent.agents.remediation_agent.RemediationAgent.__init__",
         return_value=None,
     ):
         agent = RemediationAgent.__new__(RemediationAgent)
@@ -146,7 +146,7 @@ def test_remediation_agent_remediate_json_mode():
 
 def test_remediate_parser_accepts_cve_id():
     """Parser accepts a positional CVE-ID argument."""
-    from manus_use.cli import _build_remediate_parser
+    from manus_agent.cli import _build_remediate_parser
 
     args = _build_remediate_parser().parse_args(["CVE-2024-3094"])
     assert args.cve_id == "CVE-2024-3094"
@@ -154,7 +154,7 @@ def test_remediate_parser_accepts_cve_id():
 
 def test_remediate_parser_default_output_is_text():
     """--output defaults to 'text'."""
-    from manus_use.cli import _build_remediate_parser
+    from manus_agent.cli import _build_remediate_parser
 
     args = _build_remediate_parser().parse_args(["CVE-2024-3094"])
     assert args.output == "text"
@@ -162,7 +162,7 @@ def test_remediate_parser_default_output_is_text():
 
 def test_remediate_parser_output_json():
     """--output json is accepted."""
-    from manus_use.cli import _build_remediate_parser
+    from manus_agent.cli import _build_remediate_parser
 
     args = _build_remediate_parser().parse_args(["CVE-2024-3094", "--output", "json"])
     assert args.output == "json"
@@ -170,7 +170,7 @@ def test_remediate_parser_output_json():
 
 def test_remediate_parser_config_path():
     """--config FILE is accepted and returns a Path."""
-    from manus_use.cli import _build_remediate_parser
+    from manus_agent.cli import _build_remediate_parser
 
     args = _build_remediate_parser().parse_args(["CVE-2024-3094", "--config", "/tmp/config.toml"])
     assert args.config == Path("/tmp/config.toml")
@@ -178,7 +178,7 @@ def test_remediate_parser_config_path():
 
 def test_remediate_parser_no_config_defaults_to_none():
     """--config defaults to None (triggers auto-search)."""
-    from manus_use.cli import _build_remediate_parser
+    from manus_agent.cli import _build_remediate_parser
 
     args = _build_remediate_parser().parse_args(["CVE-2024-3094"])
     assert args.config is None
@@ -186,7 +186,7 @@ def test_remediate_parser_no_config_defaults_to_none():
 
 def test_remediate_parser_rejects_missing_cve_id():
     """Parser errors when CVE-ID is not provided."""
-    from manus_use.cli import _build_remediate_parser
+    from manus_agent.cli import _build_remediate_parser
 
     with pytest.raises(SystemExit) as exc_info:
         _build_remediate_parser().parse_args([])
@@ -195,7 +195,7 @@ def test_remediate_parser_rejects_missing_cve_id():
 
 def test_remediate_parser_rejects_invalid_output_format():
     """Parser rejects --output values other than text/json."""
-    from manus_use.cli import _build_remediate_parser
+    from manus_agent.cli import _build_remediate_parser
 
     with pytest.raises(SystemExit) as exc_info:
         _build_remediate_parser().parse_args(["CVE-2024-3094", "--output", "xml"])
@@ -209,12 +209,12 @@ def test_remediate_parser_rejects_invalid_output_format():
 
 def test_run_remediate_success_returns_0():
     """_run_remediate returns 0 on success."""
-    from manus_use.config import Config
+    from manus_agent.config import Config
 
     mock_agent = mock.MagicMock()
     mock_agent.handle_request.return_value = "Upgrade to version 2.0"
 
-    with mock.patch("manus_use.cli._run_remediate", return_value=0) as patched:
+    with mock.patch("manus_agent.cli._run_remediate", return_value=0) as patched:
         result = patched(cve_id="CVE-2024-3094", output="text", config=Config())
 
     assert result == 0
@@ -222,10 +222,10 @@ def test_run_remediate_success_returns_0():
 
 def test_run_remediate_import_error_returns_1():
     """_run_remediate returns 1 when RemediationAgent cannot be imported."""
-    from manus_use.config import Config
+    from manus_agent.config import Config
 
     with mock.patch(
-        "manus_use.cli._run_remediate",
+        "manus_agent.cli._run_remediate",
         side_effect=None,
         return_value=1,
     ) as patched:
@@ -241,11 +241,11 @@ def test_run_remediate_import_error_returns_1():
 
 def test_main_dispatches_remediate_subcommand(monkeypatch):
     """main() routes 'remediate CVE-...' to _run_remediate."""
-    from manus_use import cli
+    from manus_agent import cli
 
     monkeypatch.setattr(sys, "argv", ["manus-agent", "remediate", "CVE-2024-3094"])
 
-    with mock.patch("manus_use.cli._run_remediate", return_value=0) as mock_run:
+    with mock.patch("manus_agent.cli._run_remediate", return_value=0) as mock_run:
         with pytest.raises(SystemExit) as exc_info:
             cli.main()
 
@@ -258,11 +258,11 @@ def test_main_dispatches_remediate_subcommand(monkeypatch):
 
 def test_main_dispatches_remediate_with_json_flag(monkeypatch):
     """main() passes --output json through to _run_remediate."""
-    from manus_use import cli
+    from manus_agent import cli
 
     monkeypatch.setattr(sys, "argv", ["manus-agent", "remediate", "CVE-2024-3094", "--output", "json"])
 
-    with mock.patch("manus_use.cli._run_remediate", return_value=0) as mock_run:
+    with mock.patch("manus_agent.cli._run_remediate", return_value=0) as mock_run:
         with pytest.raises(SystemExit) as exc_info:
             cli.main()
 
@@ -273,7 +273,7 @@ def test_main_dispatches_remediate_with_json_flag(monkeypatch):
 
 def test_main_remediate_missing_cve_id_exits_nonzero(monkeypatch):
     """main() with 'remediate' but no CVE-ID exits non-zero."""
-    from manus_use import cli
+    from manus_agent import cli
 
     monkeypatch.setattr(sys, "argv", ["manus-agent", "remediate"])
 
@@ -285,7 +285,7 @@ def test_main_remediate_missing_cve_id_exits_nonzero(monkeypatch):
 
 def test_main_remediate_is_in_subcommands_set():
     """The _SUBCOMMANDS set includes 'remediate'."""
-    from manus_use.cli import _SUBCOMMANDS
+    from manus_agent.cli import _SUBCOMMANDS
 
     assert "remediate" in _SUBCOMMANDS
 
@@ -297,7 +297,7 @@ def test_main_remediate_is_in_subcommands_set():
 
 def test_system_prompt_has_required_sections():
     """The system prompt instructs the agent to produce the expected report sections."""
-    from manus_use.agents.remediation_agent import _SYSTEM_PROMPT
+    from manus_agent.agents.remediation_agent import _SYSTEM_PROMPT
 
     for section in ("Summary", "Exploitation Status", "Remediation Steps", "Verification", "References"):
         assert section in _SYSTEM_PROMPT, f"Missing section: {section}"
@@ -305,7 +305,7 @@ def test_system_prompt_has_required_sections():
 
 def test_system_prompt_mentions_nvd_and_cisa():
     """The system prompt instructs the agent to check NVD and CISA KEV."""
-    from manus_use.agents.remediation_agent import _SYSTEM_PROMPT
+    from manus_agent.agents.remediation_agent import _SYSTEM_PROMPT
 
     assert "get_nvd_data" in _SYSTEM_PROMPT
     assert "check_cisa_kev" in _SYSTEM_PROMPT
@@ -313,14 +313,14 @@ def test_system_prompt_mentions_nvd_and_cisa():
 
 def test_system_prompt_mentions_cwe():
     """The system prompt instructs the agent to look up CWE weakness details."""
-    from manus_use.agents.remediation_agent import _SYSTEM_PROMPT
+    from manus_agent.agents.remediation_agent import _SYSTEM_PROMPT
 
     assert "get_cwe_details" in _SYSTEM_PROMPT
 
 
 def test_system_prompt_mentions_urgency_levels():
     """The system prompt requires the agent to classify urgency."""
-    from manus_use.agents.remediation_agent import _SYSTEM_PROMPT
+    from manus_agent.agents.remediation_agent import _SYSTEM_PROMPT
 
     assert "CRITICAL" in _SYSTEM_PROMPT
     assert "urgency" in _SYSTEM_PROMPT.lower()
@@ -371,8 +371,8 @@ def test_remediation_agent_live_run():
     pytest.importorskip("strands", reason="strands not installed")
     pytest.importorskip("boto3", reason="boto3 not installed")
 
-    from manus_use.agents.remediation_agent import RemediationAgent
-    from manus_use.config import Config
+    from manus_agent.agents.remediation_agent import RemediationAgent
+    from manus_agent.config import Config
 
     config = Config.from_file()
     try:

@@ -15,9 +15,9 @@ from typing import Any
 
 from strands import Agent
 
-from manus_use.config import Config
-from manus_use.tools import manus_workflow
-from manus_use.tools.manus_workflow import WORKFLOW_DIR
+from manus_agent.config import Config
+from manus_agent.tools import manus_workflow
+from manus_agent.tools.manus_workflow import WORKFLOW_DIR
 
 SYSTEM_PROMPT = """You are a Workflow Management Agent that coordinates complex
 multi-step tasks using different specialised agents:

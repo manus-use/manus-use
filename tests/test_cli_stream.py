@@ -11,14 +11,14 @@ from unittest import mock
 
 
 def _build_run_parser():
-    from manus_use.cli import _build_run_parser as _brp
+    from manus_agent.cli import _build_run_parser as _brp
 
     return _brp()
 
 
 def _invoke_main(argv, *, single_shot_rc=0):
     """Call cli.main() and return captured data."""
-    from manus_use import cli
+    from manus_agent import cli
 
     captured = {}
 
@@ -47,7 +47,7 @@ def _invoke_main(argv, *, single_shot_rc=0):
     with mock.patch.object(sys, "argv", ["manus-agent"] + argv):
         with mock.patch.object(cli, "_run_single_shot", side_effect=fake_single_shot) as m_ss:
             with mock.patch.object(cli, "_run_interactive"):
-                with mock.patch("manus_use.cli.Config") as m_cfg:
+                with mock.patch("manus_agent.cli.Config") as m_cfg:
                     m_cfg.from_file.return_value = mock.MagicMock()
                     try:
                         cli.main()
@@ -128,7 +128,7 @@ def test_main_no_stream_flag_forwarded_false():
 
 def test_stream_and_json_warns_stderr(tmp_path):
     """--stream --format json writes a warning to stderr."""
-    from manus_use import cli
+    from manus_agent import cli
 
     fake_agent = mock.MagicMock()
     fake_agent.return_value = "some result"
@@ -136,8 +136,8 @@ def test_stream_and_json_warns_stderr(tmp_path):
 
     stderr_capture = StringIO()
 
-    with mock.patch("manus_use.cli._make_agent", return_value=fake_agent):
-        with mock.patch("manus_use.cli._append_history"):
+    with mock.patch("manus_agent.cli._make_agent", return_value=fake_agent):
+        with mock.patch("manus_agent.cli._append_history"):
             with mock.patch("sys.stderr", stderr_capture):
                 with mock.patch("sys.stdout", StringIO()):
                     cli._run_single_shot(
@@ -159,7 +159,7 @@ def test_stream_and_json_warns_stderr(tmp_path):
 
 def test_stream_and_json_output_is_valid_json(tmp_path):
     """--stream --format json still produces valid JSON output."""
-    from manus_use import cli
+    from manus_agent import cli
 
     fake_response = mock.MagicMock()
     fake_response.__str__ = lambda self: "hello result"
@@ -169,8 +169,8 @@ def test_stream_and_json_output_is_valid_json(tmp_path):
 
     stdout_capture = StringIO()
 
-    with mock.patch("manus_use.cli._make_agent", return_value=fake_agent):
-        with mock.patch("manus_use.cli._append_history"):
+    with mock.patch("manus_agent.cli._make_agent", return_value=fake_agent):
+        with mock.patch("manus_agent.cli._append_history"):
             with mock.patch("sys.stderr", StringIO()):
                 with mock.patch("sys.stdout", stdout_capture):
                     cli._run_single_shot(
@@ -197,7 +197,7 @@ def test_stream_and_json_output_is_valid_json(tmp_path):
 
 def test_stream_true_uses_printing_callback_handler():
     """With stream=True and PrintingCallbackHandler available, it is used."""
-    from manus_use import cli
+    from manus_agent import cli
 
     fake_response = mock.MagicMock()
     fake_response.__str__ = lambda self: "streamed result"
@@ -214,8 +214,8 @@ def test_stream_true_uses_printing_callback_handler():
         make_agent_calls.append(kwargs)
         return fake_stream_agent
 
-    with mock.patch("manus_use.cli._make_agent", side_effect=capturing_make_agent):
-        with mock.patch("manus_use.cli._append_history"):
+    with mock.patch("manus_agent.cli._make_agent", side_effect=capturing_make_agent):
+        with mock.patch("manus_agent.cli._append_history"):
             with mock.patch("sys.stdout", StringIO()):
                 with mock.patch("strands.handlers.PrintingCallbackHandler", mock_handler_class):
                     cli._run_single_shot(
@@ -243,7 +243,7 @@ def test_stream_true_uses_printing_callback_handler():
 
 def test_stream_true_fallback_when_import_fails():
     """When PrintingCallbackHandler is unavailable, falls back gracefully."""
-    from manus_use import cli
+    from manus_agent import cli
 
     fake_response = mock.MagicMock()
     fake_response.__str__ = lambda self: "buffered result"
@@ -264,10 +264,10 @@ def test_stream_true_fallback_when_import_fails():
             raise TypeError("callback_handler not supported")
         return buffered_agent
 
-    with mock.patch("manus_use.cli._make_agent", side_effect=mock_make_agent):
-        with mock.patch("manus_use.cli._append_history"):
+    with mock.patch("manus_agent.cli._make_agent", side_effect=mock_make_agent):
+        with mock.patch("manus_agent.cli._append_history"):
             with mock.patch("sys.stderr", stderr_capture):
-                with mock.patch("manus_use.cli.console"):
+                with mock.patch("manus_agent.cli.console"):
                     rc = cli._run_single_shot(
                         "task",
                         mode="single",
@@ -295,7 +295,7 @@ def test_stream_true_fallback_when_import_fails():
 
 def test_stream_generator_result_iterates_chunks():
     """When result is a generator, chunks are printed and joined."""
-    from manus_use import cli
+    from manus_agent import cli
 
     def fake_gen():
         yield "Hello"
@@ -320,8 +320,8 @@ def test_stream_generator_result_iterates_chunks():
         return real_import(name, *args, **kwargs)
 
     with mock.patch("builtins.__import__", side_effect=mock_import):
-        with mock.patch("manus_use.cli._make_agent", return_value=fake_agent):
-            with mock.patch("manus_use.cli._append_history"):
+        with mock.patch("manus_agent.cli._make_agent", return_value=fake_agent):
+            with mock.patch("manus_agent.cli._append_history"):
                 with mock.patch("sys.stdout", stdout_capture):
                     with mock.patch("sys.stderr", stderr_capture):
                         rc = cli._run_single_shot(
@@ -349,7 +349,7 @@ def test_stream_generator_result_iterates_chunks():
 
 def test_stream_false_uses_buffered_path():
     """With stream=False, normal console.status path is used."""
-    from manus_use import cli
+    from manus_agent import cli
 
     fake_response = mock.MagicMock()
     fake_response.__str__ = lambda self: "buffered result"
@@ -357,9 +357,9 @@ def test_stream_false_uses_buffered_path():
     fake_agent = mock.MagicMock(return_value=fake_response)
     fake_config = mock.MagicMock()
 
-    with mock.patch("manus_use.cli._make_agent", return_value=fake_agent):
-        with mock.patch("manus_use.cli._append_history"):
-            with mock.patch("manus_use.cli.console"):
+    with mock.patch("manus_agent.cli._make_agent", return_value=fake_agent):
+        with mock.patch("manus_agent.cli._append_history"):
+            with mock.patch("manus_agent.cli.console"):
                 rc = cli._run_single_shot(
                     "task",
                     mode="single",
@@ -383,7 +383,7 @@ def test_stream_false_uses_buffered_path():
 
 def test_stream_not_on_analyze_parser():
     """--stream is not a recognised flag on the analyze parser."""
-    from manus_use.cli import _build_analyze_parser
+    from manus_agent.cli import _build_analyze_parser
 
     parser = _build_analyze_parser()
     action_dests = {a.dest for a in parser._actions}
@@ -392,7 +392,7 @@ def test_stream_not_on_analyze_parser():
 
 def test_stream_not_on_discover_parser():
     """--stream is not a recognised flag on the discover parser."""
-    from manus_use.cli import _build_discover_parser
+    from manus_agent.cli import _build_discover_parser
 
     parser = _build_discover_parser()
     action_dests = {a.dest for a in parser._actions}
@@ -401,7 +401,7 @@ def test_stream_not_on_discover_parser():
 
 def test_stream_not_on_history_parser():
     """--stream is not a recognised flag on the history parser."""
-    from manus_use.cli import _build_history_parser
+    from manus_agent.cli import _build_history_parser
 
     parser = _build_history_parser()
     action_dests = {a.dest for a in parser._actions}
@@ -410,7 +410,7 @@ def test_stream_not_on_history_parser():
 
 def test_stream_not_on_init_parser():
     """--stream is not a recognised flag on the init parser."""
-    from manus_use.cli import _build_init_parser
+    from manus_agent.cli import _build_init_parser
 
     parser = _build_init_parser()
     action_dests = {a.dest for a in parser._actions}
@@ -419,7 +419,7 @@ def test_stream_not_on_init_parser():
 
 def test_stream_not_on_doctor_parser():
     """--stream is not a recognised flag on the doctor parser."""
-    from manus_use.cli import _build_doctor_parser
+    from manus_agent.cli import _build_doctor_parser
 
     parser = _build_doctor_parser()
     action_dests = {a.dest for a in parser._actions}
@@ -433,7 +433,7 @@ def test_stream_not_on_doctor_parser():
 
 def test_stream_fallback_buffered_warning_for_non_iterable():
     """Non-iterable result in fallback path prints buffered-output warning."""
-    from manus_use import cli
+    from manus_agent import cli
 
     # A plain object that is not iterable and not a string
     class _Opaque:
@@ -456,10 +456,10 @@ def test_stream_fallback_buffered_warning_for_non_iterable():
         return real_import(name, *args, **kwargs)
 
     with mock.patch("builtins.__import__", side_effect=mock_import):
-        with mock.patch("manus_use.cli._make_agent", return_value=fake_agent):
-            with mock.patch("manus_use.cli._append_history"):
+        with mock.patch("manus_agent.cli._make_agent", return_value=fake_agent):
+            with mock.patch("manus_agent.cli._append_history"):
                 with mock.patch("sys.stderr", stderr_capture):
-                    with mock.patch("manus_use.cli.console"):
+                    with mock.patch("manus_agent.cli.console"):
                         rc = cli._run_single_shot(
                             "task",
                             mode="single",

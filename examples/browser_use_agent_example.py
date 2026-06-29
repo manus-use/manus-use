@@ -1,7 +1,7 @@
 """Example of using BrowserUseAgent - browser-use as a Strands Agent."""
 
-from manus_use.agents import BrowserUseAgent
-from manus_use.config import Config
+from manus_agent.agents import BrowserUseAgent
+from manus_agent.config import Config
 
 
 def example_browser_use_agent():

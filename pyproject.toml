@@ -53,7 +53,7 @@ Homepage = "https://github.com/manus-use/manus-agent"
 "Bug Tracker" = "https://github.com/manus-use/manus-agent/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/manus_use"]
+packages = ["src/manus_agent"]
 
 [project.optional-dependencies]
 dev = [
@@ -89,14 +89,14 @@ cli = [
 ]
 
 [project.scripts]
-manus-agent = "manus_use.cli:main"
+manus-agent = "manus_agent.cli:main"
 
 [tool.hatch.envs.default]
 features = ["dev", "browser", "search", "visualization"]
 
 [tool.hatch.envs.default.scripts]
 test = "pytest tests/ -v"
-test-cov = "pytest tests/ --cov=manus_use --cov-report=html"
+test-cov = "pytest tests/ --cov=manus_agent --cov-report=html"
 lint = "ruff check src/ tests/"
 format = "ruff format src/ tests/"
 typecheck = "mypy src/"

@@ -18,7 +18,7 @@ def _invoke(argv: list[str], *, inputs: list[str] | None = None):
 
     Returns (exit_code, capsys-style stdout) via capturing sys.exit.
     """
-    from manus_use import cli  # noqa: PLC0415
+    from manus_agent import cli  # noqa: PLC0415
 
     exit_code = 0
 
@@ -40,7 +40,7 @@ def _invoke(argv: list[str], *, inputs: list[str] | None = None):
 class TestInitCommand:
     def test_init_writes_config(self, tmp_path):
         """init writes a valid TOML config to the specified path."""
-        from manus_use import cli
+        from manus_agent import cli
 
         dest = tmp_path / "config.toml"
 
@@ -61,8 +61,8 @@ class TestInitCommand:
             ]
         )
 
-        with mock.patch("manus_use.cli.Prompt.ask", side_effect=lambda *a, **kw: next(prompt_responses)):
-            with mock.patch("manus_use.cli.Confirm.ask", side_effect=lambda *a, **kw: next(confirm_responses)):
+        with mock.patch("manus_agent.cli.Prompt.ask", side_effect=lambda *a, **kw: next(prompt_responses)):
+            with mock.patch("manus_agent.cli.Confirm.ask", side_effect=lambda *a, **kw: next(confirm_responses)):
                 with mock.patch.object(sys, "argv", ["manus-agent", "init", "--output", str(dest), "--force"]):
                     with pytest.raises(SystemExit) as exc_info:
                         cli.main()
@@ -75,13 +75,13 @@ class TestInitCommand:
 
     def test_init_aborts_when_no_overwrite(self, tmp_path):
         """init exits 0 without writing when user declines overwrite."""
-        from manus_use import cli
+        from manus_agent import cli
 
         dest = tmp_path / "config.toml"
         dest.write_text("[llm]\nprovider = 'openai'\n")
         original_mtime = dest.stat().st_mtime
 
-        with mock.patch("manus_use.cli.Confirm.ask", return_value=False):
+        with mock.patch("manus_agent.cli.Confirm.ask", return_value=False):
             with mock.patch.object(sys, "argv", ["manus-agent", "init", "--output", str(dest)]):
                 with pytest.raises(SystemExit) as exc_info:
                     cli.main()
@@ -91,7 +91,7 @@ class TestInitCommand:
 
     def test_init_force_overwrites_without_prompt(self, tmp_path):
         """--force skips the overwrite prompt."""
-        from manus_use import cli
+        from manus_agent import cli
 
         dest = tmp_path / "config.toml"
         dest.write_text("[llm]\nprovider = 'openai'\n")
@@ -99,8 +99,8 @@ class TestInitCommand:
         prompt_seq = iter(["1", "gpt-4o"])
         confirm_seq = iter([False, True])  # no api key, yes sandbox
 
-        with mock.patch("manus_use.cli.Prompt.ask", side_effect=lambda *a, **kw: next(prompt_seq)):
-            with mock.patch("manus_use.cli.Confirm.ask", side_effect=lambda *a, **kw: next(confirm_seq)):
+        with mock.patch("manus_agent.cli.Prompt.ask", side_effect=lambda *a, **kw: next(prompt_seq)):
+            with mock.patch("manus_agent.cli.Confirm.ask", side_effect=lambda *a, **kw: next(confirm_seq)):
                 with mock.patch.object(sys, "argv", ["manus-agent", "init", "--output", str(dest), "--force"]):
                     with pytest.raises(SystemExit) as exc_info:
                         cli.main()
@@ -111,7 +111,7 @@ class TestInitCommand:
 
     def test_init_anthropic_with_api_key(self, tmp_path):
         """init stores api_key in config when user opts to."""
-        from manus_use import cli
+        from manus_agent import cli
 
         dest = tmp_path / "config.toml"
 
@@ -120,8 +120,8 @@ class TestInitCommand:
 
         env_patch = {"ANTHROPIC_API_KEY": ""}  # not set in env
 
-        with mock.patch("manus_use.cli.Prompt.ask", side_effect=lambda *a, **kw: next(prompt_seq)):
-            with mock.patch("manus_use.cli.Confirm.ask", side_effect=lambda *a, **kw: next(confirm_seq)):
+        with mock.patch("manus_agent.cli.Prompt.ask", side_effect=lambda *a, **kw: next(prompt_seq)):
+            with mock.patch("manus_agent.cli.Confirm.ask", side_effect=lambda *a, **kw: next(confirm_seq)):
                 with mock.patch.dict(os.environ, env_patch, clear=False):
                     with mock.patch.object(sys, "argv", ["manus-agent", "init", "--output", str(dest), "--force"]):
                         with pytest.raises(SystemExit) as exc_info:
@@ -134,7 +134,7 @@ class TestInitCommand:
 
     def test_init_bedrock_writes_region(self, tmp_path):
         """init stores aws_region for the bedrock provider."""
-        from manus_use import cli
+        from manus_agent import cli
 
         dest = tmp_path / "config.toml"
         # provider choice 3 = bedrock; then model, region, sandbox
@@ -147,8 +147,8 @@ class TestInitCommand:
         )
         confirm_seq = iter([True])  # sandbox
 
-        with mock.patch("manus_use.cli.Prompt.ask", side_effect=lambda *a, **kw: next(prompt_seq)):
-            with mock.patch("manus_use.cli.Confirm.ask", side_effect=lambda *a, **kw: next(confirm_seq)):
+        with mock.patch("manus_agent.cli.Prompt.ask", side_effect=lambda *a, **kw: next(prompt_seq)):
+            with mock.patch("manus_agent.cli.Confirm.ask", side_effect=lambda *a, **kw: next(confirm_seq)):
                 with mock.patch.object(sys, "argv", ["manus-agent", "init", "--output", str(dest), "--force"]):
                     with pytest.raises(SystemExit) as exc_info:
                         cli.main()
@@ -160,7 +160,7 @@ class TestInitCommand:
 
     def test_init_creates_parent_directory(self, tmp_path):
         """init creates missing parent directories."""
-        from manus_use import cli
+        from manus_agent import cli
 
         dest = tmp_path / "nested" / "dir" / "config.toml"
         assert not dest.parent.exists()
@@ -168,8 +168,8 @@ class TestInitCommand:
         prompt_seq = iter(["4", "llama3.2", "http://localhost:11434"])
         confirm_seq = iter([False])  # sandbox
 
-        with mock.patch("manus_use.cli.Prompt.ask", side_effect=lambda *a, **kw: next(prompt_seq)):
-            with mock.patch("manus_use.cli.Confirm.ask", side_effect=lambda *a, **kw: next(confirm_seq)):
+        with mock.patch("manus_agent.cli.Prompt.ask", side_effect=lambda *a, **kw: next(prompt_seq)):
+            with mock.patch("manus_agent.cli.Confirm.ask", side_effect=lambda *a, **kw: next(confirm_seq)):
                 with mock.patch.object(sys, "argv", ["manus-agent", "init", "--output", str(dest), "--force"]):
                     with pytest.raises(SystemExit) as exc_info:
                         cli.main()
@@ -196,7 +196,7 @@ class TestDoctorCommand:
                 Keeps tests hermetic across CI environments that lack optional
                 packages like ``strands``.
         """
-        from manus_use import cli
+        from manus_agent import cli
 
         argv = ["manus-agent", "doctor"] + (extra_argv or [])
 
@@ -206,7 +206,7 @@ class TestDoctorCommand:
         if env_patch is not None:
             patches.append(mock.patch.dict(os.environ, env_patch))
         if mock_imports_ok or import_side_effects:
-            patches.append(mock.patch("manus_use.cli._check_import", side_effect=lambda p: p not in missing))
+            patches.append(mock.patch("manus_agent.cli._check_import", side_effect=lambda p: p not in missing))
 
         with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)):
             ctx = contextlib.ExitStack()
@@ -234,7 +234,7 @@ class TestDoctorCommand:
 
     def test_doctor_exits_1_missing_env_var(self, tmp_path):
         """doctor returns 1 when required env var is absent."""
-        from manus_use import cli
+        from manus_agent import cli
 
         config_file = tmp_path / "config.toml"
         config_file.write_text("[llm]\nprovider = 'openai'\nmodel = 'gpt-4o'\n")
@@ -245,7 +245,7 @@ class TestDoctorCommand:
         with mock.patch.dict(os.environ, env, clear=True):
             with mock.patch.object(sys, "argv", ["manus-agent", "doctor", "--config", str(config_file)]):
                 with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)):
-                    with mock.patch("manus_use.cli._check_import", return_value=True):
+                    with mock.patch("manus_agent.cli._check_import", return_value=True):
                         with pytest.raises(SystemExit) as exc_info:
                             cli.main()
 
@@ -312,9 +312,9 @@ class TestDoctorCommand:
         with mock.patch.dict(os.environ, env, clear=True):
             with mock.patch.object(sys, "argv", ["manus-agent", "doctor", "--config", str(config_file)]):
                 with mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)):
-                    with mock.patch("manus_use.cli._check_import", return_value=True):
+                    with mock.patch("manus_agent.cli._check_import", return_value=True):
                         with pytest.raises(SystemExit) as exc_info:
-                            from manus_use import cli as _cli
+                            from manus_agent import cli as _cli
 
                             _cli.main()
 
@@ -330,7 +330,7 @@ class TestDoctorCommand:
 class TestBackwardCompat:
     def test_single_shot_still_works(self):
         """Positional task argument still routes to _run_single_shot."""
-        from manus_use import cli
+        from manus_agent import cli
 
         captured = {}
 
@@ -340,7 +340,7 @@ class TestBackwardCompat:
 
         with mock.patch.object(sys, "argv", ["manus-agent", "hello world"]):
             with mock.patch.object(cli, "_run_single_shot", side_effect=fake_ss):
-                with mock.patch("manus_use.cli.Config") as m_cfg:
+                with mock.patch("manus_agent.cli.Config") as m_cfg:
                     m_cfg.from_file.return_value = mock.MagicMock()
                     with pytest.raises(SystemExit) as exc_info:
                         cli.main()
@@ -350,11 +350,11 @@ class TestBackwardCompat:
 
     def test_interactive_still_works(self):
         """No positional task → routes to _run_interactive."""
-        from manus_use import cli
+        from manus_agent import cli
 
         with mock.patch.object(sys, "argv", ["manus-agent"]):
             with mock.patch.object(cli, "_run_interactive") as m_int:
-                with mock.patch("manus_use.cli.Config") as m_cfg:
+                with mock.patch("manus_agent.cli.Config") as m_cfg:
                     m_cfg.from_file.return_value = mock.MagicMock()
                     cli.main()
 
@@ -362,7 +362,7 @@ class TestBackwardCompat:
 
     def test_version_flag_still_works(self):
         """--version still exits 0 and doesn't need subcommand."""
-        from manus_use import cli
+        from manus_agent import cli
 
         with mock.patch.object(sys, "argv", ["manus-agent", "--version"]):
             with pytest.raises(SystemExit) as exc_info:

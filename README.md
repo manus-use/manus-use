@@ -557,22 +557,22 @@ base_url = "http://localhost:11434"
 
 ```python
 # General-purpose agent
-from manus_use import ManusAgent
+from manus_agent import ManusAgent
 agent = ManusAgent()
 result = agent("Write a Python script that fetches weather data and saves it to CSV")
 
 # Browser automation
-from manus_use.agents import BrowserUseAgent
+from manus_agent.agents import BrowserUseAgent
 agent = BrowserUseAgent()
 result = agent("Go to GitHub and find the top 5 trending Python repositories today")
 
 # Data analysis
-from manus_use.agents import DataAnalysisAgent
+from manus_agent.agents import DataAnalysisAgent
 agent = DataAnalysisAgent()
 result = agent("Load sales.csv, compute monthly revenue, and plot a bar chart")
 
 # Multi-agent orchestration
-from manus_use.multi_agents import WorkflowAgent
+from manus_agent.multi_agents import WorkflowAgent
 workflow = WorkflowAgent()
 result = workflow.handle_request("""
     1. Search the web for recent AI research papers
@@ -581,8 +581,8 @@ result = workflow.handle_request("""
 """)
 
 # Vulnerability intelligence
-from manus_use.agents import VulnerabilityIntelligenceAgent
-from manus_use.config import Config
+from manus_agent.agents import VulnerabilityIntelligenceAgent
+from manus_agent.config import Config
 agent = VulnerabilityIntelligenceAgent(config=Config.from_file())
 result = agent.handle_request("Analyse CVE-2025-6554")
 ```
@@ -682,7 +682,7 @@ pip install -e ".[dev,browser,search,visualization]"
 
 ```bash
 pytest tests/ -v
-pytest tests/ --cov=manus_use --cov-report=html
+pytest tests/ --cov=manus_agent --cov-report=html
 
 # Via hatch
 hatch run test
@@ -706,7 +706,7 @@ hatch run format
 
 ```
 manus-agent/
-├── src/manus_use/
+├── src/manus_agent/
 │   ├── agents/          # Agent implementations
 │   │   ├── base.py
 │   │   ├── manus.py

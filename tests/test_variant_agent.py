@@ -15,14 +15,14 @@ import pytest
 
 def test_variant_agent_module_imports_without_crashing():
     """The module must be importable even without optional deps installed."""
-    import manus_use.agents.variant_agent as va
+    import manus_agent.agents.variant_agent as va
 
     assert hasattr(va, "VariantAnalysisAgent")
 
 
 def test_variant_agent_all_exports():
     """__all__ exports VariantAnalysisAgent and DEFAULT_MODEL_ID."""
-    from manus_use.agents.variant_agent import __all__
+    from manus_agent.agents.variant_agent import __all__
 
     assert "VariantAnalysisAgent" in __all__
     assert "DEFAULT_MODEL_ID" in __all__
@@ -30,12 +30,12 @@ def test_variant_agent_all_exports():
 
 def test_variant_agent_exported_from_agents_package():
     """VariantAnalysisAgent is re-exported from the agents package."""
-    from manus_use.agents import VariantAnalysisAgent  # noqa: F401
+    from manus_agent.agents import VariantAnalysisAgent  # noqa: F401
 
 
 def test_default_model_id_is_nonempty_string():
     """DEFAULT_MODEL_ID is a non-empty string."""
-    from manus_use.agents.variant_agent import DEFAULT_MODEL_ID
+    from manus_agent.agents.variant_agent import DEFAULT_MODEL_ID
 
     assert isinstance(DEFAULT_MODEL_ID, str)
     assert DEFAULT_MODEL_ID
@@ -43,7 +43,7 @@ def test_default_model_id_is_nonempty_string():
 
 def test_system_prompt_is_string():
     """SYSTEM_PROMPT is a non-empty string with the expected sections."""
-    from manus_use.agents.variant_agent import SYSTEM_PROMPT
+    from manus_agent.agents.variant_agent import SYSTEM_PROMPT
 
     assert isinstance(SYSTEM_PROMPT, str)
     assert "variant" in SYSTEM_PROMPT.lower()
@@ -57,8 +57,8 @@ def test_system_prompt_is_string():
 
 def test_variant_agent_instantiates_with_mock_config():
     """VariantAnalysisAgent() instantiates when Config is mocked."""
-    with mock.patch("manus_use.agents.variant_agent.VariantAnalysisAgent.__init__", return_value=None):
-        from manus_use.agents.variant_agent import VariantAnalysisAgent
+    with mock.patch("manus_agent.agents.variant_agent.VariantAnalysisAgent.__init__", return_value=None):
+        from manus_agent.agents.variant_agent import VariantAnalysisAgent
 
         agent = VariantAnalysisAgent.__new__(VariantAnalysisAgent)
         agent._config = mock.MagicMock()
@@ -71,8 +71,8 @@ def test_variant_agent_init_without_strands(monkeypatch):
     """VariantAnalysisAgent.__init__ works even when strands is absent (lazy import)."""
     fake_config = mock.MagicMock()
 
-    with mock.patch("manus_use.agents.variant_agent.VariantAnalysisAgent.__init__", return_value=None):
-        from manus_use.agents.variant_agent import VariantAnalysisAgent
+    with mock.patch("manus_agent.agents.variant_agent.VariantAnalysisAgent.__init__", return_value=None):
+        from manus_agent.agents.variant_agent import VariantAnalysisAgent
 
         agent = VariantAnalysisAgent.__new__(VariantAnalysisAgent)
         agent._config = fake_config
@@ -90,7 +90,7 @@ def test_variant_agent_init_without_strands(monkeypatch):
 
 def test_handle_request_calls_internal_agent():
     """handle_request() calls the internal _agent with the prompt."""
-    from manus_use.agents.variant_agent import VariantAnalysisAgent
+    from manus_agent.agents.variant_agent import VariantAnalysisAgent
 
     fake_inner = mock.MagicMock(return_value="RESULT")
 
@@ -107,7 +107,7 @@ def test_handle_request_calls_internal_agent():
 
 def test_handle_request_lazy_builds_agent():
     """handle_request() calls _build_agent when _agent is None."""
-    from manus_use.agents.variant_agent import VariantAnalysisAgent
+    from manus_agent.agents.variant_agent import VariantAnalysisAgent
 
     fake_inner = mock.MagicMock(return_value="LAZY_RESULT")
 
@@ -132,7 +132,7 @@ def test_handle_request_lazy_builds_agent():
 
 def test_analyze_variants_builds_prompt_with_cve_id():
     """analyze_variants() builds a prompt containing the CVE id."""
-    from manus_use.agents.variant_agent import VariantAnalysisAgent
+    from manus_agent.agents.variant_agent import VariantAnalysisAgent
 
     captured_prompts: list[str] = []
 
@@ -156,7 +156,7 @@ def test_analyze_variants_builds_prompt_with_cve_id():
 
 def test_analyze_variants_prompt_mentions_variant():
     """analyze_variants() prompt includes variant-related context."""
-    from manus_use.agents.variant_agent import VariantAnalysisAgent
+    from manus_agent.agents.variant_agent import VariantAnalysisAgent
 
     captured: list[str] = []
 
@@ -180,7 +180,7 @@ def test_analyze_variants_prompt_mentions_variant():
 
 def test_build_variants_parser_cve_id_required():
     """_build_variants_parser requires a positional CVE-ID argument."""
-    from manus_use.cli import _build_variants_parser
+    from manus_agent.cli import _build_variants_parser
 
     parser = _build_variants_parser()
     with pytest.raises(SystemExit) as exc_info:
@@ -190,7 +190,7 @@ def test_build_variants_parser_cve_id_required():
 
 def test_build_variants_parser_parses_cve_id():
     """_build_variants_parser correctly parses a CVE-ID positional."""
-    from manus_use.cli import _build_variants_parser
+    from manus_agent.cli import _build_variants_parser
 
     parser = _build_variants_parser()
     args = parser.parse_args(["CVE-2024-3094"])
@@ -199,7 +199,7 @@ def test_build_variants_parser_parses_cve_id():
 
 def test_build_variants_parser_output_default_text():
     """_build_variants_parser defaults --output to text."""
-    from manus_use.cli import _build_variants_parser
+    from manus_agent.cli import _build_variants_parser
 
     parser = _build_variants_parser()
     args = parser.parse_args(["CVE-2024-3094"])
@@ -208,7 +208,7 @@ def test_build_variants_parser_output_default_text():
 
 def test_build_variants_parser_output_json():
     """_build_variants_parser accepts --output json."""
-    from manus_use.cli import _build_variants_parser
+    from manus_agent.cli import _build_variants_parser
 
     parser = _build_variants_parser()
     args = parser.parse_args(["CVE-2024-3094", "--output", "json"])
@@ -217,7 +217,7 @@ def test_build_variants_parser_output_json():
 
 def test_build_variants_parser_output_invalid():
     """_build_variants_parser rejects invalid --output values."""
-    from manus_use.cli import _build_variants_parser
+    from manus_agent.cli import _build_variants_parser
 
     parser = _build_variants_parser()
     with pytest.raises(SystemExit) as exc_info:
@@ -232,7 +232,7 @@ def test_build_variants_parser_output_invalid():
 
 def test_run_variants_missing_cve_id_exits_error():
     """_run_variants with no arguments exits with code 2."""
-    from manus_use.cli import _run_variants
+    from manus_agent.cli import _run_variants
 
     with pytest.raises(SystemExit) as exc_info:
         _run_variants([])
@@ -241,8 +241,8 @@ def test_run_variants_missing_cve_id_exits_error():
 
 def test_run_variants_text_output_calls_handle_request(capsys):
     """_run_variants text mode calls analyze_variants and prints result."""
-    from manus_use.agents.variant_agent import VariantAnalysisAgent
-    from manus_use.cli import _run_variants
+    from manus_agent.agents.variant_agent import VariantAnalysisAgent
+    from manus_agent.cli import _run_variants
 
     with mock.patch.object(VariantAnalysisAgent, "__init__", return_value=None):
         with mock.patch.object(VariantAnalysisAgent, "analyze_variants", return_value="VARIANT_REPORT") as m_av:
@@ -256,8 +256,8 @@ def test_run_variants_text_output_calls_handle_request(capsys):
 
 def test_run_variants_json_output_emits_valid_json(capsys):
     """_run_variants json mode emits valid JSON with cve_id and report keys."""
-    from manus_use.agents.variant_agent import VariantAnalysisAgent
-    from manus_use.cli import _run_variants
+    from manus_agent.agents.variant_agent import VariantAnalysisAgent
+    from manus_agent.cli import _run_variants
 
     with mock.patch.object(VariantAnalysisAgent, "__init__", return_value=None):
         with mock.patch.object(VariantAnalysisAgent, "analyze_variants", return_value="JSON_REPORT"):
@@ -272,14 +272,14 @@ def test_run_variants_json_output_emits_valid_json(capsys):
 
 def test_run_variants_import_error_returns_1(monkeypatch):
     """_run_variants returns exit code 1 when ImportError is raised."""
-    from manus_use import cli
+    from manus_agent import cli
 
-    with mock.patch.dict(sys.modules, {"manus_use.agents.variant_agent": None}):
+    with mock.patch.dict(sys.modules, {"manus_agent.agents.variant_agent": None}):
         # Force ImportError by patching the import inside _run_variants
         real_import = __builtins__.__import__ if hasattr(__builtins__, "__import__") else __import__
 
         def fake_import(name, *args, **kwargs):
-            if name == "manus_use.agents.variant_agent":
+            if name == "manus_agent.agents.variant_agent":
                 raise ImportError("strands not installed")
             return real_import(name, *args, **kwargs)
 
@@ -296,7 +296,7 @@ def test_run_variants_import_error_returns_1(monkeypatch):
 
 def test_subcommands_contains_variants():
     """_SUBCOMMANDS set includes 'variants'."""
-    from manus_use.cli import _SUBCOMMANDS
+    from manus_agent.cli import _SUBCOMMANDS
 
     assert "variants" in _SUBCOMMANDS
 
@@ -308,7 +308,7 @@ def test_subcommands_contains_variants():
 
 def test_main_routes_variants_subcommand():
     """main() routes 'variants' to _run_variants."""
-    from manus_use import cli
+    from manus_agent import cli
 
     captured: dict = {}
 
@@ -328,7 +328,7 @@ def test_main_routes_variants_subcommand():
 
 def test_main_variants_passes_output_flag():
     """main() passes --output json flag correctly to _run_variants."""
-    from manus_use import cli
+    from manus_agent import cli
 
     captured: dict = {}
 
@@ -393,7 +393,7 @@ def test_thin_wrapper_main_calls_analyze_variants():
     ):
         spec.loader.exec_module(mod)
 
-    from manus_use.agents.variant_agent import VariantAnalysisAgent
+    from manus_agent.agents.variant_agent import VariantAnalysisAgent
 
     with mock.patch.object(VariantAnalysisAgent, "__init__", return_value=None):
         with mock.patch.object(VariantAnalysisAgent, "analyze_variants", return_value="WRAPPER_RESULT") as m_av:

@@ -8,7 +8,7 @@
 
 def _import_validator():
     """Import the module-level validator function."""
-    from manus_use.agents.vi_agent import (  # noqa: PLC0415
+    from manus_agent.agents.vi_agent import (  # noqa: PLC0415
         _REQUIRED_REPORT_SECTIONS,
         _report_complete_validator,
     )
@@ -105,7 +105,7 @@ def test_goal_loop_attached_to_agent():
     """GoalLoop plugin is importable and accepts the VA report validator."""
     from strands.vended_plugins.goal import GoalLoop  # noqa: PLC0415
 
-    from manus_use.agents.vi_agent import (  # noqa: PLC0415
+    from manus_agent.agents.vi_agent import (  # noqa: PLC0415
         _REQUIRED_REPORT_SECTIONS,
         _report_complete_validator,
     )
@@ -121,6 +121,6 @@ def test_goal_loop_attached_to_agent():
 
 
 def test_required_sections_tuple_not_empty():
-    from manus_use.agents.vi_agent import _REQUIRED_REPORT_SECTIONS  # noqa: PLC0415
+    from manus_agent.agents.vi_agent import _REQUIRED_REPORT_SECTIONS  # noqa: PLC0415
 
     assert len(_REQUIRED_REPORT_SECTIONS) >= 4

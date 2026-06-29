@@ -1,7 +1,7 @@
 """Multi-agent flow example."""
 
-from manus_use import BrowserAgent, DataAnalysisAgent, ManusAgent
-from manus_use.multi_agents import Orchestrator
+from manus_agent import BrowserAgent, DataAnalysisAgent, ManusAgent
+from manus_agent.multi_agents import Orchestrator
 
 
 def example_multi_agent_flow():
@@ -30,7 +30,7 @@ def example_custom_flow():
     """Example of custom flow with dependencies."""
     print("\n=== Custom Flow Example ===")
 
-    from manus_use.multi_agents import TaskPlan
+    from manus_agent.multi_agents import TaskPlan
 
     # Create orchestrator
     flow = Orchestrator()

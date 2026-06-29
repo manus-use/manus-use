@@ -41,7 +41,7 @@ pip install -e ".[dev]"
 pytest tests/ -v
 
 # With coverage
-pytest tests/ --cov=manus_use --cov-report=html
+pytest tests/ --cov=manus_agent --cov-report=html
 
 # Run a specific test file
 pytest tests/test_cli.py -v
@@ -92,7 +92,7 @@ hatch run test-cov  # pytest --cov
 
 ```
 manus-use/
-├── src/manus_use/
+├── src/manus_agent/
 │   ├── agents/          # Agent classes (one file per agent type)
 │   │   ├── base.py      # BaseManusAgent — all agents inherit from here
 │   │   ├── manus.py     # ManusAgent (general-purpose)
@@ -112,10 +112,10 @@ manus-use/
 
 **Key conventions:**
 
-- Each agent class lives in its own file under `src/manus_use/agents/`.
+- Each agent class lives in its own file under `src/manus_agent/agents/`.
 - All agents inherit from `BaseManusAgent` (`agents/base.py`), which inherits from `strands.Agent`.
-- Tools are `@strands.tools.tool`-decorated functions. Import them as `from manus_use.tools.my_tool import my_tool`.
-- Use `from manus_use.config import Config` — **never** `from src.manus_use.config import Config`.
+- Tools are `@strands.tools.tool`-decorated functions. Import them as `from manus_agent.tools.my_tool import my_tool`.
+- Use `from manus_agent.config import Config` — **never** `from src.manus_agent.config import Config`.
 - Defer heavy imports (MCP, Docker, Playwright) to function bodies so the package is always importable.
 
 ---
@@ -143,7 +143,7 @@ chore(deps): bump strands-agents to >=1.45.0
 - [ ] `ruff format --check src/ tests/` — no formatting changes needed
 - [ ] `pytest tests/ -v` — all tests pass (integration tests excluded)
 - [ ] New behaviour is covered by tests
-- [ ] No `from src.manus_use.` imports (use `from manus_use.` — these break installed packages)
+- [ ] No `from src.manus_agent.` imports (use `from manus_agent.` — these break installed packages)
 - [ ] No `sys.path.insert` calls in `src/` (breaks installed packages)
 - [ ] Heavy optional deps deferred to function scope, not module top-level
 
@@ -151,13 +151,13 @@ chore(deps): bump strands-agents to >=1.45.0
 
 ## Adding a new agent
 
-1. Create `src/manus_use/agents/my_agent.py`:
+1. Create `src/manus_agent/agents/my_agent.py`:
 
 ```python
 """MyAgent — short description."""
 
-from manus_use.agents.base import BaseManusAgent
-from manus_use.config import Config
+from manus_agent.agents.base import BaseManusAgent
+from manus_agent.config import Config
 
 DEFAULT_MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 DEFAULT_AWS_REGION = "us-east-1"
@@ -189,7 +189,7 @@ class MyAgent(BaseManusAgent):
         return "You are a helpful agent that does X."
 ```
 
-2. Export it from `src/manus_use/agents/__init__.py`.
+2. Export it from `src/manus_agent/agents/__init__.py`.
 
 3. Write tests in `tests/test_my_agent.py` — mock `strands.Agent.__init__` and `strands.Agent.__call__` so tests don't need live credentials.
 
@@ -199,7 +199,7 @@ class MyAgent(BaseManusAgent):
 
 Follow the pattern of existing subcommands (`analyze`, `discover`, `remediate`):
 
-1. Add `_build_mycommand_parser()` and `_run_mycommand()` to `src/manus_use/cli.py`.
+1. Add `_build_mycommand_parser()` and `_run_mycommand()` to `src/manus_agent/cli.py`.
 2. Register the subcommand name in the `_SUBCOMMANDS` set.
 3. Add a dispatch block in `main()`.
 4. Update the `epilog` string in `_build_run_parser()` with a usage example.

@@ -18,7 +18,7 @@ from mcp.client.sse import sse_client
 from strands import Agent
 from strands.tools.mcp import MCPClient
 
-from manus_use.config import Config
+from manus_agent.config import Config
 
 # Resolve SSE URL: config file takes precedence, env var as fallback
 config = Config.from_file()
