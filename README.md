@@ -29,6 +29,7 @@ Built on [Strands SDK](https://github.com/strands-agents/sdk-python) and integra
 - [Python API](#python-api)
 - [Security & Vulnerability Intelligence](#security--vulnerability-intelligence)
 - [Development](#development)
+- [Changelog](#changelog)
 
 ---
 
@@ -382,6 +383,47 @@ confirms the CVE is actively exploited in the wild.
 | `--output {text,json}` | `text` | Output format |
 | `--sources LIST` | all | Comma-separated subset: `trickest,vulncheck_kev,exploitdb,github,nvd` |
 
+---
+
+### `manus-use changelog` — Manage project changelog
+
+```bash
+# Show the full CHANGELOG.md
+manus-use changelog view
+
+# Add an [Unreleased] entry from conventional commits since last tag
+manus-use changelog update
+
+# Cut a release (promotes [Unreleased] → [1.2.0] and tags git)
+manus-use changelog release 1.2.0
+
+# Preview without writing
+manus-use changelog release 1.2.0 --dry-run
+```
+
+Uses [Conventional Commits](https://www.conventionalcommits.org/) — commit
+messages prefixed `feat:`, `fix:`, `docs:`, etc. are grouped automatically
+into `Added`, `Fixed`, and `Changed` sections.
+
+---
+
+### 🔜 Coming soon
+
+These tools are implemented as Strands tools and wired into the VI agent;
+CLI subcommands are tracked in open PRs and will merge shortly.
+
+| Subcommand | PR | Description |
+|---|---|---|
+| `manus-use silent-patches <owner/repo>` | [#51](https://github.com/manus-use/manus-use/pull/51) | Detect security commits with no CVE reference — two-stage heuristic scoring on commit messages + diff keywords |
+| `manus-use cve-timeline <CVE-ID>` | [#53](https://github.com/manus-use/manus-use/pull/53) | Full timeline view: publish date → EPSS movement → KEV add date → patch date |
+| `manus-use version-range <CVE-ID>` | [#54](https://github.com/manus-use/manus-use/pull/54) | NVD CPE → PyPI/npm/Maven cross-reference; structured vulnerable semver ranges + first patched release |
+| `manus-use vendor-response <CVE-ID>` | [#58](https://github.com/manus-use/manus-use/pull/58) | 6-state patch-status classifier: `patch_available` / `patch_backported` / `wont_fix` / `investigating` / `no_patch` / `unknown` |
+| `manus-use poc-freshness <CVE-ID>` | [#60](https://github.com/manus-use/manus-use/pull/60) | PoC freshness check — last-commit recency, recently-starred repos, new exploit-db entries |
+| `manus-use blast-radius <CVE-or-pkg>` | [#63](https://github.com/manus-use/manus-use/pull/63) | Downstream exposure estimator — resolves affected packages (NVD CPE + OSV + GHSA) and enriches each with npm/PyPI/Maven download counts |
+| `manus-use sbom-scan <bom.json>` | [#64](https://github.com/manus-use/manus-use/pull/64) | CycloneDX/SPDX SBOM scanner — OSV.dev batch query, EPSS enrichment, CISA KEV flagging; ranks by KEV then EPSS |
+| `manus-use temporal-priority <CVE-ID>` | [#65](https://github.com/manus-use/manus-use/pull/65) | Time-aware urgency scorer (0–100) combining CVSS, EPSS, EPSS spike recency, KEV, patch availability, and CVE age |
+| `manus-use cluster-variants <CVE-ID>` | [#67](https://github.com/manus-use/manus-use/pull/67) | CVE variant cluster analysis — groups related CVEs by same component, same CWE, and same researcher/disclosure domain |
+
 
 ### `manus-use history` — Browse past runs
 
@@ -566,11 +608,11 @@ ManusUse includes a multi-source vulnerability intelligence pipeline accessible 
 The `manus-use analyze` command runs an 8-step pipeline:
 
 1. **NVD + GitHub Advisory** — official CVE metadata, CVSS, CWE
-2. **CISA KEV** — known-exploited-vulnerabilities catalogue
+2. **CISA KEV** — known-exploited-vulnerabilities catalogue; **VulnCheck KEV** when `VULNCHECK_API_KEY` is set (100+ intel sources, ransomware association flag)
 3. **AlienVault OTX** — threat intelligence pulses and IoCs
 4. **PoC discovery** — PoC Week trending digest, Trickest/CVE index, Exploit-DB, PacketStorm, GitHub
 5. **URL verification** — every candidate URL is fetched and validated
-6. **Static analysis** — code-level analysis of confirmed PoCs (network calls, payload patterns)
+6. **Static analysis** — code-level analysis of confirmed PoCs (network calls, payload patterns); patch diff summariser; exploit complexity scoring; version range resolution
 7. **CWE correlation** — weakness classification and remediation hints
 8. **Report generation** — structured text, JSON, or Lark document output
 
@@ -607,9 +649,28 @@ manus-use compare CVE-2024-3094 CVE-2021-44228 --output json | jq .higher_priori
 manus-use exploit-complexity CVE-2024-3094
 manus-use exploit-complexity CVE-2024-3094 --output json | jq .attacker_friendly
 
+# Find PoC exploits across five public sources in parallel
+manus-use poc-search CVE-2024-3094
+manus-use poc-search CVE-2024-3094 --output json | jq .exploited_in_wild
+
 # Discover new high-EPSS CVEs from the last 2 weeks
 manus-use discover --since 2025-06-12 --min-epss 0.6
+
+# Manage the project changelog
+manus-use changelog view
+manus-use changelog release 1.2.0
 ```
+
+### VulnCheck enrichment (optional)
+
+Set `VULNCHECK_API_KEY` to unlock two additional data sources inside the VI pipeline:
+
+| Index | What it adds |
+|---|---|
+| `vulncheck-kev` | Exploitation status aggregated from 100+ intel sources (FBI Flash, CERT advisories, etc.); prints 🚨 **ACTIVELY EXPLOITED** banner when confirmed |
+| `nist-nvd2` | Enriched CPE matching with additional CVSS metadata and version range data |
+
+All other functionality works without the key.
 
 > **Important:** These tools are designed for defensive security purposes only. Use them for legitimate security research, vulnerability management, and defence.
 
@@ -639,7 +700,8 @@ manus-use discover --since 2025-06-12 --min-epss 0.6
 - Web search (DuckDuckGo, configurable)
 - Browser automation (click, type, extract, screenshot)
 - Data visualization (charts, plots, reports)
-- Security tools (NVD, CISA KEV, OTX, Exploit-DB, Trickest, PoC Week)
+- Security tools (NVD, CISA KEV, OTX, Exploit-DB, Trickest, PoC Week, VulnCheck KEV)
+- Vulnerability intelligence: EPSS trend, patch diff, exploit complexity, PoC aggregation, CVE comparison
 - HTTP requests with content extraction
 - Python REPL with persistent state
 
@@ -743,6 +805,12 @@ Explore the [examples/](examples/) directory for runnable scripts:
 ## License
 
 This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a full release history.
+
+---
 
 ## Acknowledgments
 
