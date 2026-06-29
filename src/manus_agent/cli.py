@@ -1050,6 +1050,7 @@ _SUBCOMMANDS = {
     "remediate",
     "variants",
     "epss-trend",
+    "epss-decay",
     "patch-diff",
     "compare",
     "exploit-complexity",
@@ -1151,6 +1152,108 @@ def _run_epss_trend(argv: list[str]) -> int:
         print("  ----------   ------   ----------")
         for pt in analysis["points"][-15:]:  # show last 15 rows
             print(f"  {pt['date']}   {pt['epss']:.4f}   {pt['percentile']:.4f}")
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# epss-decay subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_epss_decay_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-agent epss-decay",
+        description=(
+            "Detect whether a CVE's EPSS score has decayed significantly below its\n"
+            "all-time peak — the 'attackers tried and moved on' signal.\n"
+            "Complements epss-trend (which detects rising spikes) by analysing\n"
+            "historical peak-to-current drop."
+        ),
+        add_help=True,
+    )
+    p.add_argument("cve_id", metavar="CVE-ID", help="CVE identifier, e.g. CVE-2021-44228")
+    p.add_argument(
+        "--days",
+        type=int,
+        default=365,
+        metavar="N",
+        help="Days of EPSS history to fetch (default: 365, max: 365)",
+    )
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return p
+
+
+def _run_epss_decay(argv: list[str]) -> int:
+    import json as _json
+
+    parser = _build_epss_decay_parser()
+    args = parser.parse_args(argv)
+    cve_id = args.cve_id.strip().upper()
+    if not cve_id.startswith("CVE-"):
+        parser.error("CVE-ID must start with 'CVE-', e.g. CVE-2021-44228")
+
+    try:
+        from manus_agent.tools.get_epss_trend import _fetch_epss_time_series
+        from manus_agent.tools.score_epss_decay import _analyse_decay
+    except ImportError as exc:
+        print(f"[error] missing dependencies: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        raw = _fetch_epss_time_series(cve_id, min(args.days, 365))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[error] EPSS API request failed: {exc}", file=sys.stderr)
+        return 1
+
+    data_list = raw.get("data", [])
+    if not data_list:
+        print(f"[error] No EPSS data found for {cve_id}", file=sys.stderr)
+        return 1
+
+    series = data_list[0].get("time-series", [])
+    if not series:
+        series = [
+            {
+                "date": data_list[0].get("date", ""),
+                "epss": data_list[0].get("epss", "0"),
+                "percentile": data_list[0].get("percentile", "0"),
+            }
+        ]
+
+    analysis = _analyse_decay(series)
+
+    if args.output == "json":
+        payload = {
+            "cve_id": cve_id,
+            "days_requested": args.days,
+            "data_points_available": len(series),
+            "decay": {k: v for k, v in analysis.items() if k != "points"},
+        }
+        print(_json.dumps(payload, indent=2))
+        return 0
+
+    # --- text output ---
+    decay_class = analysis["class"]
+    print(f"EPSS Decay Analysis  — {cve_id}")
+    print(f"  Decay class      : {decay_class.upper()}")
+    print(f"  Peak EPSS        : {analysis['peak_epss']:.4f}  (on {analysis['peak_date']})")
+    print(f"  Current EPSS     : {analysis['current_epss']:.4f}  (on {analysis['current_date']})")
+    if analysis["decay_ratio"] is not None:
+        print(f"  Decay ratio      : {analysis['decay_ratio']:.4f}  ({analysis['decay_ratio'] * 100:.1f}% of peak)")
+    if analysis["days_since_peak"] is not None:
+        print(f"  Days since peak  : {analysis['days_since_peak']}")
+    print(f"  Peak sustained   : {analysis['peak_sustained_days']} day(s)")
+    if analysis["decay_rate_per_week"] is not None:
+        print(f"  Decay rate/week  : {analysis['decay_rate_per_week']:+.4f} EPSS pts/week")
+    print()
+    print(f"  {analysis['interpretation']}")
+    print()
+    print(f"  Data points available: {len(series)} ({args.days}-day window)")
     return 0
 
 
@@ -1885,6 +1988,10 @@ def _build_run_parser() -> argparse.ArgumentParser:
             "  manus-agent epss-trend CVE-2024-3094\n"
             "  manus-agent epss-trend CVE-2024-3094 --days 90 --output json\n"
             "\n"
+            '  # EPSS decay detection ("attackers tried and moved on")\n'
+            "  manus-agent epss-decay CVE-2021-44228\n"
+            "  manus-agent epss-decay CVE-2021-44228 --days 365 --output json\n"
+            "\n"
             "  # Patch diff summariser (fixing-commit analysis)\n"
             "  manus-agent patch-diff CVE-2024-3094\n"
             "  manus-agent patch-diff CVE-2024-3094 --output json\n"
@@ -2164,6 +2271,10 @@ def main() -> None:
     if first_positional == "epss-trend":
         idx = argv.index("epss-trend")
         sys.exit(_run_epss_trend(argv[idx + 1 :]))
+
+    if first_positional == "epss-decay":
+        idx = argv.index("epss-decay")
+        sys.exit(_run_epss_decay(argv[idx + 1 :]))
 
     if first_positional == "patch-diff":
         idx = argv.index("patch-diff")

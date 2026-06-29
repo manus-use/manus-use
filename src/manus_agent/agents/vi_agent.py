@@ -62,6 +62,7 @@ Your process is optimized to build a comprehensive picture from authoritative, f
 - Call `check_cisa_kev` to determine if the vulnerability is on the CISA Known Exploited Vulnerabilities (KEV) list.
 - Call `get_otx_cve_details` to check for threat intelligence information from AlienVault OTX, such as associated pulses and IoCs.
 - Call `get_epss_trend` with the CVE ID (default 30 days of history). A `spike_detected=true` result (>0.10 jump in 7 days) indicates the vulnerability has recently been weaponised or discovered by attackers â flag this prominently in the report with the spike date and magnitude.
+- Call `score_epss_decay` with the CVE ID (default 365 days) to detect whether attacker interest has peaked and waned. A `significant_decay` class (current score <40% of all-time peak) means the CVE was once hot but is no longer actively targeted -- include this context in the report exploitability analysis.
 
 **Step 3: Gather Public Exploits and Advisories**
 - First, call `get_poc_week` (no arguments) to check if the CVE appears in recent PoC Week digests. A high mention_rank (low number) means the security community considers it high-priority this week â note this in your analysis.
@@ -217,6 +218,7 @@ class VulnerabilityIntelligenceAgent:
             from manus_agent.tools.get_poc_week import get_poc_week
             from manus_agent.tools.get_trickest_pocs import get_trickest_pocs
             from manus_agent.tools.get_vulncheck_data import get_vulncheck_data
+            from manus_agent.tools.score_epss_decay import score_epss_decay
             from manus_agent.tools.score_exploit_complexity import score_exploit_complexity
             from manus_agent.tools.search_poc_sources import search_poc_sources
         except ImportError as exc:  # pragma: no cover - depends on env
@@ -269,6 +271,7 @@ class VulnerabilityIntelligenceAgent:
             get_github_advisory,
             "manus_agent.tools.verify_exploit",
             get_epss_trend,
+            score_epss_decay,
             get_patch_diff,
             score_exploit_complexity,
             get_vulncheck_data,
