@@ -1085,7 +1085,7 @@ class TestCliMainDispatch:
         from manus_use.cli import main
 
         with patch("manus_use.cli._run_poc_search", return_value=0) as mock_run:
-            with patch("sys.argv", ["manus-use", "poc-search", "CVE-2024-3094"]):
+            with patch("sys.argv", ["manus-agent", "poc-search", "CVE-2024-3094"]):
                 with pytest.raises(SystemExit) as exc_info:
                     main()
                 assert exc_info.value.code == 0

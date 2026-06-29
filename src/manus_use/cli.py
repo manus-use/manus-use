@@ -120,7 +120,7 @@ def _make_agent(agent_type: str, config: Config, **agent_kwargs):
 def _build_analyze_parser() -> argparse.ArgumentParser:
     """Build the argument parser for the `analyze` subcommand."""
     parser = argparse.ArgumentParser(
-        prog="manus-use analyze",
+        prog="manus-agent analyze",
         description="Run a vulnerability intelligence analysis for a CVE.",
     )
     parser.add_argument(
@@ -256,7 +256,7 @@ def _append_history(
 def _build_discover_parser() -> argparse.ArgumentParser:
     """Build the argument parser for the `discover` subcommand."""
     parser = argparse.ArgumentParser(
-        prog="manus-use discover",
+        prog="manus-agent discover",
         description="Discover recent high-EPSS CVEs and submit them for tracking.",
     )
     parser.add_argument(
@@ -375,7 +375,7 @@ def _run_discover(
 def _build_remediate_parser() -> argparse.ArgumentParser:
     """Build the argument parser for the ``remediate`` subcommand."""
     parser = argparse.ArgumentParser(
-        prog="manus-use remediate",
+        prog="manus-agent remediate",
         description="Generate actionable remediation guidance for a CVE.",
     )
     parser.add_argument(
@@ -998,7 +998,7 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
 
 def _build_variants_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="manus-use variants",
+        prog="manus-agent variants",
         description="CVE variant analysis — find similar bugs in related codebases",
         add_help=True,
     )
@@ -1066,7 +1066,7 @@ _SUBCOMMANDS = {
 
 def _build_epss_trend_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="manus-use epss-trend",
+        prog="manus-agent epss-trend",
         description=(
             "Fetch EPSS (Exploit Prediction Scoring System) score history for a CVE \n"
             "and flag significant spikes that indicate new exploitation activity."
@@ -1161,7 +1161,7 @@ def _run_epss_trend(argv: list[str]) -> int:
 
 def _build_patch_diff_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="manus-use patch-diff",
+        prog="manus-agent patch-diff",
         description=(
             "Fetch the fixing-commit diff for a CVE from GitHub and produce a\n"
             "structured summary: files changed, functions touched, bug class,\n"
@@ -1229,7 +1229,7 @@ def _run_patch_diff(argv: list[str]) -> int:
 
 def _build_compare_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="manus-use compare",
+        prog="manus-agent compare",
         description=(
             "Compare two CVEs side-by-side across CVSS, EPSS, CISA KEV, CWE,\n"
             "attack vector, and other dimensions.  Outputs a prioritisation\n"
@@ -1303,7 +1303,7 @@ def _run_compare(argv: list[str]) -> int:
 
 def _build_exploit_complexity_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="manus-use exploit-complexity",
+        prog="manus-agent exploit-complexity",
         description="Score the practical complexity of exploiting a CVE (1=trivial, 5=very hard).",
     )
     parser.add_argument("cve_id", metavar="CVE-ID", help="CVE identifier (e.g. CVE-2024-3094)")
@@ -1351,7 +1351,7 @@ def _run_exploit_complexity(argv: list[str]) -> int:
 
 def _build_poc_search_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="manus-use poc-search",
+        prog="manus-agent poc-search",
         description=(
             "Search multiple public sources for PoC exploits related to a CVE.\n"
             "Sources: trickest/cve, VulnCheck KEV, Exploit-DB, GitHub, NVD refs."
@@ -1459,7 +1459,7 @@ def _run_poc_search(argv: list[str]) -> int:  # noqa: C901
 
 def _build_changelog_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="manus-use changelog",
+        prog="manus-agent changelog",
         description=(
             "View CHANGELOG.md or generate release notes from recent git commits.\n"
             "Without --generate, prints the CHANGELOG.md content (or the section\n"
@@ -1694,7 +1694,7 @@ def _run_changelog_generate(args: argparse.Namespace, root: "_Path") -> int:  # 
 
 def _build_blast_radius_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="manus-use blast-radius",
+        prog="manus-agent blast-radius",
         description=(
             "Estimate the downstream blast radius of a vulnerable package or CVE.\n"
             "Given a package spec (requests@2.28.0, npm:axios@1.6.0, CVE-2021-44228),\n"
@@ -1862,7 +1862,7 @@ def _run_blast_radius(argv: list[str]) -> int:
 def _build_run_parser() -> argparse.ArgumentParser:
     """Build the top-level run/interactive parser."""
     parser = argparse.ArgumentParser(
-        prog="manus-use",
+        prog="manus-agent",
         description="ManusUse – Advanced AI Agent Framework",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
@@ -1912,7 +1912,7 @@ def _build_run_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version",
         action="version",
-        version=f"manus-use {__version__}",
+        version=f"manus-agent {__version__}",
     )
     parser.add_argument(
         "task",
@@ -1977,7 +1977,7 @@ def _build_run_parser() -> argparse.ArgumentParser:
 def _build_init_parser() -> argparse.ArgumentParser:
     """Build the `init` subcommand parser."""
     parser = argparse.ArgumentParser(
-        prog="manus-use init",
+        prog="manus-agent init",
         description="Guided wizard to create a manus-use configuration file.",
     )
     parser.add_argument(
@@ -1998,7 +1998,7 @@ def _build_init_parser() -> argparse.ArgumentParser:
 def _build_doctor_parser() -> argparse.ArgumentParser:
     """Build the `doctor` subcommand parser."""
     parser = argparse.ArgumentParser(
-        prog="manus-use doctor",
+        prog="manus-agent doctor",
         description="Diagnose your manus-use installation: packages, config file, API keys.",
     )
     parser.add_argument(
@@ -2014,7 +2014,7 @@ def _build_doctor_parser() -> argparse.ArgumentParser:
 def _build_history_parser() -> argparse.ArgumentParser:
     """Build the `history` subcommand parser."""
     parser = argparse.ArgumentParser(
-        prog="manus-use history",
+        prog="manus-agent history",
         description="Show past single-shot task runs recorded in the history log.",
     )
     parser.add_argument(

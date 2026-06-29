@@ -844,7 +844,7 @@ class TestMainDispatchesCompare:
     def test_main_routes_compare_subcommand(self):
 
         with patch("manus_use.cli._run_compare", return_value=0) as mock_run:
-            with patch("sys.argv", ["manus-use", "compare", "CVE-2021-44228", "CVE-2024-3094"]):
+            with patch("sys.argv", ["manus-agent", "compare", "CVE-2021-44228", "CVE-2024-3094"]):
                 try:
                     from manus_use.cli import main
 
@@ -857,7 +857,7 @@ class TestMainDispatchesCompare:
     def test_main_compare_passes_output_flag(self):
 
         with patch("manus_use.cli._run_compare", return_value=0) as mock_run:
-            with patch("sys.argv", ["manus-use", "compare", "CVE-2021-44228", "CVE-2024-3094", "--output", "json"]):
+            with patch("sys.argv", ["manus-agent", "compare", "CVE-2021-44228", "CVE-2024-3094", "--output", "json"]):
                 try:
                     from manus_use.cli import main
 

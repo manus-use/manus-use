@@ -46,14 +46,14 @@ Built on [Strands SDK](https://github.com/strands-agents/sdk-python) and integra
 
 ```bash
 # Basic installation
-pip install manus-use
+pip install manus-agent
 
 # With browser automation support
-pip install manus-use[browser]
+pip install manus-agent[browser]
 playwright install chromium
 
 # Full installation with all optional features
-pip install manus-use[browser,search,visualization]
+pip install manus-agent[browser,search,visualization]
 ```
 
 ---
@@ -62,13 +62,13 @@ pip install manus-use[browser,search,visualization]
 
 ```bash
 # 1. Set up credentials
-manus-use init
+manus-agent init
 
 # 2. Verify your environment
-manus-use doctor
+manus-agent doctor
 
 # 3. Run a task
-manus-use "Write a Python script that fetches the current Bitcoin price"
+manus-agent "Write a Python script that fetches the current Bitcoin price"
 
 # Or start the interactive REPL
 manus-use
@@ -78,27 +78,27 @@ manus-use
 
 ## CLI Reference
 
-### `manus-use [task]` — Run a task
+### `manus-agent [task]` — Run a task
 
 ```bash
 # Single-shot (prints result, then exits)
-manus-use "Create a factorial function in Python"
+manus-agent "Create a factorial function in Python"
 
 # Use a specific agent type
-manus-use --agent browser "Find the top 5 trending GitHub repos today"
+manus-agent --agent browser "Find the top 5 trending GitHub repos today"
 
 # Force multi-agent orchestration
-manus-use --mode multi "Research quantum computing and create a presentation"
+manus-agent --mode multi "Research quantum computing and create a presentation"
 
 # JSON output for piping
-manus-use --format json "List the first 10 prime numbers" | jq .result
+manus-agent --format json "List the first 10 prime numbers" | jq .result
 
 # Stream output tokens in real time
-manus-use --stream "Write a short story about a robot"
+manus-agent --stream "Write a short story about a robot"
 
 # Interactive REPL
 manus-use
-manus-use --mode multi
+manus-agent --mode multi
 ```
 
 | Flag | Default | Description |
@@ -115,44 +115,44 @@ manus-use --mode multi
 
 ---
 
-### `manus-use init` — Configure credentials
+### `manus-agent init` — Configure credentials
 
 ```bash
-manus-use init                        # write to ~/.manus-use/config.toml
-manus-use init --output ./my.toml    # write to a custom path
-manus-use init --force                # overwrite without prompting
+manus-agent init                        # write to ~/.manus-use/config.toml
+manus-agent init --output ./my.toml    # write to a custom path
+manus-agent init --force                # overwrite without prompting
 ```
 
-### `manus-use doctor` — Diagnose your environment
+### `manus-agent doctor` — Diagnose your environment
 
 ```bash
-manus-use doctor
-manus-use doctor --config ./custom.toml
+manus-agent doctor
+manus-agent doctor --config ./custom.toml
 ```
 
 Checks Python packages, config file validity, and API key accessibility.
 
-### `manus-use history` — Browse past runs
+### `manus-agent history` — Browse past runs
 
 ```bash
-manus-use history                        # last 20 runs
-manus-use history --limit 50            # last 50 runs
-manus-use history --grep "bitcoin"      # filter by task text
-manus-use history --format json | jq .  # all history as JSON
-manus-use history --clear               # delete all history
+manus-agent history                        # last 20 runs
+manus-agent history --limit 50            # last 50 runs
+manus-agent history --grep "bitcoin"      # filter by task text
+manus-agent history --format json | jq .  # all history as JSON
+manus-agent history --clear               # delete all history
 ```
 
 History is stored at `~/.manus-use/history.jsonl`.
 
 ---
 
-### `manus-use analyze <CVE-ID>` — Vulnerability intelligence
+### `manus-agent analyze <CVE-ID>` — Vulnerability intelligence
 
 ```bash
-manus-use analyze CVE-2025-6554
-manus-use analyze CVE-2024-3094 --verify
-manus-use analyze CVE-2025-6554 --output json
-manus-use analyze CVE-2025-6554 --output lark
+manus-agent analyze CVE-2025-6554
+manus-agent analyze CVE-2024-3094 --verify
+manus-agent analyze CVE-2025-6554 --output json
+manus-agent analyze CVE-2025-6554 --output lark
 ```
 
 Runs an 8-step intelligence pipeline — see [Security & Vulnerability Intelligence](#security--vulnerability-intelligence) for full details.
@@ -165,11 +165,11 @@ Runs an 8-step intelligence pipeline — see [Security & Vulnerability Intellige
 
 ---
 
-### `manus-use remediate <CVE-ID>` — Remediation guidance
+### `manus-agent remediate <CVE-ID>` — Remediation guidance
 
 ```bash
-manus-use remediate CVE-2024-3094
-manus-use remediate CVE-2024-3094 --output json
+manus-agent remediate CVE-2024-3094
+manus-agent remediate CVE-2024-3094 --output json
 ```
 
 | Flag | Default | Description |
@@ -179,13 +179,13 @@ manus-use remediate CVE-2024-3094 --output json
 
 ---
 
-### `manus-use discover` — CVE discovery
+### `manus-agent discover` — CVE discovery
 
 ```bash
-manus-use discover
-manus-use discover --since 2025-06-01 --min-epss 0.7
-manus-use discover --dry-run
-manus-use discover --output json
+manus-agent discover
+manus-agent discover --since 2025-06-01 --min-epss 0.7
+manus-agent discover --dry-run
+manus-agent discover --output json
 ```
 
 | Flag | Default | Description |
@@ -198,12 +198,12 @@ manus-use discover --output json
 
 ---
 
-### `manus-use epss-trend <CVE-ID>` — EPSS score history
+### `manus-agent epss-trend <CVE-ID>` — EPSS score history
 
 ```bash
-manus-use epss-trend CVE-2024-3094
-manus-use epss-trend CVE-2024-3094 --days 90
-manus-use epss-trend CVE-2024-3094 --output json | jq .analysis.spike_detected
+manus-agent epss-trend CVE-2024-3094
+manus-agent epss-trend CVE-2024-3094 --days 90
+manus-agent epss-trend CVE-2024-3094 --output json | jq .analysis.spike_detected
 ```
 
 Fetches daily EPSS scores from the [FIRST.org API](https://www.first.org/epss/) and detects exploitation spikes (≥ 0.10 jump in a 7-day window).
@@ -215,11 +215,11 @@ Fetches daily EPSS scores from the [FIRST.org API](https://www.first.org/epss/) 
 
 ---
 
-### `manus-use patch-diff <CVE-ID>` — Patch diff summariser
+### `manus-agent patch-diff <CVE-ID>` — Patch diff summariser
 
 ```bash
-manus-use patch-diff CVE-2024-3094
-manus-use patch-diff CVE-2024-3094 --output json | jq .commit_summaries
+manus-agent patch-diff CVE-2024-3094
+manus-agent patch-diff CVE-2024-3094 --output json | jq .commit_summaries
 ```
 
 Finds the fixing commit(s) via GHSA + NVD, fetches the raw unified diff, and produces a structured summary: files/functions changed, bug class (14 categories), reproduction condition hints, and commit URL.
@@ -230,11 +230,11 @@ Finds the fixing commit(s) via GHSA + NVD, fetches the raw unified diff, and pro
 
 ---
 
-### `manus-use variants <CVE-ID>` — Variant analysis
+### `manus-agent variants <CVE-ID>` — Variant analysis
 
 ```bash
-manus-use variants CVE-2024-3094
-manus-use variants CVE-2024-3094 --output json
+manus-agent variants CVE-2024-3094
+manus-agent variants CVE-2024-3094 --output json
 ```
 
 | Flag | Default | Description |
@@ -243,11 +243,11 @@ manus-use variants CVE-2024-3094 --output json
 
 ---
 
-### `manus-use compare <CVE-A> <CVE-B>` — Side-by-side comparison
+### `manus-agent compare <CVE-A> <CVE-B>` — Side-by-side comparison
 
 ```bash
-manus-use compare CVE-2024-3094 CVE-2021-44228
-manus-use compare CVE-2024-3094 CVE-2021-44228 --output json | jq .higher_priority
+manus-agent compare CVE-2024-3094 CVE-2021-44228
+manus-agent compare CVE-2024-3094 CVE-2021-44228 --output json | jq .higher_priority
 ```
 
 Fetches NVD, EPSS, and CISA KEV data for both CVEs in parallel and produces a side-by-side comparison across CVSS, EPSS, KEV membership, CWE, and exploitability factors. Outputs a prioritisation recommendation with confidence level (*strong / moderate / weak*).
@@ -258,11 +258,11 @@ Fetches NVD, EPSS, and CISA KEV data for both CVEs in parallel and produces a si
 
 ---
 
-### `manus-use exploit-complexity <CVE-ID>` — Exploit complexity scorer
+### `manus-agent exploit-complexity <CVE-ID>` — Exploit complexity scorer
 
 ```bash
-manus-use exploit-complexity CVE-2024-3094
-manus-use exploit-complexity CVE-2024-3094 --output json | jq .attacker_friendly
+manus-agent exploit-complexity CVE-2024-3094
+manus-agent exploit-complexity CVE-2024-3094 --output json | jq .attacker_friendly
 ```
 
 Scores practical attacker effort on a 1–5 scale across five dimensions:
@@ -283,12 +283,12 @@ Outputs a `complexity_score` (1–5), a label (*trivial / low / moderate / high 
 
 ---
 
-### `manus-use poc-search <CVE-ID>` — Multi-source PoC aggregator
+### `manus-agent poc-search <CVE-ID>` — Multi-source PoC aggregator
 
 ```bash
-manus-use poc-search CVE-2024-3094
-manus-use poc-search CVE-2024-3094 --sources trickest,exploitdb,github
-manus-use poc-search CVE-2024-3094 --output json | jq .exploited_in_wild
+manus-agent poc-search CVE-2024-3094
+manus-agent poc-search CVE-2024-3094 --sources trickest,exploitdb,github
+manus-agent poc-search CVE-2024-3094 --output json | jq .exploited_in_wild
 ```
 
 Queries five PoC sources **in parallel**, deduplicates results, and sorts by exploited-in-wild status and publication date:
@@ -308,14 +308,14 @@ Queries five PoC sources **in parallel**, deduplicates results, and sorts by exp
 
 ---
 
-### `manus-use blast-radius <SPEC>` — Dependency blast radius
+### `manus-agent blast-radius <SPEC>` — Dependency blast radius
 
 ```bash
-manus-use blast-radius requests@2.28.0
-manus-use blast-radius pypi:urllib3@1.26.5
-manus-use blast-radius npm:lodash@4.17.20
-manus-use blast-radius CVE-2021-44228
-manus-use blast-radius CVE-2021-44228 --output json | jq .summary
+manus-agent blast-radius requests@2.28.0
+manus-agent blast-radius pypi:urllib3@1.26.5
+manus-agent blast-radius npm:lodash@4.17.20
+manus-agent blast-radius CVE-2021-44228
+manus-agent blast-radius CVE-2021-44228 --output json | jq .summary
 ```
 
 Estimates how broadly a vulnerability propagates downstream. Resolves affected packages from NVD CPE + OSV.dev + GHSA, then enriches each with real download/dependent stats:
@@ -344,12 +344,12 @@ Blast-radius labels per package:
 
 ---
 
-### `manus-use silent-patches <owner/repo>` — Silent patch detector
+### `manus-agent silent-patches <owner/repo>` — Silent patch detector
 
 ```bash
-manus-use silent-patches torvalds/linux
-manus-use silent-patches torvalds/linux --since 2025-01-01
-manus-use silent-patches torvalds/linux --output json | jq .[].classification
+manus-agent silent-patches torvalds/linux
+manus-agent silent-patches torvalds/linux --since 2025-01-01
+manus-agent silent-patches torvalds/linux --output json | jq .[].classification
 ```
 
 Scans a repository's commit history for security fixes that were never assigned a CVE. Uses two-stage heuristic scoring: commit message keywords then diff keywords. Each candidate commit is labelled with one of 14 bug classes (e.g. `auth_bypass`, `buffer_overflow`, `use_after_free`).
@@ -364,11 +364,11 @@ Scans a repository's commit history for security fixes that were never assigned 
 
 ---
 
-### `manus-use cve-timeline <CVE-ID>` — CVE timeline
+### `manus-agent cve-timeline <CVE-ID>` — CVE timeline
 
 ```bash
-manus-use cve-timeline CVE-2021-44228
-manus-use cve-timeline CVE-2021-44228 --output json
+manus-agent cve-timeline CVE-2021-44228
+manus-agent cve-timeline CVE-2021-44228 --output json
 ```
 
 Reconstructs the full event timeline for a CVE: NVD publish date → EPSS history → CISA KEV add date → patch release date. Useful for understanding how quickly a vulnerability was weaponised and fixed.
@@ -379,12 +379,12 @@ Reconstructs the full event timeline for a CVE: NVD publish date → EPSS histor
 
 ---
 
-### `manus-use version-range <CVE-ID>` — Affected version ranges
+### `manus-agent version-range <CVE-ID>` — Affected version ranges
 
 ```bash
-manus-use version-range CVE-2021-44228
-manus-use version-range CVE-2021-44228 --ecosystem pypi
-manus-use version-range CVE-2021-44228 --output json | jq .first_patched_version
+manus-agent version-range CVE-2021-44228
+manus-agent version-range CVE-2021-44228 --ecosystem pypi
+manus-agent version-range CVE-2021-44228 --output json | jq .first_patched_version
 ```
 
 Walks NVD CPE configurations and cross-references PyPI / npm / Maven to produce structured vulnerable semver ranges, a list of affected releases, and the first patched release.
@@ -396,11 +396,11 @@ Walks NVD CPE configurations and cross-references PyPI / npm / Maven to produce 
 
 ---
 
-### `manus-use vendor-response <CVE-ID>` — Vendor response tracker
+### `manus-agent vendor-response <CVE-ID>` — Vendor response tracker
 
 ```bash
-manus-use vendor-response CVE-2024-3094
-manus-use vendor-response CVE-2024-3094 --output json | jq .classification
+manus-agent vendor-response CVE-2024-3094
+manus-agent vendor-response CVE-2024-3094 --output json | jq .classification
 ```
 
 Queries four sources (NVD reference URL patterns, GHSA published state + patched_versions, CISA KEV required-action + due-date, repo-level GitHub security advisories) and outputs a 6-state patch-status classification:
@@ -415,11 +415,11 @@ Confidence is rated `high / moderate / low`. A VulnCheck KEV hit upgrades confid
 
 ---
 
-### `manus-use poc-freshness <CVE-ID>` — PoC freshness checker
+### `manus-agent poc-freshness <CVE-ID>` — PoC freshness checker
 
 ```bash
-manus-use poc-freshness CVE-2024-3094
-manus-use poc-freshness CVE-2024-3094 --output json | jq .freshness_score
+manus-agent poc-freshness CVE-2024-3094
+manus-agent poc-freshness CVE-2024-3094 --output json | jq .freshness_score
 ```
 
 Measures how recently PoC activity occurred: last commit recency in known PoC repos, recently-starred repositories, new Exploit-DB entries. A high freshness score means attacker interest is ongoing.
@@ -430,11 +430,11 @@ Measures how recently PoC activity occurred: last commit recency in known PoC re
 
 ---
 
-### `manus-use sbom-scan <bom-file>` — SBOM scanner
+### `manus-agent sbom-scan <bom-file>` — SBOM scanner
 
 ```bash
-manus-use sbom-scan bom.json
-manus-use sbom-scan sbom.spdx.json --output json | jq .critical_count
+manus-agent sbom-scan bom.json
+manus-agent sbom-scan sbom.spdx.json --output json | jq .critical_count
 ```
 
 Parses CycloneDX or SPDX SBOMs, queries OSV.dev in batch for all components, enriches each finding with EPSS and CISA KEV status, and ranks results by KEV membership then EPSS score.
@@ -445,11 +445,11 @@ Parses CycloneDX or SPDX SBOMs, queries OSV.dev in batch for all components, enr
 
 ---
 
-### `manus-use temporal-priority <CVE-ID>` — Temporal priority scorer
+### `manus-agent temporal-priority <CVE-ID>` — Temporal priority scorer
 
 ```bash
-manus-use temporal-priority CVE-2024-3094
-manus-use temporal-priority CVE-2024-3094 --output json | jq .score
+manus-agent temporal-priority CVE-2024-3094
+manus-agent temporal-priority CVE-2024-3094 --output json | jq .score
 ```
 
 Produces a 0–100 urgency score combining CVSS base score, current EPSS, EPSS spike recency, CISA KEV membership, patch availability, and CVE age. Designed to answer: *"given everything I know today, how urgent is this?"*
@@ -460,11 +460,11 @@ Produces a 0–100 urgency score combining CVSS base score, current EPSS, EPSS s
 
 ---
 
-### `manus-use cluster-variants <CVE-ID>` — CVE variant clustering
+### `manus-agent cluster-variants <CVE-ID>` — CVE variant clustering
 
 ```bash
-manus-use cluster-variants CVE-2021-44228
-manus-use cluster-variants CVE-2021-44228 --output json | jq .clusters
+manus-agent cluster-variants CVE-2021-44228
+manus-agent cluster-variants CVE-2021-44228 --output json | jq .clusters
 ```
 
 Groups CVEs related to the input across three cluster dimensions: same component/vendor, same CWE weakness class, and same researcher/disclosure domain. Useful for finding the full attack surface when one CVE is confirmed exploited.
@@ -475,13 +475,13 @@ Groups CVEs related to the input across three cluster dimensions: same component
 
 ---
 
-### `manus-use changelog` — Manage project changelog
+### `manus-agent changelog` — Manage project changelog
 
 ```bash
-manus-use changelog                       # show full CHANGELOG.md
-manus-use changelog --version 0.1.0      # show section for a specific version
-manus-use changelog --generate           # preview next release notes from commits
-manus-use changelog --generate --output json
+manus-agent changelog                       # show full CHANGELOG.md
+manus-agent changelog --version 0.1.0      # show section for a specific version
+manus-agent changelog --generate           # preview next release notes from commits
+manus-agent changelog --generate --output json
 ```
 
 Parses [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, etc.) and groups them into `Added`, `Fixed`, and `Changed` sections.
@@ -496,7 +496,7 @@ Parses [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `f
 
 ## Configuration
 
-Create `~/.manus-use/config.toml` (or run `manus-use init`):
+Create `~/.manus-use/config.toml` (or run `manus-agent init`):
 
 ```toml
 [llm]
@@ -593,7 +593,7 @@ result = agent.handle_request("Analyse CVE-2025-6554")
 
 ### Pipeline
 
-The `manus-use analyze` command runs an 8-step pipeline:
+The `manus-agent analyze` command runs an 8-step pipeline:
 
 1. **NVD + GHSA** — official CVE metadata, CVSS, CWE
 2. **CISA KEV** — known-exploited-vulnerabilities catalogue; **VulnCheck KEV** when `VULNCHECK_API_KEY` is set (100+ intel sources, ransomware flag)
@@ -608,27 +608,27 @@ The `manus-use analyze` command runs an 8-step pipeline:
 
 ```bash
 # Full intelligence report
-manus-use analyze CVE-2024-3094
+manus-agent analyze CVE-2024-3094
 
 # How exploitable is it right now?
-manus-use exploit-complexity CVE-2024-3094
-manus-use epss-trend CVE-2024-3094
+manus-agent exploit-complexity CVE-2024-3094
+manus-agent epss-trend CVE-2024-3094
 
 # What changed in the fix?
-manus-use patch-diff CVE-2024-3094
+manus-agent patch-diff CVE-2024-3094
 
 # Am I affected?
-manus-use version-range CVE-2024-3094
-manus-use sbom-scan bom.json
+manus-agent version-range CVE-2024-3094
+manus-agent sbom-scan bom.json
 
 # Triage two CVEs
-manus-use compare CVE-2024-3094 CVE-2021-44228
-manus-use temporal-priority CVE-2024-3094
+manus-agent compare CVE-2024-3094 CVE-2021-44228
+manus-agent temporal-priority CVE-2024-3094
 
 # Find related exposure
-manus-use blast-radius CVE-2021-44228
-manus-use cluster-variants CVE-2021-44228
-manus-use silent-patches apache/log4j
+manus-agent blast-radius CVE-2021-44228
+manus-agent cluster-variants CVE-2021-44228
+manus-agent silent-patches apache/log4j
 ```
 
 ### VulnCheck enrichment (optional)
@@ -720,7 +720,7 @@ manus-agent/
 │   ├── multi_agents/
 │   │   └── workflow_agent.py
 │   ├── tools/           # Strands tool implementations (one file per tool)
-│   ├── cli.py           # manus-use CLI entry point
+│   ├── cli.py           # manus-agent CLI entry point
 │   ├── config.py
 │   └── __init__.py
 ├── tests/               # pytest test suite (900+ tests, all mocked)

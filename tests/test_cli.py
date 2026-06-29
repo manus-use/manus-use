@@ -32,7 +32,7 @@ def _invoke_main(argv, *, patch_single_shot=True, single_shot_rc=0):
         captured["no_history"] = no_history
         return single_shot_rc
 
-    with mock.patch.object(sys, "argv", ["manus-use"] + argv):
+    with mock.patch.object(sys, "argv", ["manus-agent"] + argv):
         with mock.patch.object(cli, "_run_single_shot", side_effect=fake_single_shot) as m_ss:
             with mock.patch.object(cli, "_run_interactive") as m_int:
                 with mock.patch("manus_use.cli.Config") as m_cfg:
@@ -56,7 +56,7 @@ def test_version_flag():
     """--version prints version string and exits 0."""
     from manus_use import cli
 
-    with mock.patch.object(sys, "argv", ["manus-use", "--version"]):
+    with mock.patch.object(sys, "argv", ["manus-agent", "--version"]):
         with pytest.raises(SystemExit) as exc_info:
             cli.main()
     assert exc_info.value.code == 0
@@ -68,7 +68,7 @@ def test_version_flag():
 
 
 def test_single_shot_dispatches_task():
-    """`manus-use 'do X'` routes to _run_single_shot with correct task."""
+    """`manus-agent 'do X'` routes to _run_single_shot with correct task."""
     captured = _invoke_main(["do X"])
     assert captured["task"] == "do X"
     assert captured["_run_single_shot"].called
@@ -143,7 +143,7 @@ def test_output_without_task_is_error():
     """--output without a task argument should produce an argparse error (exit 2)."""
     from manus_use import cli
 
-    with mock.patch.object(sys, "argv", ["manus-use", "--output", "out.txt"]):
+    with mock.patch.object(sys, "argv", ["manus-agent", "--output", "out.txt"]):
         with mock.patch("manus_use.cli.Config") as m_cfg:
             m_cfg.from_file.return_value = mock.MagicMock()
             with pytest.raises(SystemExit) as exc_info:
@@ -428,7 +428,7 @@ def _invoke_history(argv):
     from manus_use import cli
 
     captured = {}
-    with mock.patch.object(sys, "argv", ["manus-use", "history"] + argv):
+    with mock.patch.object(sys, "argv", ["manus-agent", "history"] + argv):
         with mock.patch.object(cli, "_cmd_history") as m_hist:
             m_hist.return_value = 0
             try:
