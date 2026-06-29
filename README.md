@@ -3,7 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/manus-use.svg)](https://pypi.org/project/manus-use/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://github.com/manus-use/manus-use/actions/workflows/test.yml/badge.svg)](https://github.com/manus-use/manus-use/actions)
+[![Tests](https://github.com/manus-use/manus-agent/actions/workflows/test.yml/badge.svg)](https://github.com/manus-use/manus-agent/actions)
 
 A powerful, extensible framework for building AI agents with comprehensive tool support, multi-agent orchestration, and advanced web automation capabilities.
 
@@ -414,15 +414,15 @@ CLI subcommands are tracked in open PRs and will merge shortly.
 
 | Subcommand | PR | Description |
 |---|---|---|
-| `manus-use silent-patches <owner/repo>` | [#51](https://github.com/manus-use/manus-use/pull/51) | Detect security commits with no CVE reference — two-stage heuristic scoring on commit messages + diff keywords |
-| `manus-use cve-timeline <CVE-ID>` | [#53](https://github.com/manus-use/manus-use/pull/53) | Full timeline view: publish date → EPSS movement → KEV add date → patch date |
-| `manus-use version-range <CVE-ID>` | [#54](https://github.com/manus-use/manus-use/pull/54) | NVD CPE → PyPI/npm/Maven cross-reference; structured vulnerable semver ranges + first patched release |
-| `manus-use vendor-response <CVE-ID>` | [#58](https://github.com/manus-use/manus-use/pull/58) | 6-state patch-status classifier: `patch_available` / `patch_backported` / `wont_fix` / `investigating` / `no_patch` / `unknown` |
-| `manus-use poc-freshness <CVE-ID>` | [#60](https://github.com/manus-use/manus-use/pull/60) | PoC freshness check — last-commit recency, recently-starred repos, new exploit-db entries |
-| `manus-use blast-radius <CVE-or-pkg>` | [#63](https://github.com/manus-use/manus-use/pull/63) | Downstream exposure estimator — resolves affected packages (NVD CPE + OSV + GHSA) and enriches each with npm/PyPI/Maven download counts |
-| `manus-use sbom-scan <bom.json>` | [#64](https://github.com/manus-use/manus-use/pull/64) | CycloneDX/SPDX SBOM scanner — OSV.dev batch query, EPSS enrichment, CISA KEV flagging; ranks by KEV then EPSS |
-| `manus-use temporal-priority <CVE-ID>` | [#65](https://github.com/manus-use/manus-use/pull/65) | Time-aware urgency scorer (0–100) combining CVSS, EPSS, EPSS spike recency, KEV, patch availability, and CVE age |
-| `manus-use cluster-variants <CVE-ID>` | [#67](https://github.com/manus-use/manus-use/pull/67) | CVE variant cluster analysis — groups related CVEs by same component, same CWE, and same researcher/disclosure domain |
+| `manus-use silent-patches <owner/repo>` | [#51](https://github.com/manus-use/manus-agent/pull/51) | Detect security commits with no CVE reference — two-stage heuristic scoring on commit messages + diff keywords |
+| `manus-use cve-timeline <CVE-ID>` | [#53](https://github.com/manus-use/manus-agent/pull/53) | Full timeline view: publish date → EPSS movement → KEV add date → patch date |
+| `manus-use version-range <CVE-ID>` | [#54](https://github.com/manus-use/manus-agent/pull/54) | NVD CPE → PyPI/npm/Maven cross-reference; structured vulnerable semver ranges + first patched release |
+| `manus-use vendor-response <CVE-ID>` | [#58](https://github.com/manus-use/manus-agent/pull/58) | 6-state patch-status classifier: `patch_available` / `patch_backported` / `wont_fix` / `investigating` / `no_patch` / `unknown` |
+| `manus-use poc-freshness <CVE-ID>` | [#60](https://github.com/manus-use/manus-agent/pull/60) | PoC freshness check — last-commit recency, recently-starred repos, new exploit-db entries |
+| `manus-use blast-radius <CVE-or-pkg>` | [#63](https://github.com/manus-use/manus-agent/pull/63) | Downstream exposure estimator — resolves affected packages (NVD CPE + OSV + GHSA) and enriches each with npm/PyPI/Maven download counts |
+| `manus-use sbom-scan <bom.json>` | [#64](https://github.com/manus-use/manus-agent/pull/64) | CycloneDX/SPDX SBOM scanner — OSV.dev batch query, EPSS enrichment, CISA KEV flagging; ranks by KEV then EPSS |
+| `manus-use temporal-priority <CVE-ID>` | [#65](https://github.com/manus-use/manus-agent/pull/65) | Time-aware urgency scorer (0–100) combining CVSS, EPSS, EPSS spike recency, KEV, patch availability, and CVE age |
+| `manus-use cluster-variants <CVE-ID>` | [#67](https://github.com/manus-use/manus-agent/pull/67) | CVE variant cluster analysis — groups related CVEs by same component, same CWE, and same researcher/disclosure domain |
 
 
 ### `manus-use blast-radius <SPEC>` — Dependency blast radius
@@ -773,7 +773,7 @@ All other functionality works without the key.
 ### Set up a development environment
 
 ```bash
-git clone https://github.com/manus-use/manus-use.git
+git clone https://github.com/manus-use/manus-agent.git
 cd manus-use
 pip install -e ".[dev,browser,search,visualization]"
 ```
@@ -850,9 +850,9 @@ Explore the [examples/](examples/) directory for runnable scripts:
 
 ## Support
 
-- 📖 [Documentation](https://github.com/manus-use/manus-use/wiki)
-- 🐛 [Issue Tracker](https://github.com/manus-use/manus-use/issues)
-- 💬 [Discussions](https://github.com/manus-use/manus-use/discussions)
+- 📖 [Documentation](https://github.com/manus-use/manus-agent/wiki)
+- 🐛 [Issue Tracker](https://github.com/manus-use/manus-agent/issues)
+- 💬 [Discussions](https://github.com/manus-use/manus-agent/discussions)
 
 ---
 
