@@ -20,6 +20,7 @@ Built on [Strands SDK](https://github.com/strands-agents/sdk-python) and integra
   - [remediate](#manus-agent-remediate-cve-id--remediation-guidance)
   - [discover](#manus-agent-discover--cve-discovery)
   - [epss-trend](#manus-agent-epss-trend-cve-id--epss-score-history)
+  - [epss-decay](#manus-agent-epss-decay-cve-id--epss-decay-detector)
   - [patch-diff](#manus-agent-patch-diff-cve-id--patch-diff-summariser)
   - [variants](#manus-agent-variants-cve-id--variant-analysis)
   - [compare](#manus-agent-compare-cve-a-cve-b--side-by-side-comparison)
@@ -211,6 +212,32 @@ Fetches daily EPSS scores from the [FIRST.org API](https://www.first.org/epss/) 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--days N` | `30` | Days of history (max 365) |
+| `--output {text,json}` | `text` | Output format |
+
+---
+
+### `manus-agent epss-decay <CVE-ID>` — EPSS decay detector
+
+```bash
+manus-agent epss-decay CVE-2021-44228
+manus-agent epss-decay CVE-2021-44228 --days 365
+manus-agent epss-decay CVE-2021-44228 --output json | jq .decay.class
+```
+
+Detects whether a CVE's EPSS score has decayed significantly below its all-time peak — the *"attackers tried and moved on"* signal. Complements `epss-trend` (which detects rising spikes) by analysing the full historical arc: where did the score peak, how long did it stay there, and how far has it since fallen?
+
+Decay classes:
+
+| Class | Condition | Interpretation |
+|-------|-----------|----------------|
+| `significant_decay` | current < 40% of peak | Attacker interest peaked and substantially waned |
+| `moderate_decay` | current 40–70% of peak | Interest waning but still elevated |
+| `stable` | current ≥ 70% of peak | Still near peak — actively scored |
+| `never_peaked` | peak < 0.15 | Never attracted significant attacker attention |
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--days N` | `365` | Days of history to fetch (max 365) |
 | `--output {text,json}` | `text` | Output format |
 
 ---
@@ -610,9 +637,10 @@ The `manus-agent analyze` command runs an 8-step pipeline:
 # Full intelligence report
 manus-agent analyze CVE-2024-3094
 
-# How exploitable is it right now?
+# How exploitable is it right now? Is attacker interest waning?
 manus-agent exploit-complexity CVE-2024-3094
 manus-agent epss-trend CVE-2024-3094
+manus-agent epss-decay CVE-2024-3094
 
 # What changed in the fix?
 manus-agent patch-diff CVE-2024-3094

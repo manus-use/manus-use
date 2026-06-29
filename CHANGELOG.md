@@ -57,6 +57,11 @@ and [Semantic Versioning](https://semver.org/).
   summarises the patch diff from a GitHub commit URL.
 - `get_epss_trend` tool and `manus-agent epss-trend` CLI subcommand — retrieves daily
   EPSS scores for a CVE and detects exploitation spikes.
+- `score_epss_decay` tool and `manus-agent epss-decay` CLI subcommand — detects whether
+  a CVE's EPSS score has decayed significantly below its all-time peak, providing the
+  complementary *"attackers tried and moved on"* signal to `epss-trend`'s spike detection.
+  Classifies decay as `significant_decay`, `moderate_decay`, `stable`, or `never_peaked`;
+  reports peak date, days since peak, peak-sustained duration, and weekly decay rate.
 - `manus-agent poc-search` CLI subcommand — searches public PoC sources from the command
   line.
 - `.github/workflows/publish.yml` — automated PyPI publishing via OIDC Trusted
