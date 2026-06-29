@@ -9,20 +9,20 @@ from unittest.mock import Mock, patch
 import pytest
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
-from manus_use.agents.browser_use_agent import BrowserUseAgent
-from manus_use.sandbox.exploit_sandbox import InterpreterNotFoundError
-from manus_use.tools import get_tools_by_names
-from manus_use.tools.browser_utils import prepare_evaluate_script
-from manus_use.tools.file_operations import (
+from manus_agent.agents.browser_use_agent import BrowserUseAgent
+from manus_agent.sandbox.exploit_sandbox import InterpreterNotFoundError
+from manus_agent.tools import get_tools_by_names
+from manus_agent.tools.browser_utils import prepare_evaluate_script
+from manus_agent.tools.file_operations import (
     file_delete,
     file_list,
     file_move,
     file_read,
     file_write,
 )
-from manus_use.tools.patches import use_browser_patch as use_browser_patch_module
-from manus_use.tools.patches.use_browser_patch import apply_comprehensive_patch
-from manus_use.tools.python_repl import python_repl
+from manus_agent.tools.patches import use_browser_patch as use_browser_patch_module
+from manus_agent.tools.patches.use_browser_patch import apply_comprehensive_patch
+from manus_agent.tools.python_repl import python_repl
 
 
 def test_python_repl_interactive_does_not_reexecute_code_when_saving_state(monkeypatch, tmp_path):
@@ -57,7 +57,7 @@ def test_python_repl_interactive_does_not_reexecute_code_when_saving_state(monke
 def test_verify_exploit_returns_structured_infra_error_on_transient_run_failure(monkeypatch):
     """verify_exploit should classify transient docker/runtime failures as infra_error with error metadata."""
 
-    from manus_use.tools import verify_exploit as verify_exploit_module
+    from manus_agent.tools import verify_exploit as verify_exploit_module
 
     class FakeClient:
         def ping(self):
@@ -128,7 +128,7 @@ def test_verify_exploit_returns_structured_infra_error_on_transient_run_failure(
 def test_verify_exploit_classifies_missing_interpreter_in_runner_as_infra_error(monkeypatch):
     """Missing interpreter in the remote exploit runner should be reported as infra_error."""
 
-    from manus_use.tools import verify_exploit as verify_exploit_module
+    from manus_agent.tools import verify_exploit as verify_exploit_module
 
     class FakeClient:
         def ping(self):
@@ -205,7 +205,7 @@ def test_verify_exploit_classifies_missing_interpreter_in_runner_as_infra_error(
 def test_verify_exploit_classifies_missing_interpreter_in_target_as_target_error(monkeypatch):
     """Missing interpreter in the local target container should be reported as target_error."""
 
-    from manus_use.tools import verify_exploit as verify_exploit_module
+    from manus_agent.tools import verify_exploit as verify_exploit_module
 
     class FakeClient:
         def ping(self):
@@ -277,7 +277,7 @@ def test_verify_exploit_classifies_missing_interpreter_in_target_as_target_error
 
 def test_exploit_sandbox_start_target_uses_create_connect_start(monkeypatch):
     """start_target should use create+connect+start, not run+disconnect+reconnect."""
-    from manus_use.sandbox.exploit_sandbox import ExploitSandbox
+    from manus_agent.sandbox.exploit_sandbox import ExploitSandbox
 
     call_log = []
 
@@ -316,11 +316,11 @@ def test_exploit_sandbox_start_target_uses_create_connect_start(monkeypatch):
         networks = FakeNetworks()
 
     monkeypatch.setattr(
-        "manus_use.sandbox.exploit_sandbox.get_docker_client",
+        "manus_agent.sandbox.exploit_sandbox.get_docker_client",
         lambda: FakeClient(),
     )
     monkeypatch.setattr(
-        "manus_use.sandbox.exploit_sandbox.wait_for_container_running",
+        "manus_agent.sandbox.exploit_sandbox.wait_for_container_running",
         lambda container, timeout=20: None,
     )
 
@@ -354,7 +354,7 @@ def test_exploit_sandbox_start_target_uses_create_connect_start(monkeypatch):
 
 def test_exploit_sandbox_run_local_exploit_returns_interpreter_metadata(monkeypatch):
     """run_local_exploit should return interpreter metadata (first definition, not shadow)."""
-    from manus_use.sandbox.exploit_sandbox import ExploitSandbox
+    from manus_agent.sandbox.exploit_sandbox import ExploitSandbox
 
     class FakeContainer:
         def __init__(self):
@@ -371,11 +371,11 @@ def test_exploit_sandbox_run_local_exploit_returns_interpreter_metadata(monkeypa
     sandbox.target_container = FakeContainer()
 
     monkeypatch.setattr(
-        "manus_use.sandbox.exploit_sandbox._copy_to_container",
+        "manus_agent.sandbox.exploit_sandbox._copy_to_container",
         lambda container, data, path: None,
     )
     monkeypatch.setattr(
-        "manus_use.sandbox.exploit_sandbox.wait_for_container_running",
+        "manus_agent.sandbox.exploit_sandbox.wait_for_container_running",
         lambda container, timeout=20: None,
     )
 
@@ -1091,10 +1091,10 @@ def test_apply_comprehensive_patch_normalizes_evaluate_scripts(monkeypatch):
     assert "?.textContent ?? null" in normalized_script
 
 
-@patch("manus_use.agents.browser_use_agent.BROWSER_USE_AVAILABLE", True)
-@patch("manus_use.agents.browser_use_agent.ChatBedrock", create=True)
-@patch("manus_use.agents.browser_use_agent.ChatOpenAI", create=True)
-@patch("manus_use.agents.browser_use_agent.apply_comprehensive_patch")
+@patch("manus_agent.agents.browser_use_agent.BROWSER_USE_AVAILABLE", True)
+@patch("manus_agent.agents.browser_use_agent.ChatBedrock", create=True)
+@patch("manus_agent.agents.browser_use_agent.ChatOpenAI", create=True)
+@patch("manus_agent.agents.browser_use_agent.apply_comprehensive_patch")
 def test_browser_use_agent_applies_patch_config(mock_apply_patch, _mock_openai, _mock_bedrock):
     """BrowserUseAgent should push timeout/retry config into the patch layer."""
     browser_config = Mock()
@@ -1126,7 +1126,7 @@ def test_browser_use_agent_applies_patch_config(mock_apply_patch, _mock_openai, 
 
 def test_create_lark_document_is_openclaw_defaults_false_when_not_set(monkeypatch):
     """is_openclaw should default to False when OPENCLAW env var is not set."""
-    from manus_use.tools import create_lark_document as cld_module
+    from manus_agent.tools import create_lark_document as cld_module
 
     monkeypatch.delenv("OPENCLAW", raising=False)
     monkeypatch.setenv("LARK_DOCUMENT_URL", "https://example.com/lark")
@@ -1162,7 +1162,7 @@ def test_create_lark_document_is_openclaw_defaults_false_when_not_set(monkeypatc
 
 def test_create_lark_document_technical_details_schema_wording():
     """technical_details schema should require concise Markdown sections with exact headings."""
-    from manus_use.tools import create_lark_document as cld_module
+    from manus_agent.tools import create_lark_document as cld_module
 
     schema = cld_module.TOOL_SPEC["inputSchema"]["json"]
     description = schema["properties"]["technical_details"]["description"]
@@ -1185,7 +1185,7 @@ def test_create_lark_document_technical_details_schema_wording():
 
 def test_create_lark_document_is_openclaw_defaults_true_when_openclaw_env(monkeypatch):
     """is_openclaw should default to True when OPENCLAW=true env var is set."""
-    from manus_use.tools import create_lark_document as cld_module
+    from manus_agent.tools import create_lark_document as cld_module
 
     monkeypatch.setenv("OPENCLAW", "true")
     monkeypatch.setenv("LARK_DOCUMENT_URL", "https://example.com/lark")
@@ -1221,7 +1221,7 @@ def test_create_lark_document_is_openclaw_defaults_true_when_openclaw_env(monkey
 
 def test_create_lark_document_is_openclaw_explicit_override(monkeypatch):
     """Explicit is_openclaw in tool input should override the environment-based default."""
-    from manus_use.tools import create_lark_document as cld_module
+    from manus_agent.tools import create_lark_document as cld_module
 
     monkeypatch.delenv("OPENCLAW", raising=False)  # default would be False
     monkeypatch.setenv("LARK_DOCUMENT_URL", "https://example.com/lark")

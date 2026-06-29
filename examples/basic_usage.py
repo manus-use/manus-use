@@ -1,7 +1,7 @@
 """Basic usage examples for ManusUse."""
 
-from manus_use import BrowserAgent, DataAnalysisAgent, ManusAgent
-from manus_use.tools import code_execute, file_read, file_write
+from manus_agent import BrowserAgent, DataAnalysisAgent, ManusAgent
+from manus_agent.tools import code_execute, file_read, file_write
 
 
 def example_manus_agent():
@@ -46,7 +46,7 @@ def example_custom_config():
     """Example with custom configuration."""
     print("\n=== Custom Configuration Example ===")
 
-    from manus_use.config import Config, LLMConfig
+    from manus_agent.config import Config, LLMConfig
 
     # Create custom config
     config = Config(llm=LLMConfig(provider="openai", model="gpt-4", temperature=0.7, max_tokens=2000))

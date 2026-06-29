@@ -111,18 +111,18 @@ def _kev_response(catalog: dict) -> MagicMock:
 
 class TestFetchNvd:
     def test_returns_cve_record_on_success(self):
-        from manus_use.tools.compare_cves import _fetch_nvd
+        from manus_agent.tools.compare_cves import _fetch_nvd
 
-        with patch("manus_use.tools.compare_cves.requests.get") as mock_get:
+        with patch("manus_agent.tools.compare_cves.requests.get") as mock_get:
             mock_get.return_value = _nvd_response(MOCK_NVD_LOG4SHELL)
             result = _fetch_nvd("CVE-2021-44228")
 
         assert result.get("id") == "CVE-2021-44228"
 
     def test_returns_error_dict_when_no_vulnerabilities(self):
-        from manus_use.tools.compare_cves import _fetch_nvd
+        from manus_agent.tools.compare_cves import _fetch_nvd
 
-        with patch("manus_use.tools.compare_cves.requests.get") as mock_get:
+        with patch("manus_agent.tools.compare_cves.requests.get") as mock_get:
             resp = MagicMock()
             resp.raise_for_status = MagicMock()
             resp.json.return_value = {"vulnerabilities": []}
@@ -134,9 +134,9 @@ class TestFetchNvd:
     def test_returns_error_dict_on_request_exception(self):
         import requests
 
-        from manus_use.tools.compare_cves import _fetch_nvd
+        from manus_agent.tools.compare_cves import _fetch_nvd
 
-        with patch("manus_use.tools.compare_cves.requests.get", side_effect=requests.RequestException("timeout")):
+        with patch("manus_agent.tools.compare_cves.requests.get", side_effect=requests.RequestException("timeout")):
             result = _fetch_nvd("CVE-2021-44228")
 
         assert "error" in result
@@ -145,18 +145,18 @@ class TestFetchNvd:
 
 class TestFetchEpss:
     def test_returns_entry_on_success(self):
-        from manus_use.tools.compare_cves import _fetch_epss
+        from manus_agent.tools.compare_cves import _fetch_epss
 
-        with patch("manus_use.tools.compare_cves.requests.get") as mock_get:
+        with patch("manus_agent.tools.compare_cves.requests.get") as mock_get:
             mock_get.return_value = _epss_response(MOCK_EPSS_LOG4SHELL)
             result = _fetch_epss("CVE-2021-44228")
 
         assert result.get("epss") == "0.97535"
 
     def test_returns_error_dict_when_no_data(self):
-        from manus_use.tools.compare_cves import _fetch_epss
+        from manus_agent.tools.compare_cves import _fetch_epss
 
-        with patch("manus_use.tools.compare_cves.requests.get") as mock_get:
+        with patch("manus_agent.tools.compare_cves.requests.get") as mock_get:
             resp = MagicMock()
             resp.raise_for_status = MagicMock()
             resp.json.return_value = {"data": []}
@@ -168,9 +168,9 @@ class TestFetchEpss:
     def test_returns_error_on_request_exception(self):
         import requests
 
-        from manus_use.tools.compare_cves import _fetch_epss
+        from manus_agent.tools.compare_cves import _fetch_epss
 
-        with patch("manus_use.tools.compare_cves.requests.get", side_effect=requests.RequestException("conn")):
+        with patch("manus_agent.tools.compare_cves.requests.get", side_effect=requests.RequestException("conn")):
             result = _fetch_epss("CVE-2021-44228")
 
         assert "error" in result
@@ -178,9 +178,9 @@ class TestFetchEpss:
 
 class TestFetchKev:
     def test_returns_in_kev_true_for_known_cve(self):
-        from manus_use.tools.compare_cves import _fetch_kev
+        from manus_agent.tools.compare_cves import _fetch_kev
 
-        with patch("manus_use.tools.compare_cves.requests.get") as mock_get:
+        with patch("manus_agent.tools.compare_cves.requests.get") as mock_get:
             mock_get.return_value = _kev_response(MOCK_KEV_CATALOG)
             result = _fetch_kev("CVE-2021-44228")
 
@@ -189,9 +189,9 @@ class TestFetchKev:
         assert result["vendor_project"] == "Apache"
 
     def test_returns_in_kev_false_for_unknown_cve(self):
-        from manus_use.tools.compare_cves import _fetch_kev
+        from manus_agent.tools.compare_cves import _fetch_kev
 
-        with patch("manus_use.tools.compare_cves.requests.get") as mock_get:
+        with patch("manus_agent.tools.compare_cves.requests.get") as mock_get:
             mock_get.return_value = _kev_response(MOCK_KEV_CATALOG)
             result = _fetch_kev("CVE-2024-3094")
 
@@ -201,18 +201,18 @@ class TestFetchKev:
     def test_returns_in_kev_false_on_request_exception(self):
         import requests
 
-        from manus_use.tools.compare_cves import _fetch_kev
+        from manus_agent.tools.compare_cves import _fetch_kev
 
-        with patch("manus_use.tools.compare_cves.requests.get", side_effect=requests.RequestException("net")):
+        with patch("manus_agent.tools.compare_cves.requests.get", side_effect=requests.RequestException("net")):
             result = _fetch_kev("CVE-2021-44228")
 
         assert result["in_kev"] is False
         assert "error" in result
 
     def test_case_insensitive_matching(self):
-        from manus_use.tools.compare_cves import _fetch_kev
+        from manus_agent.tools.compare_cves import _fetch_kev
 
-        with patch("manus_use.tools.compare_cves.requests.get") as mock_get:
+        with patch("manus_agent.tools.compare_cves.requests.get") as mock_get:
             mock_get.return_value = _kev_response(MOCK_KEV_CATALOG)
             result = _fetch_kev("cve-2021-44228")  # lower-case input
 
@@ -221,7 +221,7 @@ class TestFetchKev:
 
 class TestExtractCvss:
     def test_prefers_v31_over_v2(self):
-        from manus_use.tools.compare_cves import _extract_cvss
+        from manus_agent.tools.compare_cves import _extract_cvss
 
         result = _extract_cvss(MOCK_NVD_LOG4SHELL)
         assert result["version"] == "3.1"
@@ -230,7 +230,7 @@ class TestExtractCvss:
         assert result["attack_vector"] == "NETWORK"
 
     def test_falls_back_to_v2_when_no_v3(self):
-        from manus_use.tools.compare_cves import _extract_cvss
+        from manus_agent.tools.compare_cves import _extract_cvss
 
         nvd = {
             "metrics": {
@@ -251,7 +251,7 @@ class TestExtractCvss:
         assert result["score"] == 9.3
 
     def test_returns_none_score_when_no_metrics(self):
-        from manus_use.tools.compare_cves import _extract_cvss
+        from manus_agent.tools.compare_cves import _extract_cvss
 
         result = _extract_cvss({})
         assert result["score"] is None
@@ -260,13 +260,13 @@ class TestExtractCvss:
 
 class TestExtractCwe:
     def test_returns_cwe_ids(self):
-        from manus_use.tools.compare_cves import _extract_cwe
+        from manus_agent.tools.compare_cves import _extract_cwe
 
         result = _extract_cwe(MOCK_NVD_LOG4SHELL)
         assert "CWE-917" in result
 
     def test_filters_out_placeholder_cwes(self):
-        from manus_use.tools.compare_cves import _extract_cwe
+        from manus_agent.tools.compare_cves import _extract_cwe
 
         nvd = {
             "weaknesses": [
@@ -279,14 +279,14 @@ class TestExtractCwe:
         assert result == ["CWE-79"]
 
     def test_returns_empty_list_when_no_weaknesses(self):
-        from manus_use.tools.compare_cves import _extract_cwe
+        from manus_agent.tools.compare_cves import _extract_cwe
 
         assert _extract_cwe({}) == []
 
 
 class TestExtractAffected:
     def test_returns_vendor_product(self):
-        from manus_use.tools.compare_cves import _extract_affected
+        from manus_agent.tools.compare_cves import _extract_affected
 
         result = _extract_affected(MOCK_NVD_LOG4SHELL)
         assert "Apache" in result
@@ -294,33 +294,33 @@ class TestExtractAffected:
         assert "log4j" in result.lower()
 
     def test_returns_unknown_when_no_config(self):
-        from manus_use.tools.compare_cves import _extract_affected
+        from manus_agent.tools.compare_cves import _extract_affected
 
         assert _extract_affected({}) == "Unknown"
 
 
 class TestExtractPublished:
     def test_returns_date_portion(self):
-        from manus_use.tools.compare_cves import _extract_published
+        from manus_agent.tools.compare_cves import _extract_published
 
         result = _extract_published(MOCK_NVD_LOG4SHELL)
         assert result == "2021-12-10"
 
     def test_returns_unknown_when_missing(self):
-        from manus_use.tools.compare_cves import _extract_published
+        from manus_agent.tools.compare_cves import _extract_published
 
         assert _extract_published({}) == "Unknown"
 
 
 class TestExtractDescription:
     def test_returns_english_description(self):
-        from manus_use.tools.compare_cves import _extract_description
+        from manus_agent.tools.compare_cves import _extract_description
 
         result = _extract_description(MOCK_NVD_LOG4SHELL)
         assert "Log4j2" in result
 
     def test_truncates_long_descriptions(self):
-        from manus_use.tools.compare_cves import _extract_description
+        from manus_agent.tools.compare_cves import _extract_description
 
         nvd = {"descriptions": [{"lang": "en", "value": "x" * 300}]}
         result = _extract_description(nvd)
@@ -328,7 +328,7 @@ class TestExtractDescription:
         assert result.endswith("…")
 
     def test_returns_empty_string_when_no_description(self):
-        from manus_use.tools.compare_cves import _extract_description
+        from manus_agent.tools.compare_cves import _extract_description
 
         assert _extract_description({}) == ""
 
@@ -360,72 +360,72 @@ class TestScoreCve:
         }
 
     def test_kev_adds_ten_points(self):
-        from manus_use.tools.compare_cves import _score_cve
+        from manus_agent.tools.compare_cves import _score_cve
 
         score, reasons = _score_cve(self._make_profile(in_kev=True))
         assert score >= 10
         assert any("KEV" in r for r in reasons)
 
     def test_critical_cvss_adds_eight_points(self):
-        from manus_use.tools.compare_cves import _score_cve
+        from manus_agent.tools.compare_cves import _score_cve
 
         score, reasons = _score_cve(self._make_profile(cvss_score=9.8))
         assert score >= 8
         assert any("Critical" in r for r in reasons)
 
     def test_high_cvss_adds_five_points(self):
-        from manus_use.tools.compare_cves import _score_cve
+        from manus_agent.tools.compare_cves import _score_cve
 
         score, _ = _score_cve(self._make_profile(cvss_score=7.5))
         assert score == 5
 
     def test_medium_cvss_adds_two_points(self):
-        from manus_use.tools.compare_cves import _score_cve
+        from manus_agent.tools.compare_cves import _score_cve
 
         score, _ = _score_cve(self._make_profile(cvss_score=5.0))
         assert score == 2
 
     def test_high_epss_adds_eight_points(self):
-        from manus_use.tools.compare_cves import _score_cve
+        from manus_agent.tools.compare_cves import _score_cve
 
         score, reasons = _score_cve(self._make_profile(epss=0.85))
         assert score >= 8
         assert any("very high" in r for r in reasons)
 
     def test_medium_epss_adds_five_points(self):
-        from manus_use.tools.compare_cves import _score_cve
+        from manus_agent.tools.compare_cves import _score_cve
 
         score, _ = _score_cve(self._make_profile(epss=0.55))
         assert score == 5
 
     def test_low_elevated_epss_adds_two_points(self):
-        from manus_use.tools.compare_cves import _score_cve
+        from manus_agent.tools.compare_cves import _score_cve
 
         score, _ = _score_cve(self._make_profile(epss=0.15))
         assert score == 2
 
     def test_network_av_adds_three_points(self):
-        from manus_use.tools.compare_cves import _score_cve
+        from manus_agent.tools.compare_cves import _score_cve
 
         score, reasons = _score_cve(self._make_profile(attack_vector="NETWORK"))
         assert score == 3
         assert any("remotely exploitable" in r for r in reasons)
 
     def test_none_pr_adds_two_points(self):
-        from manus_use.tools.compare_cves import _score_cve
+        from manus_agent.tools.compare_cves import _score_cve
 
         score, _ = _score_cve(self._make_profile(privileges_required="NONE"))
         assert score == 2
 
     def test_none_ui_adds_one_point(self):
-        from manus_use.tools.compare_cves import _score_cve
+        from manus_agent.tools.compare_cves import _score_cve
 
         score, _ = _score_cve(self._make_profile(user_interaction="NONE"))
         assert score == 1
 
     def test_full_score_log4shell_profile(self):
         """Log4Shell: KEV + CVSS 10 + high EPSS + NETWORK + no priv + no UI"""
-        from manus_use.tools.compare_cves import _score_cve
+        from manus_agent.tools.compare_cves import _score_cve
 
         profile = self._make_profile(
             in_kev=True,
@@ -468,7 +468,7 @@ class TestBuildComparison:
         }
 
     def test_higher_cvss_wins(self):
-        from manus_use.tools.compare_cves import _build_comparison
+        from manus_agent.tools.compare_cves import _build_comparison
 
         pa = self._profile("CVE-2021-44228", 10.0)
         pb = self._profile("CVE-2024-3094", 7.5)
@@ -476,7 +476,7 @@ class TestBuildComparison:
         assert result["higher_priority"] == "CVE-2021-44228"
 
     def test_kev_membership_can_flip_priority(self):
-        from manus_use.tools.compare_cves import _build_comparison
+        from manus_agent.tools.compare_cves import _build_comparison
 
         # pa: CVSS 9.0, no KEV; pb: CVSS 7.5 but in KEV
         pa = self._profile("CVE-A", 9.0)
@@ -488,7 +488,7 @@ class TestBuildComparison:
         assert result["higher_priority"] == "CVE-B"
 
     def test_tie_produces_tie_result(self):
-        from manus_use.tools.compare_cves import _build_comparison
+        from manus_agent.tools.compare_cves import _build_comparison
 
         pa = self._profile("CVE-A", 9.0)
         pb = self._profile("CVE-B", 9.0)
@@ -497,7 +497,7 @@ class TestBuildComparison:
         assert result["confidence"] == "tie"
 
     def test_recommendation_mentions_winner(self):
-        from manus_use.tools.compare_cves import _build_comparison
+        from manus_agent.tools.compare_cves import _build_comparison
 
         pa = self._profile("CVE-2021-44228", 10.0)
         pb = self._profile("CVE-2024-3094", 6.0)
@@ -505,7 +505,7 @@ class TestBuildComparison:
         assert "CVE-2021-44228" in result["recommendation"]
 
     def test_strong_confidence_when_margin_ge_10(self):
-        from manus_use.tools.compare_cves import _build_comparison
+        from manus_agent.tools.compare_cves import _build_comparison
 
         pa = self._profile("CVE-A", 10.0)
         pa_kev = {"in_kev": True, "date_added": "2024-01-01", "due_date": "2024-01-15"}
@@ -514,7 +514,7 @@ class TestBuildComparison:
         assert result["confidence"] == "strong"
 
     def test_priority_scores_included_in_result(self):
-        from manus_use.tools.compare_cves import _build_comparison
+        from manus_agent.tools.compare_cves import _build_comparison
 
         pa = self._profile("CVE-A", 9.0)
         pb = self._profile("CVE-B", 7.5)
@@ -531,7 +531,7 @@ class TestBuildComparison:
 
 class TestRenderText:
     def _make_comparison(self):
-        from manus_use.tools.compare_cves import _build_comparison
+        from manus_agent.tools.compare_cves import _build_comparison
 
         profile_a = {
             "cve_id": "CVE-2021-44228",
@@ -573,7 +573,7 @@ class TestRenderText:
         return _build_comparison(profile_a, kev_a, profile_b, {"in_kev": False})
 
     def test_contains_both_cve_ids(self):
-        from manus_use.tools.compare_cves import _render_text
+        from manus_agent.tools.compare_cves import _render_text
 
         comp = self._make_comparison()
         text = _render_text(comp)
@@ -581,31 +581,31 @@ class TestRenderText:
         assert "CVE-2024-3094" in text
 
     def test_contains_cvss_row(self):
-        from manus_use.tools.compare_cves import _render_text
+        from manus_agent.tools.compare_cves import _render_text
 
         text = _render_text(self._make_comparison())
         assert "CVSS" in text
 
     def test_contains_epss_row(self):
-        from manus_use.tools.compare_cves import _render_text
+        from manus_agent.tools.compare_cves import _render_text
 
         text = _render_text(self._make_comparison())
         assert "EPSS" in text
 
     def test_contains_kev_row(self):
-        from manus_use.tools.compare_cves import _render_text
+        from manus_agent.tools.compare_cves import _render_text
 
         text = _render_text(self._make_comparison())
         assert "KEV" in text
 
     def test_contains_recommendation(self):
-        from manus_use.tools.compare_cves import _render_text
+        from manus_agent.tools.compare_cves import _render_text
 
         text = _render_text(self._make_comparison())
         assert "RECOMMENDATION" in text
 
     def test_kev_yes_shown_for_kev_member(self):
-        from manus_use.tools.compare_cves import _render_text
+        from manus_agent.tools.compare_cves import _render_text
 
         text = _render_text(self._make_comparison())
         assert "YES" in text
@@ -646,18 +646,18 @@ class TestCompareCvesToolEntryPoint:
         mock_get.side_effect = side_effect
 
     def test_returns_success_status(self):
-        from manus_use.tools.compare_cves import compare_cves
+        from manus_agent.tools.compare_cves import compare_cves
 
-        with patch("manus_use.tools.compare_cves.requests.get") as mock_get:
+        with patch("manus_agent.tools.compare_cves.requests.get") as mock_get:
             self._setup_mocks(mock_get)
             result = compare_cves(self._make_tool_use("CVE-2021-44228", "CVE-2024-3094"))
 
         assert result["status"] == "success"
 
     def test_returns_text_content(self):
-        from manus_use.tools.compare_cves import compare_cves
+        from manus_agent.tools.compare_cves import compare_cves
 
-        with patch("manus_use.tools.compare_cves.requests.get") as mock_get:
+        with patch("manus_agent.tools.compare_cves.requests.get") as mock_get:
             self._setup_mocks(mock_get)
             result = compare_cves(self._make_tool_use("CVE-2021-44228", "CVE-2024-3094"))
 
@@ -666,9 +666,9 @@ class TestCompareCvesToolEntryPoint:
         assert "CVE-2021-44228" in texts[0]
 
     def test_returns_json_content(self):
-        from manus_use.tools.compare_cves import compare_cves
+        from manus_agent.tools.compare_cves import compare_cves
 
-        with patch("manus_use.tools.compare_cves.requests.get") as mock_get:
+        with patch("manus_agent.tools.compare_cves.requests.get") as mock_get:
             self._setup_mocks(mock_get)
             result = compare_cves(self._make_tool_use("CVE-2021-44228", "CVE-2024-3094"))
 
@@ -680,21 +680,21 @@ class TestCompareCvesToolEntryPoint:
         assert "recommendation" in comp
 
     def test_invalid_cve_id_returns_error(self):
-        from manus_use.tools.compare_cves import compare_cves
+        from manus_agent.tools.compare_cves import compare_cves
 
         result = compare_cves(self._make_tool_use("not-a-cve", "CVE-2024-3094"))
         assert result["status"] == "error"
 
     def test_both_cve_ids_validated(self):
-        from manus_use.tools.compare_cves import compare_cves
+        from manus_agent.tools.compare_cves import compare_cves
 
         result = compare_cves(self._make_tool_use("CVE-2021-44228", "bad-id"))
         assert result["status"] == "error"
 
     def test_higher_priority_field_present(self):
-        from manus_use.tools.compare_cves import compare_cves
+        from manus_agent.tools.compare_cves import compare_cves
 
-        with patch("manus_use.tools.compare_cves.requests.get") as mock_get:
+        with patch("manus_agent.tools.compare_cves.requests.get") as mock_get:
             self._setup_mocks(mock_get)
             result = compare_cves(self._make_tool_use("CVE-2021-44228", "CVE-2024-3094"))
 
@@ -709,7 +709,7 @@ class TestCompareCvesToolEntryPoint:
 
 class TestCompareCLIParser:
     def test_parser_accepts_two_cve_ids(self):
-        from manus_use.cli import _build_compare_parser
+        from manus_agent.cli import _build_compare_parser
 
         parser = _build_compare_parser()
         args = parser.parse_args(["CVE-2021-44228", "CVE-2024-3094"])
@@ -717,28 +717,28 @@ class TestCompareCLIParser:
         assert args.cve_id_b == "CVE-2024-3094"
 
     def test_parser_defaults_output_to_text(self):
-        from manus_use.cli import _build_compare_parser
+        from manus_agent.cli import _build_compare_parser
 
         parser = _build_compare_parser()
         args = parser.parse_args(["CVE-2021-44228", "CVE-2024-3094"])
         assert args.output == "text"
 
     def test_parser_accepts_json_output_flag(self):
-        from manus_use.cli import _build_compare_parser
+        from manus_agent.cli import _build_compare_parser
 
         parser = _build_compare_parser()
         args = parser.parse_args(["CVE-2021-44228", "CVE-2024-3094", "--output", "json"])
         assert args.output == "json"
 
     def test_parser_rejects_invalid_output_format(self):
-        from manus_use.cli import _build_compare_parser
+        from manus_agent.cli import _build_compare_parser
 
         parser = _build_compare_parser()
         with pytest.raises(SystemExit):
             parser.parse_args(["CVE-A", "CVE-B", "--output", "xml"])
 
     def test_help_exits_zero(self, capsys):
-        from manus_use.cli import _build_compare_parser
+        from manus_agent.cli import _build_compare_parser
 
         parser = _build_compare_parser()
         with pytest.raises(SystemExit) as exc:
@@ -773,18 +773,18 @@ class TestRunCompare:
         mock_get.side_effect = side_effect
 
     def test_text_output_exits_zero(self, capsys):
-        from manus_use.cli import _run_compare
+        from manus_agent.cli import _run_compare
 
-        with patch("manus_use.tools.compare_cves.requests.get") as mock_get:
+        with patch("manus_agent.tools.compare_cves.requests.get") as mock_get:
             self._mock_imports(mock_get)
             code = _run_compare(["CVE-2021-44228", "CVE-2024-3094"])
 
         assert code == 0
 
     def test_text_output_contains_both_cves(self, capsys):
-        from manus_use.cli import _run_compare
+        from manus_agent.cli import _run_compare
 
-        with patch("manus_use.tools.compare_cves.requests.get") as mock_get:
+        with patch("manus_agent.tools.compare_cves.requests.get") as mock_get:
             self._mock_imports(mock_get)
             _run_compare(["CVE-2021-44228", "CVE-2024-3094"])
 
@@ -793,9 +793,9 @@ class TestRunCompare:
         assert "CVE-2024-3094" in captured.out
 
     def test_json_output_is_valid_json(self, capsys):
-        from manus_use.cli import _run_compare
+        from manus_agent.cli import _run_compare
 
-        with patch("manus_use.tools.compare_cves.requests.get") as mock_get:
+        with patch("manus_agent.tools.compare_cves.requests.get") as mock_get:
             self._mock_imports(mock_get)
             code = _run_compare(["CVE-2021-44228", "CVE-2024-3094", "--output", "json"])
 
@@ -805,9 +805,9 @@ class TestRunCompare:
         assert "recommendation" in data
 
     def test_json_output_contains_higher_priority_field(self, capsys):
-        from manus_use.cli import _run_compare
+        from manus_agent.cli import _run_compare
 
-        with patch("manus_use.tools.compare_cves.requests.get") as mock_get:
+        with patch("manus_agent.tools.compare_cves.requests.get") as mock_get:
             self._mock_imports(mock_get)
             _run_compare(["CVE-2021-44228", "CVE-2024-3094", "--output", "json"])
 
@@ -816,19 +816,19 @@ class TestRunCompare:
         assert data["higher_priority"] in ("CVE-2021-44228", "CVE-2024-3094", "tie")
 
     def test_invalid_cve_id_a_exits_one(self, capsys):
-        from manus_use.cli import _run_compare
+        from manus_agent.cli import _run_compare
 
         code = _run_compare(["invalid", "CVE-2024-3094"])
         assert code == 1
 
     def test_invalid_cve_id_b_exits_one(self, capsys):
-        from manus_use.cli import _run_compare
+        from manus_agent.cli import _run_compare
 
         code = _run_compare(["CVE-2024-3094", "not-a-cve"])
         assert code == 1
 
     def test_error_message_written_to_stderr(self, capsys):
-        from manus_use.cli import _run_compare
+        from manus_agent.cli import _run_compare
 
         _run_compare(["bad-input", "CVE-2024-3094"])
         captured = capsys.readouterr()
@@ -837,16 +837,16 @@ class TestRunCompare:
 
 class TestMainDispatchesCompare:
     def test_compare_in_subcommands_set(self):
-        from manus_use.cli import _SUBCOMMANDS
+        from manus_agent.cli import _SUBCOMMANDS
 
         assert "compare" in _SUBCOMMANDS
 
     def test_main_routes_compare_subcommand(self):
 
-        with patch("manus_use.cli._run_compare", return_value=0) as mock_run:
+        with patch("manus_agent.cli._run_compare", return_value=0) as mock_run:
             with patch("sys.argv", ["manus-agent", "compare", "CVE-2021-44228", "CVE-2024-3094"]):
                 try:
-                    from manus_use.cli import main
+                    from manus_agent.cli import main
 
                     main()
                 except SystemExit as e:
@@ -856,10 +856,10 @@ class TestMainDispatchesCompare:
 
     def test_main_compare_passes_output_flag(self):
 
-        with patch("manus_use.cli._run_compare", return_value=0) as mock_run:
+        with patch("manus_agent.cli._run_compare", return_value=0) as mock_run:
             with patch("sys.argv", ["manus-agent", "compare", "CVE-2021-44228", "CVE-2024-3094", "--output", "json"]):
                 try:
-                    from manus_use.cli import main
+                    from manus_agent.cli import main
 
                     main()
                 except SystemExit:

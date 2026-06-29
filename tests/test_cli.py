@@ -18,7 +18,7 @@ def _invoke_main(argv, *, patch_single_shot=True, single_shot_rc=0):
     patch_single_shot=True stubs out _run_single_shot so we only test CLI
     parsing, not actual agent execution.
     """
-    from manus_use import cli
+    from manus_agent import cli
 
     captured = {}
 
@@ -35,7 +35,7 @@ def _invoke_main(argv, *, patch_single_shot=True, single_shot_rc=0):
     with mock.patch.object(sys, "argv", ["manus-agent"] + argv):
         with mock.patch.object(cli, "_run_single_shot", side_effect=fake_single_shot) as m_ss:
             with mock.patch.object(cli, "_run_interactive") as m_int:
-                with mock.patch("manus_use.cli.Config") as m_cfg:
+                with mock.patch("manus_agent.cli.Config") as m_cfg:
                     m_cfg.from_file.return_value = mock.MagicMock()
                     try:
                         cli.main()
@@ -54,7 +54,7 @@ def _invoke_main(argv, *, patch_single_shot=True, single_shot_rc=0):
 
 def test_version_flag():
     """--version prints version string and exits 0."""
-    from manus_use import cli
+    from manus_agent import cli
 
     with mock.patch.object(sys, "argv", ["manus-agent", "--version"]):
         with pytest.raises(SystemExit) as exc_info:
@@ -141,10 +141,10 @@ def test_no_task_goes_interactive():
 
 def test_output_without_task_is_error():
     """--output without a task argument should produce an argparse error (exit 2)."""
-    from manus_use import cli
+    from manus_agent import cli
 
     with mock.patch.object(sys, "argv", ["manus-agent", "--output", "out.txt"]):
-        with mock.patch("manus_use.cli.Config") as m_cfg:
+        with mock.patch("manus_agent.cli.Config") as m_cfg:
             m_cfg.from_file.return_value = mock.MagicMock()
             with pytest.raises(SystemExit) as exc_info:
                 cli.main()
@@ -158,8 +158,8 @@ def test_output_without_task_is_error():
 
 def test_run_single_shot_writes_output_file(tmp_path):
     """_run_single_shot saves result text to the specified output path."""
-    from manus_use import cli
-    from manus_use.config import Config
+    from manus_agent import cli
+    from manus_agent.config import Config
 
     out_file = tmp_path / "out.txt"
     fake_config = mock.MagicMock(spec=Config)
@@ -186,8 +186,8 @@ def test_run_single_shot_writes_output_file(tmp_path):
 
 def test_run_single_shot_no_output_file(tmp_path):
     """_run_single_shot with output=None does not write any file."""
-    from manus_use import cli
-    from manus_use.config import Config
+    from manus_agent import cli
+    from manus_agent.config import Config
 
     fake_config = mock.MagicMock(spec=Config)
     fake_agent = mock.MagicMock()
@@ -253,8 +253,8 @@ def test_no_history_flag():
 
 def test_run_single_shot_json_format_stdout(tmp_path, capsys):
     """--format json writes a valid JSON object to stdout."""
-    from manus_use import cli
-    from manus_use.config import Config
+    from manus_agent import cli
+    from manus_agent.config import Config
 
     fake_config = mock.MagicMock(spec=Config)
     fake_agent = mock.MagicMock()
@@ -284,8 +284,8 @@ def test_run_single_shot_json_format_stdout(tmp_path, capsys):
 
 def test_run_single_shot_json_format_writes_json_to_file(tmp_path):
     """--format json + --output FILE writes valid JSON to the file."""
-    from manus_use import cli
-    from manus_use.config import Config
+    from manus_agent import cli
+    from manus_agent.config import Config
 
     out_file = tmp_path / "result.json"
     fake_config = mock.MagicMock(spec=Config)
@@ -317,7 +317,7 @@ def test_run_single_shot_json_format_writes_json_to_file(tmp_path):
 
 def test_append_history_creates_file(tmp_path):
     """_append_history creates the history file and writes a valid JSON record."""
-    from manus_use import cli
+    from manus_agent import cli
 
     hist_path = tmp_path / ".manus-agent" / "history.jsonl"
 
@@ -344,7 +344,7 @@ def test_append_history_creates_file(tmp_path):
 
 def test_append_history_appends_multiple(tmp_path):
     """Multiple calls to _append_history write one record per line."""
-    from manus_use import cli
+    from manus_agent import cli
 
     hist_path = tmp_path / "history.jsonl"
 
@@ -368,8 +368,8 @@ def test_append_history_appends_multiple(tmp_path):
 
 def test_no_history_flag_skips_append(tmp_path):
     """--no-history True prevents _append_history from being called."""
-    from manus_use import cli
-    from manus_use.config import Config
+    from manus_agent import cli
+    from manus_agent.config import Config
 
     fake_config = mock.MagicMock(spec=Config)
     fake_agent = mock.MagicMock()
@@ -393,8 +393,8 @@ def test_no_history_flag_skips_append(tmp_path):
 
 def test_history_flag_calls_append(tmp_path):
     """When no_history=False, _append_history is called after success."""
-    from manus_use import cli
-    from manus_use.config import Config
+    from manus_agent import cli
+    from manus_agent.config import Config
 
     fake_config = mock.MagicMock(spec=Config)
     fake_agent = mock.MagicMock()
@@ -425,7 +425,7 @@ def test_history_flag_calls_append(tmp_path):
 
 def _invoke_history(argv):
     """Call cli.main() with history subcommand argv."""
-    from manus_use import cli
+    from manus_agent import cli
 
     captured = {}
     with mock.patch.object(sys, "argv", ["manus-agent", "history"] + argv):
@@ -447,7 +447,7 @@ def test_history_subcommand_dispatches():
 
 def test_cmd_history_no_file(tmp_path):
     """_cmd_history prints a friendly message when no history file exists."""
-    from manus_use import cli
+    from manus_agent import cli
 
     hist_path = tmp_path / "history.jsonl"
     args = mock.MagicMock()
@@ -466,7 +466,7 @@ def test_cmd_history_shows_records(tmp_path):
     """_cmd_history reads and displays records from the history file."""
     import datetime
 
-    from manus_use import cli
+    from manus_agent import cli
 
     hist_path = tmp_path / "history.jsonl"
     for i in range(3):
@@ -498,7 +498,7 @@ def test_cmd_history_json_format(tmp_path, capsys):
     """_cmd_history --format json writes JSON array to stdout."""
     import datetime
 
-    from manus_use import cli
+    from manus_agent import cli
 
     hist_path = tmp_path / "history.jsonl"
     record = {
@@ -533,7 +533,7 @@ def test_cmd_history_grep_filter(tmp_path):
     """_cmd_history --grep filters entries by task substring."""
     import datetime
 
-    from manus_use import cli
+    from manus_agent import cli
 
     hist_path = tmp_path / "history.jsonl"
     tasks = ["find CVE-2024", "list files", "analyze data"]
@@ -564,7 +564,7 @@ def test_cmd_history_grep_filter(tmp_path):
 
 def test_cmd_history_clear(tmp_path):
     """_cmd_history --clear deletes the history file."""
-    from manus_use import cli
+    from manus_agent import cli
 
     hist_path = tmp_path / "history.jsonl"
     hist_path.write_text('{"task":"x"}\n', encoding="utf-8")
@@ -583,7 +583,7 @@ def test_cmd_history_limit(tmp_path, capsys):
     """_cmd_history --limit N returns at most N entries."""
     import datetime
 
-    from manus_use import cli
+    from manus_agent import cli
 
     hist_path = tmp_path / "history.jsonl"
     for i in range(10):

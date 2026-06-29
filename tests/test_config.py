@@ -2,7 +2,7 @@
 
 import pytest
 
-from manus_use.config import Config, LLMConfig
+from manus_agent.config import Config, LLMConfig
 
 
 def test_default_config():

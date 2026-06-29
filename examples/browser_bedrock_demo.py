@@ -12,8 +12,8 @@ import asyncio
 import os
 import sys
 
-from manus_use.agents.browser import BrowserAgent
-from manus_use.config import Config
+from manus_agent.agents.browser import BrowserAgent
+from manus_agent.config import Config
 
 
 async def main() -> None:

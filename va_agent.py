@@ -2,7 +2,7 @@
 """Vulnerability Intelligence agent entry point (backwards-compat wrapper).
 
 The :class:`VulnerabilityIntelligenceAgent` implementation lives in
-``manus_use.agents.vi_agent``. This script is a thin command-line shim so
+``manus_agent.agents.vi_agent``. This script is a thin command-line shim so
 existing ``python va_agent.py CVE-... [--verify]`` and
 ``python vi_agent.py CVE-...`` workflows keep working without changes.
 
@@ -36,7 +36,7 @@ os.environ["OPENCLAW"] = os.environ.get("OPENCLAW", "false")
 # Add the src directory to Python path for in-tree execution.
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from manus_use.agents.vi_agent import VulnerabilityIntelligenceAgent  # noqa: E402
+from manus_agent.agents.vi_agent import VulnerabilityIntelligenceAgent  # noqa: E402
 
 
 def main() -> None:
@@ -57,7 +57,7 @@ def main() -> None:
         print(f"No CVE provided. Using example: {cve_id}")
 
     try:
-        from manus_use.config import Config
+        from manus_agent.config import Config
 
         config = Config.from_file()
     except Exception as exc:

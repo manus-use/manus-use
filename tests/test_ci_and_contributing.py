@@ -157,10 +157,10 @@ class TestContributing:
         )
 
     def test_contributing_warns_against_src_imports(self):
-        """CONTRIBUTING.md should warn against 'from src.manus_use' imports."""
+        """CONTRIBUTING.md should warn against 'from src.manus_agent' imports."""
         content = CONTRIBUTING_MD.read_text(encoding="utf-8")
         assert "src." in content or "from src" in content, (
-            "Should warn contributors not to use 'from src.manus_use.' imports"
+            "Should warn contributors not to use 'from src.manus_agent.' imports"
         )
 
     def test_contributing_not_empty(self):

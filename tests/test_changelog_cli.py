@@ -21,7 +21,7 @@ import pytest
 
 def _invoke_changelog(argv: list[str]) -> tuple[int, str, str]:
     """Call cli.main() with `changelog <argv>` and return (rc, stdout, stderr)."""
-    from manus_use import cli  # noqa: PLC0415
+    from manus_agent import cli  # noqa: PLC0415
 
     with mock.patch.object(sys, "argv", ["manus-agent", "changelog", *argv]):
         import io
@@ -44,25 +44,25 @@ def _invoke_changelog(argv: list[str]) -> tuple[int, str, str]:
 class TestChangelogSubcommandRouting:
     def test_changelog_in_subcommands_set(self):
         """'changelog' must be registered in _SUBCOMMANDS."""
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         assert "changelog" in cli._SUBCOMMANDS
 
     def test_changelog_build_parser_exists(self):
         """_build_changelog_parser must be importable."""
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         assert callable(cli._build_changelog_parser)
 
     def test_changelog_run_exists(self):
         """_run_changelog must be importable."""
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         assert callable(cli._run_changelog)
 
     def test_changelog_help_exits_zero(self):
         """manus-agent changelog --help exits 0."""
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         with pytest.raises(SystemExit) as exc_info:
             with mock.patch.object(sys, "argv", ["manus-agent", "changelog", "--help"]):
@@ -71,7 +71,7 @@ class TestChangelogSubcommandRouting:
 
     def test_changelog_help_mentions_generate(self, capsys):
         """Help text mentions --generate flag."""
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         with pytest.raises(SystemExit):
             with mock.patch.object(sys, "argv", ["manus-agent", "changelog", "--help"]):
@@ -81,7 +81,7 @@ class TestChangelogSubcommandRouting:
 
     def test_changelog_help_mentions_version_filter(self, capsys):
         """Help text mentions --version filter."""
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         with pytest.raises(SystemExit):
             with mock.patch.object(sys, "argv", ["manus-agent", "changelog", "--help"]):
@@ -91,7 +91,7 @@ class TestChangelogSubcommandRouting:
 
     def test_main_routes_to_changelog(self):
         """main() dispatches 'changelog' to _run_changelog."""
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         with mock.patch.object(cli, "_run_changelog", return_value=0) as mock_run:
             with pytest.raises(SystemExit) as exc_info:
@@ -102,7 +102,7 @@ class TestChangelogSubcommandRouting:
 
     def test_top_level_help_mentions_changelog(self, capsys):
         """manus-agent --help output mentions the changelog subcommand."""
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         with pytest.raises(SystemExit):
             with mock.patch.object(sys, "argv", ["manus-agent", "--help"]):
@@ -151,7 +151,7 @@ class TestChangelogView:
         """Without flags, _run_changelog returns all CHANGELOG.md content."""
         import io
 
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         cl_content = fake_changelog.read_text()
         out = io.StringIO()
@@ -169,7 +169,7 @@ class TestChangelogView:
 
     def test_view_missing_changelog_returns_nonzero(self, tmp_path: Path):
         """_run_changelog returns 1 when CHANGELOG.md doesn't exist."""
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         with mock.patch("pathlib.Path.exists", return_value=False):
             import io
@@ -182,7 +182,7 @@ class TestChangelogView:
 
     def test_version_filter_not_found_returns_nonzero(self, fake_changelog: Path):
         """--version X.Y.Z returns 1 when the section isn't in the changelog."""
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         with (
             mock.patch("pathlib.Path.exists", return_value=True),
@@ -218,7 +218,7 @@ class TestChangelogGenerate:
 
     def test_generate_text_output(self, tmp_path: Path):
         """--generate produces text output with version header."""
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         fake_pyproject = tmp_path / "pyproject.toml"
         fake_pyproject.write_text('version = "0.1.0"\n', encoding="utf-8")
@@ -257,7 +257,7 @@ class TestChangelogGenerate:
 
     def test_generate_json_output(self, tmp_path: Path):
         """--generate --output json returns valid JSON with expected keys."""
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         fake_pyproject = tmp_path / "pyproject.toml"
         fake_pyproject.write_text('version = "0.1.0"\n', encoding="utf-8")
@@ -296,7 +296,7 @@ class TestChangelogGenerate:
 
     def test_generate_no_commits_returns_zero(self, tmp_path: Path):
         """--generate returns 0 (not an error) when no conventional commits exist."""
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         mock_result = mock.MagicMock()
         mock_result.stdout = ""
@@ -328,7 +328,7 @@ class TestChangelogGenerate:
 
     def test_generate_feat_infers_minor_bump(self, tmp_path: Path):
         """A feat commit should infer a minor version bump."""
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         single_feat = "aabbccdd1234\x1ffeat(tools): my new tool\x1f\x1e"
         mock_result = mock.MagicMock()
@@ -365,7 +365,7 @@ class TestChangelogGenerate:
 
     def test_generate_fix_only_infers_patch_bump(self, tmp_path: Path):
         """Only fix commits should infer a patch bump."""
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         single_fix = "aabbccdd1234\x1ffix(cli): correct typo\x1f\x1e"
         mock_result = mock.MagicMock()
@@ -401,7 +401,7 @@ class TestChangelogGenerate:
 
     def test_generate_breaking_infers_major_bump(self, tmp_path: Path):
         """A breaking-change commit should infer a major bump."""
-        from manus_use import cli  # noqa: PLC0415
+        from manus_agent import cli  # noqa: PLC0415
 
         breaking = "aabbccdd1234\x1ffeat!: remove deprecated API\x1f\x1e"
         mock_result = mock.MagicMock()
@@ -843,7 +843,7 @@ class TestChangelogMdFile:
         content = cl.read_text(encoding="utf-8")
         assert "[Unreleased]:" in content, "CHANGELOG.md must have a '[Unreleased]: https://...' link footer"
 
-    def test_changelog_md_references_manus_use_repo(self):
+    def test_changelog_md_references_manus_agent_repo(self):
         """CHANGELOG.md links should point to the manus-use/manus-use repository."""
         root = Path(__file__).resolve().parents[1]
         cl = root / "CHANGELOG.md"

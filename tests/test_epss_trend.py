@@ -68,7 +68,7 @@ _MOCK_SPIKE_RESPONSE = {
 
 def test_get_epss_trend_module_imports():
     """The module must be importable without strands."""
-    import manus_use.tools.get_epss_trend as m
+    import manus_agent.tools.get_epss_trend as m
 
     assert hasattr(m, "get_epss_trend")
     assert hasattr(m, "TOOL_SPEC")
@@ -77,7 +77,7 @@ def test_get_epss_trend_module_imports():
 
 
 def test_tool_spec_has_required_fields():
-    from manus_use.tools.get_epss_trend import TOOL_SPEC
+    from manus_agent.tools.get_epss_trend import TOOL_SPEC
 
     assert TOOL_SPEC["name"] == "get_epss_trend"
     assert "cve_id" in TOOL_SPEC["inputSchema"]["json"]["properties"]
@@ -91,7 +91,7 @@ def test_tool_spec_has_required_fields():
 
 
 def test_analyse_series_empty():
-    from manus_use.tools.get_epss_trend import _analyse_series
+    from manus_agent.tools.get_epss_trend import _analyse_series
 
     result = _analyse_series([])
     assert result["spike_detected"] is False
@@ -100,7 +100,7 @@ def test_analyse_series_empty():
 
 
 def test_analyse_series_stable():
-    from manus_use.tools.get_epss_trend import _analyse_series
+    from manus_agent.tools.get_epss_trend import _analyse_series
 
     series = [{"date": f"2026-06-{10 + i:02d}", "epss": "0.500000", "percentile": "0.900000"} for i in range(10)]
     result = _analyse_series(series)
@@ -109,7 +109,7 @@ def test_analyse_series_stable():
 
 
 def test_analyse_series_rising():
-    from manus_use.tools.get_epss_trend import _analyse_series
+    from manus_agent.tools.get_epss_trend import _analyse_series
 
     series = [
         {"date": f"2026-06-{10 + i:02d}", "epss": f"{0.1 + i * 0.05:.6f}", "percentile": "0.900000"} for i in range(10)
@@ -119,7 +119,7 @@ def test_analyse_series_rising():
 
 
 def test_analyse_series_falling():
-    from manus_use.tools.get_epss_trend import _analyse_series
+    from manus_agent.tools.get_epss_trend import _analyse_series
 
     series = [
         {"date": f"2026-06-{10 + i:02d}", "epss": f"{0.8 - i * 0.05:.6f}", "percentile": "0.900000"} for i in range(10)
@@ -129,7 +129,7 @@ def test_analyse_series_falling():
 
 
 def test_analyse_series_spike_detected():
-    from manus_use.tools.get_epss_trend import _analyse_series
+    from manus_agent.tools.get_epss_trend import _analyse_series
 
     result = _analyse_series(_SPIKE_TIME_SERIES)
     assert result["spike_detected"] is True
@@ -137,14 +137,14 @@ def test_analyse_series_spike_detected():
 
 
 def test_analyse_series_no_spike():
-    from manus_use.tools.get_epss_trend import _analyse_series
+    from manus_agent.tools.get_epss_trend import _analyse_series
 
     result = _analyse_series(_SAMPLE_TIME_SERIES)
     assert result["spike_detected"] is False
 
 
 def test_analyse_series_returns_sorted_points():
-    from manus_use.tools.get_epss_trend import _analyse_series
+    from manus_agent.tools.get_epss_trend import _analyse_series
 
     shuffled = list(reversed(_SAMPLE_TIME_SERIES))
     result = _analyse_series(shuffled)
@@ -153,7 +153,7 @@ def test_analyse_series_returns_sorted_points():
 
 
 def test_analyse_series_current_and_oldest():
-    from manus_use.tools.get_epss_trend import _analyse_series
+    from manus_agent.tools.get_epss_trend import _analyse_series
 
     result = _analyse_series(_SAMPLE_TIME_SERIES)
     assert result["oldest_date"] == "2026-06-18"
@@ -163,7 +163,7 @@ def test_analyse_series_current_and_oldest():
 
 
 def test_analyse_series_single_point():
-    from manus_use.tools.get_epss_trend import _analyse_series
+    from manus_agent.tools.get_epss_trend import _analyse_series
 
     result = _analyse_series([{"date": "2026-06-24", "epss": "0.300000", "percentile": "0.900000"}])
     assert result["spike_detected"] is False
@@ -181,7 +181,7 @@ def _make_tool_use(cve_id: str, days: int = 30) -> dict:
 
 
 def test_tool_returns_error_for_invalid_cve():
-    from manus_use.tools.get_epss_trend import get_epss_trend
+    from manus_agent.tools.get_epss_trend import get_epss_trend
 
     result = get_epss_trend(_make_tool_use("NOTACVE"))
     assert result["status"] == "error"
@@ -189,15 +189,15 @@ def test_tool_returns_error_for_invalid_cve():
 
 
 def test_tool_returns_error_for_empty_cve():
-    from manus_use.tools.get_epss_trend import get_epss_trend
+    from manus_agent.tools.get_epss_trend import get_epss_trend
 
     result = get_epss_trend(_make_tool_use(""))
     assert result["status"] == "error"
 
 
-@patch("manus_use.tools.get_epss_trend._fetch_epss_time_series")
+@patch("manus_agent.tools.get_epss_trend._fetch_epss_time_series")
 def test_tool_success_returns_text_and_json(mock_fetch):
-    from manus_use.tools.get_epss_trend import get_epss_trend
+    from manus_agent.tools.get_epss_trend import get_epss_trend
 
     mock_fetch.return_value = _MOCK_API_RESPONSE
 
@@ -209,9 +209,9 @@ def test_tool_success_returns_text_and_json(mock_fetch):
     assert "json" in content_types
 
 
-@patch("manus_use.tools.get_epss_trend._fetch_epss_time_series")
+@patch("manus_agent.tools.get_epss_trend._fetch_epss_time_series")
 def test_tool_success_json_contains_analysis(mock_fetch):
-    from manus_use.tools.get_epss_trend import get_epss_trend
+    from manus_agent.tools.get_epss_trend import get_epss_trend
 
     mock_fetch.return_value = _MOCK_API_RESPONSE
 
@@ -224,9 +224,9 @@ def test_tool_success_json_contains_analysis(mock_fetch):
     assert "points" in json_block["analysis"]
 
 
-@patch("manus_use.tools.get_epss_trend._fetch_epss_time_series")
+@patch("manus_agent.tools.get_epss_trend._fetch_epss_time_series")
 def test_tool_spike_detected_flag(mock_fetch):
-    from manus_use.tools.get_epss_trend import get_epss_trend
+    from manus_agent.tools.get_epss_trend import get_epss_trend
 
     mock_fetch.return_value = _MOCK_SPIKE_RESPONSE
 
@@ -235,9 +235,9 @@ def test_tool_spike_detected_flag(mock_fetch):
     assert json_block["analysis"]["spike_detected"] is True
 
 
-@patch("manus_use.tools.get_epss_trend._fetch_epss_time_series")
+@patch("manus_agent.tools.get_epss_trend._fetch_epss_time_series")
 def test_tool_no_data_returns_error(mock_fetch):
-    from manus_use.tools.get_epss_trend import get_epss_trend
+    from manus_agent.tools.get_epss_trend import get_epss_trend
 
     mock_fetch.return_value = {"status": "OK", "data": []}
 
@@ -246,11 +246,11 @@ def test_tool_no_data_returns_error(mock_fetch):
     assert "No EPSS data" in result["content"][0]["text"]
 
 
-@patch("manus_use.tools.get_epss_trend._fetch_epss_time_series")
+@patch("manus_agent.tools.get_epss_trend._fetch_epss_time_series")
 def test_tool_api_failure_returns_error(mock_fetch):
     import requests
 
-    from manus_use.tools.get_epss_trend import get_epss_trend
+    from manus_agent.tools.get_epss_trend import get_epss_trend
 
     mock_fetch.side_effect = requests.exceptions.ConnectionError("network unreachable")
 
@@ -259,9 +259,9 @@ def test_tool_api_failure_returns_error(mock_fetch):
     assert "EPSS API request failed" in result["content"][0]["text"]
 
 
-@patch("manus_use.tools.get_epss_trend._fetch_epss_time_series")
+@patch("manus_agent.tools.get_epss_trend._fetch_epss_time_series")
 def test_tool_normalises_cve_to_uppercase(mock_fetch):
-    from manus_use.tools.get_epss_trend import get_epss_trend
+    from manus_agent.tools.get_epss_trend import get_epss_trend
 
     response_copy = {
         "status": "OK",
@@ -289,13 +289,13 @@ def test_tool_normalises_cve_to_uppercase(mock_fetch):
 
 
 def test_epss_trend_subcommand_registered_in_main():
-    from manus_use.cli import _SUBCOMMANDS
+    from manus_agent.cli import _SUBCOMMANDS
 
     assert "epss-trend" in _SUBCOMMANDS
 
 
 def test_epss_trend_help_exits_zero():
-    from manus_use.cli import _build_epss_trend_parser
+    from manus_agent.cli import _build_epss_trend_parser
 
     parser = _build_epss_trend_parser()
     with pytest.raises(SystemExit) as exc_info:
@@ -304,7 +304,7 @@ def test_epss_trend_help_exits_zero():
 
 
 def test_epss_trend_missing_cve_is_error():
-    from manus_use.cli import _build_epss_trend_parser
+    from manus_agent.cli import _build_epss_trend_parser
 
     parser = _build_epss_trend_parser()
     with pytest.raises(SystemExit) as exc_info:
@@ -313,7 +313,7 @@ def test_epss_trend_missing_cve_is_error():
 
 
 def test_epss_trend_parser_defaults():
-    from manus_use.cli import _build_epss_trend_parser
+    from manus_agent.cli import _build_epss_trend_parser
 
     parser = _build_epss_trend_parser()
     args = parser.parse_args(["CVE-2024-3094"])
@@ -323,7 +323,7 @@ def test_epss_trend_parser_defaults():
 
 
 def test_epss_trend_parser_custom_days():
-    from manus_use.cli import _build_epss_trend_parser
+    from manus_agent.cli import _build_epss_trend_parser
 
     parser = _build_epss_trend_parser()
     args = parser.parse_args(["CVE-2024-3094", "--days", "90"])
@@ -331,16 +331,16 @@ def test_epss_trend_parser_custom_days():
 
 
 def test_epss_trend_parser_json_output():
-    from manus_use.cli import _build_epss_trend_parser
+    from manus_agent.cli import _build_epss_trend_parser
 
     parser = _build_epss_trend_parser()
     args = parser.parse_args(["CVE-2024-3094", "--output", "json"])
     assert args.output == "json"
 
 
-@patch("manus_use.tools.get_epss_trend._fetch_epss_time_series")
+@patch("manus_agent.tools.get_epss_trend._fetch_epss_time_series")
 def test_run_epss_trend_text_output(mock_fetch, capsys):
-    from manus_use.cli import _run_epss_trend
+    from manus_agent.cli import _run_epss_trend
 
     mock_fetch.return_value = _MOCK_API_RESPONSE
     rc = _run_epss_trend(["CVE-2024-3094"])
@@ -350,9 +350,9 @@ def test_run_epss_trend_text_output(mock_fetch, capsys):
     assert "EPSS trend" in out
 
 
-@patch("manus_use.tools.get_epss_trend._fetch_epss_time_series")
+@patch("manus_agent.tools.get_epss_trend._fetch_epss_time_series")
 def test_run_epss_trend_json_output(mock_fetch, capsys):
-    from manus_use.cli import _run_epss_trend
+    from manus_agent.cli import _run_epss_trend
 
     mock_fetch.return_value = _MOCK_API_RESPONSE
     rc = _run_epss_trend(["CVE-2024-3094", "--output", "json"])
@@ -363,9 +363,9 @@ def test_run_epss_trend_json_output(mock_fetch, capsys):
     assert "analysis" in data
 
 
-@patch("manus_use.tools.get_epss_trend._fetch_epss_time_series")
+@patch("manus_agent.tools.get_epss_trend._fetch_epss_time_series")
 def test_run_epss_trend_spike_shown_in_text(mock_fetch, capsys):
-    from manus_use.cli import _run_epss_trend
+    from manus_agent.cli import _run_epss_trend
 
     mock_fetch.return_value = _MOCK_SPIKE_RESPONSE
     rc = _run_epss_trend(["CVE-2024-3094"])
@@ -374,20 +374,20 @@ def test_run_epss_trend_spike_shown_in_text(mock_fetch, capsys):
     assert "SPIKE" in out
 
 
-@patch("manus_use.tools.get_epss_trend._fetch_epss_time_series")
+@patch("manus_agent.tools.get_epss_trend._fetch_epss_time_series")
 def test_run_epss_trend_no_data_returns_nonzero(mock_fetch):
-    from manus_use.cli import _run_epss_trend
+    from manus_agent.cli import _run_epss_trend
 
     mock_fetch.return_value = {"status": "OK", "data": []}
     rc = _run_epss_trend(["CVE-9999-9999"])
     assert rc != 0
 
 
-@patch("manus_use.tools.get_epss_trend._fetch_epss_time_series")
+@patch("manus_agent.tools.get_epss_trend._fetch_epss_time_series")
 def test_run_epss_trend_api_error_returns_nonzero(mock_fetch):
     import requests
 
-    from manus_use.cli import _run_epss_trend
+    from manus_agent.cli import _run_epss_trend
 
     mock_fetch.side_effect = requests.exceptions.ConnectionError("down")
     rc = _run_epss_trend(["CVE-2024-3094"])
@@ -401,7 +401,7 @@ def test_run_epss_trend_api_error_returns_nonzero(mock_fetch):
 
 def test_vi_agent_imports_get_epss_trend():
     """get_epss_trend module must be importable and have the expected interface."""
-    from manus_use.tools.get_epss_trend import TOOL_SPEC, get_epss_trend
+    from manus_agent.tools.get_epss_trend import TOOL_SPEC, get_epss_trend
 
     assert callable(get_epss_trend)
     assert TOOL_SPEC["name"] == "get_epss_trend"

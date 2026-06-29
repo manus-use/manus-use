@@ -1,0 +1,615 @@
+import asyncio
+import logging
+import os
+from collections.abc import AsyncGenerator, Coroutine
+from typing import (
+    Any,
+)
+
+from pydantic import BaseModel
+from strands import Agent
+
+from manus_agent.config import Config
+from manus_agent.tools.patches import apply_comprehensive_patch
+
+BROWSER_CLOSE_TIMEOUT = 10.0  # Seconds
+
+# Attempt to import browser_use and its dependencies
+try:
+    from browser_use import Agent as BrowserUse
+    from browser_use.agent.views import (
+        AgentHistoryList,
+        AgentOutput,
+    )  # Assuming AgentOutput is what model_output is
+    from browser_use.browser.profile import BrowserProfile
+    from browser_use.browser.views import (
+        BrowserStateSummary,
+    )  # Assuming this is what browser_state_summary is
+    from browser_use.controller.service import Controller
+    from langchain_aws import ChatBedrock
+    from langchain_core.language_models.chat_models import BaseChatModel
+    from langchain_openai import ChatOpenAI
+
+    BROWSER_USE_AVAILABLE = True
+    IMPORTED_MODULES = {
+        "browser_use": True,
+        "langchain_aws": True,
+        "langchain_openai": True,
+    }
+    MISSING_PACKAGES = []
+
+except ImportError as e:
+    BROWSER_USE_AVAILABLE = False
+    IMPORTED_MODULES = {
+        "browser_use": False,
+        "langchain_aws": False,
+        "langchain_openai": False,
+    }
+    if "browser_use" in str(e).lower():
+        IMPORTED_MODULES["browser_use"] = False
+    if "langchain_aws" in str(e).lower() or "bedrock" in str(e).lower():
+        IMPORTED_MODULES["langchain_aws"] = False
+    if "langchain_openai" in str(e).lower() or "openai" in str(e).lower():
+        IMPORTED_MODULES["langchain_openai"] = False
+
+    MISSING_PACKAGES = [pkg for pkg, imported in IMPORTED_MODULES.items() if not imported]
+
+    # Define placeholders for type hints if imports fail
+    BrowserUse = None
+    AgentHistoryList = None
+    AgentOutput = None
+    BrowserProfile = None
+    BrowserStateSummary = None
+    Controller = None
+    ChatBedrock = None
+    ChatOpenAI = None
+    BaseChatModel = None
+
+
+class BrowserUseAgent(Agent):
+    """
+    Strands Agent wrapper for the 'browser-use' library.
+
+    This agent delegates browser automation tasks to an instance of
+    `browser_use.Agent`. It manages the lifecycle of the `browser_use.Agent`,
+    configures it based on the main application's settings, and translates
+    Strands Agent calls to `browser-use` operations.
+
+    The underlying `browser_use.Agent` handles its own LLM interactions (configured
+    via this wrapper) and browser control using Playwright. This wrapper agent
+    itself does not use Strands tools directly for browser tasks, but rather
+    treats `browser-use` as the execution engine.
+    """
+
+    def __init__(
+        self,
+        config: Config | None = None,
+        headless: bool | None = None,
+        enable_memory: bool | None = None,
+        output_model: type[BaseModel] | None = None,
+        **kwargs: Any,
+    ):
+        """Initialize BrowserUseAgent.
+
+        Args:
+            config: Configuration object for LLM and other settings.
+            headless: Whether to run the browser in headless mode.
+                      Overrides config if set.
+            enable_memory: Whether to enable memory for the browser-use agent.
+                           Overrides config if set, defaults to False.
+            output_model: Optional Pydantic model to define structured output
+                          for the browser-use agent. If provided, the agent
+                          will attempt to return JSON conforming to this model.
+            **kwargs: Additional arguments for the base Strands Agent.
+        """
+        if not BROWSER_USE_AVAILABLE:
+            # Keep message compatible with tests that use a regex like `package(s)`.
+            error_message = "Required packages for BrowserUseAgent missing. "
+            if not IMPORTED_MODULES["browser_use"]:
+                error_message += "Missing: browser-use. "
+
+            missing_llm_support = []
+            if not IMPORTED_MODULES["langchain_aws"]:
+                missing_llm_support.append("langchain-aws")
+            if not IMPORTED_MODULES["langchain_openai"]:
+                missing_llm_support.append("langchain-openai")
+            if missing_llm_support:
+                error_message += f"Missing LLM packages: {', '.join(missing_llm_support)}. "
+
+            error_message += "Install with: pip install browser-use langchain-aws langchain-openai"
+            raise ImportError(error_message)
+
+        self.config = config or Config.from_file()
+
+        # Get browser_use specific config
+        browser_config = self.config.browser_use
+
+        legacy_headless = getattr(getattr(self.config, "tools", None), "browser_headless", None)
+        default_headless = (
+            legacy_headless
+            if isinstance(legacy_headless, bool)
+            else (browser_config.headless if isinstance(browser_config.headless, bool) else True)
+        )
+
+        # Use parameters if provided, otherwise fall back to config defaults.
+        self.headless = headless if headless is not None else default_headless
+        self.enable_memory = (
+            enable_memory
+            if enable_memory is not None
+            else (browser_config.enable_memory if isinstance(browser_config.enable_memory, bool) else False)
+        )
+        self.output_model = output_model
+
+        # Store other browser_use settings
+        self.max_steps = browser_config.max_steps
+        self.max_actions_per_step = browser_config.max_actions_per_step
+        self.use_vision = browser_config.use_vision
+        self.save_conversation_path = browser_config.save_conversation_path
+        self.max_error_length = browser_config.max_error_length
+        self.tool_calling_method = browser_config.tool_calling_method
+        self.keep_alive = browser_config.keep_alive
+        self.disable_security = browser_config.disable_security
+        self.extra_chromium_args = browser_config.extra_chromium_args
+        self.timeout = browser_config.timeout
+        self.retry_count = browser_config.retry_count
+        self.debug = browser_config.debug
+        self.save_screenshots = browser_config.save_screenshots
+        self.screenshot_path = browser_config.screenshot_path
+
+        self._apply_browser_patch_config()
+
+        # Initialize Strands Agent with a dummy model and no tools,
+        # as browser-use handles its own LLM and actions.
+        super().__init__(
+            model=self._get_dummy_model(),
+            tools=[],  # No Strands tools for this agent
+            system_prompt="",  # browser-use handles its own prompting
+            **kwargs,
+        )
+
+    def _apply_browser_patch_config(self) -> None:
+        """Keep the low-level browser patch aligned with agent runtime config."""
+        timeout_ms = max(1, int(self.timeout * 1000))
+        apply_comprehensive_patch(
+            default_timeout_ms=timeout_ms,
+            max_retries=self.retry_count,
+        )
+
+    def _get_dummy_model(self) -> Any:
+        """
+        Get a dummy model instance for base Strands Agent initialization.
+        Since browser-use uses its own configured LLM, the base Agent's model
+        is not directly used for browser tasks. This provides a valid model
+        object from the main application's config to satisfy base class requirements.
+        """
+        return self.config.get_model()
+
+    def _get_browser_llm(self) -> BaseChatModel:
+        """
+        Get the LangChain BaseChatModel for the browser-use agent.
+        Uses browser_use config section if available, otherwise falls back to main LLM config.
+        Raises ImportError if required LLM packages are missing, or ValueError for
+        unsupported providers.
+        """
+
+        def _coerce_str(value: Any) -> str | None:
+            return value if isinstance(value, str) and value.strip() else None
+
+        browser_config = getattr(self.config, "browser_use", None)
+
+        provider_override = _coerce_str(getattr(browser_config, "provider", None))
+        model_override = _coerce_str(getattr(browser_config, "model", None))
+        api_key_override = _coerce_str(getattr(browser_config, "api_key", None))
+
+        use_overrides = any([provider_override, model_override, api_key_override])
+
+        provider = provider_override or self.config.llm.provider
+        model_name = model_override or self.config.llm.model
+        temperature = (
+            getattr(browser_config, "temperature", self.config.llm.temperature)
+            if use_overrides
+            else self.config.llm.temperature
+        )
+        max_tokens = (
+            getattr(browser_config, "max_tokens", self.config.llm.max_tokens)
+            if use_overrides
+            else self.config.llm.max_tokens
+        )
+        api_key = api_key_override or getattr(self.config.llm, "api_key", None)
+
+        # Get AWS region from environment for Bedrock.
+        aws_region_default = getattr(self.config.llm, "aws_region", None) or "us-east-1"
+        aws_region = os.getenv("AWS_DEFAULT_REGION", aws_region_default)
+
+        if provider == "bedrock":
+            if not ChatBedrock:
+                raise ImportError("langchain-aws package is missing. Please install with: pip install langchain-aws")
+            return ChatBedrock(
+                model_id=model_name,
+                model_kwargs={"temperature": temperature, "max_tokens": max_tokens},
+                region_name=aws_region,
+            )
+        elif provider == "openai":
+            if not ChatOpenAI:
+                raise ImportError(
+                    "langchain-openai package is missing. Please install with: pip install langchain-openai"
+                )
+            kwargs = {
+                "model_name": model_name,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
+            # Add API key if provided in config
+            if api_key:
+                kwargs["api_key"] = api_key
+            return ChatOpenAI(**kwargs)
+        else:
+            raise ValueError(
+                f"Unsupported LLM provider for BrowserUseAgent: {provider}. "
+                "Supported providers are 'bedrock' and 'openai'."
+            )
+
+    async def _run_browser_task(self, task: str) -> str:
+        """
+        Run browser task asynchronously using browser-use for a non-streaming call.
+        Instantiates a browser-use.Agent for the given task and executes it,
+        then processes the result to return a summary string.
+        Ensures the browser_use.Agent is closed after execution.
+        """
+        browser_use_agent_instance: BrowserUse | None = None
+        try:
+            self._apply_browser_patch_config()
+            # Keep BrowserProfile construction minimal for compatibility across
+            # browser_use versions (and unit tests).
+            browser_profile = BrowserProfile(headless=self.headless)
+
+            controller_kwargs = {}
+            if self.output_model:
+                controller_kwargs["output_model"] = self.output_model
+
+            controller = Controller(**controller_kwargs)
+
+            browser_use_agent_instance = BrowserUse(
+                task=task,
+                llm=self._get_browser_llm(),
+                browser_profile=browser_profile,
+                controller=controller,
+                enable_memory=self.enable_memory,
+                # Only pass parameters that browser-use actually supports
+                # max_steps, max_actions_per_step, etc. are not supported in current version
+                validate_output=False,  # Kept from original implementation
+            )
+
+            result: AgentHistoryList = await browser_use_agent_instance.run()
+
+            if self.output_model and hasattr(result, "final_result") and callable(result.final_result):
+                # If output_model is used, final_result() gives JSON string
+                final_json_string = result.final_result()
+                logging.debug("Exiting _run_browser_task with final_json_string.")
+                return final_json_string if final_json_string is not None else ""
+
+            if hasattr(result, "extracted_content") and callable(result.extracted_content):
+                extracted_items = result.extracted_content()
+                if isinstance(extracted_items, list):
+                    logging.debug("Exiting _run_browser_task with joined extracted_items.")
+                    return "\n".join(str(item) for item in extracted_items)
+                elif extracted_items is not None:
+                    logging.debug("Exiting _run_browser_task with str(extracted_items).")
+                    return str(extracted_items)
+                else:
+                    logging.debug("Exiting _run_browser_task with empty string as extracted_content was None.")
+                    logging.info("BrowserUseAgent: result.extracted_content() returned None.")
+                    return ""
+            else:
+                logging.warning(
+                    "BrowserUseAgent: Could not find 'extracted_content' method on result or it's not callable. "
+                    f"Falling back to str(result). Result type: {type(result)}, Result: {result}"
+                )
+                logging.debug("Exiting _run_browser_task with str(result) as fallback.")
+                return str(result)
+        finally:
+            if browser_use_agent_instance and hasattr(browser_use_agent_instance, "close"):
+                try:
+                    logging.debug(
+                        f"Attempting to close browser_use agent instance in _run_browser_task. keep_alive: {self.keep_alive}"
+                    )
+                    if self.keep_alive:
+                        logging.info(f"Applying {BROWSER_CLOSE_TIMEOUT}s timeout to close() due to keep_alive=True.")
+                        try:
+                            await asyncio.wait_for(browser_use_agent_instance.close(), timeout=BROWSER_CLOSE_TIMEOUT)
+                            logging.debug(
+                                f"Successfully closed browser_use agent instance in _run_browser_task within timeout. keep_alive: {self.keep_alive}"
+                            )
+                        except asyncio.TimeoutError:
+                            logging.warning(
+                                f"Timeout closing browser_use agent instance in _run_browser_task after {BROWSER_CLOSE_TIMEOUT}s (keep_alive: {self.keep_alive}). Proceeding with agent shutdown."
+                            )
+                    else:
+                        await browser_use_agent_instance.close()
+                        logging.debug(
+                            f"Successfully closed browser_use agent instance in _run_browser_task. keep_alive: {self.keep_alive}"
+                        )
+                except Exception as e_close:
+                    logging.error(
+                        f"Error closing browser_use_agent_instance in _run_browser_task (keep_alive: {self.keep_alive}): {e_close}",
+                        exc_info=True,
+                    )
+        logging.warning("Reached supposedly unreachable return in _run_browser_task's finally block.")
+        return ""  # Should be unreachable if try block returns
+
+    def __call__(self, task: str | list[dict]) -> str | Coroutine[Any, Any, str]:
+        """
+        Execute a browser task using browser-use.
+        This method delegates directly to browser-use instead of using the
+        normal Strands agent loop. It handles both synchronous and asynchronous invocation.
+
+        Args:
+            task: Task description (string) or a list of message dictionaries.
+                  If a list, the content of the last user message is used as the task.
+
+        Returns:
+            Result from browser-use (string, potentially JSON if output_model is used)
+            or a coroutine if called from an async context.
+        """
+        task_str: str
+        if isinstance(task, list):
+            task_str = task[-1].get("content", "") if task and task[-1].get("role") == "user" else ""
+            if not task_str:  # Fallback if last message isn't user or no content
+                task_str = str(task)  # Or some other summarization
+        else:
+            task_str = task
+
+        try:
+            loop = asyncio.get_running_loop()
+            if loop.is_running():
+                # We're in an async context, return a coroutine
+                return self._run_browser_task(task_str)
+            else:  # Should not happen often in typical async frameworks
+                return asyncio.run(self._run_browser_task(task_str))
+        except RuntimeError:
+            # No event loop, typically means a sync context
+            return asyncio.run(self._run_browser_task(task_str))
+
+    async def stream_async(self, task: str | list[dict], **kwargs: Any) -> AsyncGenerator[dict[str, Any], None]:
+        """
+        Execute a browser task using browser-use and stream intermediate updates.
+
+        This method implements true incremental streaming by using callbacks from
+        the underlying `browser_use.Agent`. It yields dictionaries representing
+        step updates, final results, or errors.
+
+        Args:
+            task: Task description (string) or a list of message dictionaries.
+            **kwargs: Additional arguments (currently not used but part of signature).
+
+        Yields:
+            Dictionaries representing streaming events (e.g., step updates, final results, errors).
+        """
+        task_str: str
+        if isinstance(task, list):
+            task_str = task[-1].get("content", "") if task and task[-1].get("role") == "user" else ""
+            if not task_str:
+                task_str = str(task)
+        else:
+            task_str = task
+
+        # If browser-use is not available (or was not imported successfully), fall
+        # back to a minimal streaming wrapper around `__call__`.
+        if BrowserUse is None or BrowserProfile is None or Controller is None:
+            try:
+                maybe_result = self.__call__(task=task_str)
+                if asyncio.iscoroutine(maybe_result):
+                    maybe_result = await maybe_result
+                yield {"type": "text", "text": str(maybe_result)}
+            except Exception as e:
+                logging.error("Error during BrowserUseAgent stream_async fallback: %s", e, exc_info=True)
+                yield {"type": "error", "message": str(e)}
+            return
+
+        queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+        browser_use_agent_instance: BrowserUse | None = None
+        run_task_bg = None
+
+        async def step_callback(summary: BrowserStateSummary, model_out: AgentOutput, step_num: int):
+            try:
+                event_data = {
+                    "type": "step_update",
+                    "step": step_num,
+                    "url": summary.url if summary else None,
+                    "title": summary.title if summary else None,
+                    "planned_actions": [action.model_dump(exclude_unset=True) for action in model_out.action]
+                    if model_out and model_out.action
+                    else [],
+                    "next_goal": model_out.current_state.next_goal if model_out and model_out.current_state else None,
+                }
+                await queue.put(event_data)
+            except Exception as e_cb:
+                logging.error(f"Error in stream_async step_callback: {e_cb}")
+                # Attempt to put an error on the queue so the consumer knows something went wrong
+                await queue.put({"type": "error", "message": f"Error in step_callback: {str(e_cb)}"})
+
+        async def done_callback(history: AgentHistoryList):
+            try:
+                final_content_str = ""
+                if self.output_model and hasattr(history, "final_result") and callable(history.final_result):
+                    final_content_str = history.final_result() or ""
+                elif hasattr(history, "extracted_content") and callable(history.extracted_content):
+                    extracted_items = history.extracted_content()
+                    if isinstance(extracted_items, list):
+                        final_content_str = "\n".join(str(item) for item in extracted_items)
+                    elif extracted_items is not None:
+                        final_content_str = str(extracted_items)
+
+                event_data = {
+                    "type": "final_result",
+                    "is_successful": history.is_successful() if hasattr(history, "is_successful") else None,
+                    "total_steps": len(history.history) if hasattr(history, "history") else None,  # More direct way
+                    "content": final_content_str,  # Unified content string
+                    # Optionally include more from history if needed
+                    # "full_history": history.model_dump(exclude_unset=True) # Could be very large
+                }
+                await queue.put(event_data)
+            except Exception as e_cb:
+                logging.error(f"Error in stream_async done_callback: {e_cb}")
+                await queue.put({"type": "error", "message": f"Error in done_callback: {str(e_cb)}"})
+            finally:
+                await queue.put(None)  # End of stream marker
+
+        try:
+            self._apply_browser_patch_config()
+            browser_profile = BrowserProfile(headless=self.headless)
+
+            controller_kwargs = {}
+            if self.output_model:
+                controller_kwargs["output_model"] = self.output_model
+            controller = Controller(**controller_kwargs)
+
+            browser_use_agent_instance = BrowserUse(
+                task=task_str,
+                llm=self._get_browser_llm(),
+                browser_profile=browser_profile,
+                controller=controller,
+                enable_memory=self.enable_memory,
+                # Only pass parameters that browser-use actually supports
+                validate_output=False,
+                register_new_step_callback=step_callback,
+                register_done_callback=done_callback,
+            )
+
+            run_task_bg = asyncio.create_task(browser_use_agent_instance.run())
+
+            while True:
+                item = await queue.get()
+                if item is None:
+                    queue.task_done()
+                    break
+                yield item
+                queue.task_done()
+            logging.info("Exited stream_async main event processing loop.")
+
+            # Await the background task to ensure it finishes and to catch any exceptions
+            if run_task_bg:  # Check if task was created
+                await run_task_bg
+                logging.info("Finished awaiting run_task_bg in stream_async within try block.")
+
+        except Exception as e:
+            logging.error(f"Error during BrowserUseAgent stream_async execution: {e}", exc_info=True)
+            yield {"type": "error", "message": f"Error during streaming task: {str(e)}"}
+            # Ensure queue is unblocked if consumer is still waiting
+            if queue.empty():  # Check if queue is empty before putting None
+                await queue.put(None)
+        finally:
+            if run_task_bg and not run_task_bg.done():
+                logging.debug("Cancelling background browser-use run task.")
+                run_task_bg.cancel()
+                try:
+                    await run_task_bg  # Await cancellation
+                except asyncio.CancelledError:
+                    logging.debug("Background browser-use run task was successfully cancelled.")
+                except Exception as e_cancel:
+                    logging.error(f"Error during cancellation of browser-use run task: {e_cancel}")
+
+            if browser_use_agent_instance and hasattr(browser_use_agent_instance, "close"):
+                try:
+                    logging.info(
+                        f"Attempting to close browser_use agent instance in stream_async. keep_alive: {self.keep_alive}"
+                    )
+                    if self.keep_alive:
+                        logging.info(f"Applying {BROWSER_CLOSE_TIMEOUT}s timeout to close() due to keep_alive=True.")
+                        try:
+                            await asyncio.wait_for(browser_use_agent_instance.close(), timeout=BROWSER_CLOSE_TIMEOUT)
+                            logging.info(
+                                f"Successfully closed browser_use agent instance in stream_async within timeout. keep_alive: {self.keep_alive}"
+                            )
+                        except asyncio.TimeoutError:
+                            logging.warning(
+                                f"Timeout closing browser_use agent instance in stream_async after {BROWSER_CLOSE_TIMEOUT}s (keep_alive: {self.keep_alive}). Proceeding with agent shutdown."
+                            )
+                    else:
+                        await browser_use_agent_instance.close()
+                        logging.info(
+                            f"Successfully closed browser_use agent instance in stream_async. keep_alive: {self.keep_alive}"
+                        )
+                except Exception as e_close:
+                    logging.error(
+                        f"Error closing browser_use_agent_instance in stream_async (keep_alive: {self.keep_alive}): {e_close}",
+                        exc_info=True,
+                    )
+            logging.info("stream_async method is completing its execution (end of finally block).")
+
+    async def cleanup(self):
+        """
+        Placeholder for cleanup logic if BrowserUseAgent itself held long-lived resources.
+        Currently, browser_use.Agent instances are created per-task and are expected
+        to manage their own resources via their `close()` method.
+        """
+        pass
+
+    def __del__(self):
+        """
+        Placeholder for destructor logic.
+        As `browser_use.Agent` instances are per-task, specific cleanup
+        is handled via their `close()` method within `_run_browser_task` and `stream_async`.
+        """
+        pass
+
+
+# Example usage (illustrative, typically not part of the agent file itself)
+# if __name__ == "__main__":
+#     # This example part would need to be adapted to your project's async setup
+#     # and configuration loading.
+#     async def main_example():
+#         # Load config (ensure your Config class can be instantiated simply or mock it)
+#         try:
+#             # config = Config.from_file() # Or your project's way of getting config
+#             # For testing, mock a simple config if Config.from_file() is complex
+#             class MockConfig:
+#                 class LLMConfig:
+#                     provider="openai" # or "bedrock"
+#                     model="gpt-3.5-turbo" # change as needed
+#                     temperature=0.0
+#                     max_tokens=2000
+#                     aws_region=os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+#                 llm = LLMConfig()
+#                 class ToolsConfig:
+#                     browser_headless = True # or False
+#                     browser_use_enable_memory = False
+#                 tools = ToolsConfig()
+#                 def get_model(self): # Dummy model for base Strands Agent
+#                     return Mock() # from unittest.mock
+
+#             config = MockConfig()
+
+#         except Exception as e_conf:
+#             logging.error(f"Failed to load config for example: {e_conf}")
+#             return
+
+#         # Ensure OPENAI_API_KEY (or Bedrock credentials) are set in your environment
+#         if config.llm.provider == "openai" and not os.getenv("OPENAI_API_KEY"):
+#             logging.warning("OPENAI_API_KEY not set, example might fail.")
+
+#         agent = BrowserUseAgent(config=config, headless=True, enable_memory=False)
+
+#         # --- Example for __call__ (non-streaming) ---
+#         # task_description = "What is the main headline on bbc.com/news?"
+#         # logging.info(f"Running non-streaming task: {task_description}")
+#         # try:
+#         #     result_str = await agent(task_description) # if in async context already
+#         #     # result_str = agent(task_description) # if in sync context (test carefully)
+#         #     logging.info(f"Non-streaming result:\n{result_str}")
+#         # except Exception as e_call:
+#         #     logging.error(f"Error in __call__ example: {e_call}", exc_info=True)
+
+
+#         # --- Example for stream_async ---
+#         streaming_task = "Find the weather in London and then the capital of France."
+#         logging.info(f"\nRunning streaming task: {streaming_task}")
+#         try:
+#             async for event in agent.stream_async(task=streaming_task):
+#                 logging.info(f"Streaming event: {event}")
+#         except Exception as e_stream:
+#             logging.error(f"Error in stream_async example: {e_stream}", exc_info=True)
+
+#     # if sys.platform == "win32":
+#     #     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+#     # asyncio.run(main_example())

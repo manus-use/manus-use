@@ -5,7 +5,7 @@ from __future__ import annotations
 import urllib.error
 from unittest.mock import MagicMock, patch
 
-from manus_use.tools.get_trickest_pocs import _parse_pocs, get_trickest_pocs
+from manus_agent.tools.get_trickest_pocs import _parse_pocs, get_trickest_pocs
 
 # --- Unit tests for _parse_pocs ---
 

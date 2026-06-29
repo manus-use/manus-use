@@ -8,7 +8,7 @@ from urllib.error import HTTPError, URLError
 
 import pytest
 
-from manus_use.tools.get_poc_week import (
+from manus_agent.tools.get_poc_week import (
     _last_sunday,
     _parse_poc_week,
     _url_for_date,
@@ -155,7 +155,7 @@ def _make_mock_response(html: str):
     return mock_resp
 
 
-@patch("manus_use.tools.get_poc_week.urlopen")
+@patch("manus_agent.tools.get_poc_week.urlopen")
 def test_get_poc_week_returns_dict(mock_urlopen):
     mock_urlopen.return_value = _make_mock_response(SAMPLE_HTML)
     result = get_poc_week("2026-04-27")
@@ -163,21 +163,21 @@ def test_get_poc_week_returns_dict(mock_urlopen):
     assert "error" not in result
 
 
-@patch("manus_use.tools.get_poc_week.urlopen")
+@patch("manus_agent.tools.get_poc_week.urlopen")
 def test_get_poc_week_week_date(mock_urlopen):
     mock_urlopen.return_value = _make_mock_response(SAMPLE_HTML)
     result = get_poc_week("2026-04-26")  # 2026-04-26 is a Sunday
     assert result["week_date"] == "2026-04-26"
 
 
-@patch("manus_use.tools.get_poc_week.urlopen")
+@patch("manus_agent.tools.get_poc_week.urlopen")
 def test_get_poc_week_url_field(mock_urlopen):
     mock_urlopen.return_value = _make_mock_response(SAMPLE_HTML)
     result = get_poc_week("2026-04-26")  # Sunday
     assert "20260426" in result["url"]
 
 
-@patch("manus_use.tools.get_poc_week.urlopen")
+@patch("manus_agent.tools.get_poc_week.urlopen")
 def test_get_poc_week_total(mock_urlopen):
     mock_urlopen.return_value = _make_mock_response(SAMPLE_HTML)
     result = get_poc_week("2026-04-26")  # Sunday
@@ -185,7 +185,7 @@ def test_get_poc_week_total(mock_urlopen):
     assert result["total"] == 3
 
 
-@patch("manus_use.tools.get_poc_week.urlopen")
+@patch("manus_agent.tools.get_poc_week.urlopen")
 def test_get_poc_week_rounds_to_sunday(mock_urlopen):
     """Mid-week date should round back to the preceding Sunday."""
     mock_urlopen.return_value = _make_mock_response(SAMPLE_HTML)
@@ -193,7 +193,7 @@ def test_get_poc_week_rounds_to_sunday(mock_urlopen):
     assert result["week_date"] == "2026-04-26"  # prior Sunday
 
 
-@patch("manus_use.tools.get_poc_week.urlopen")
+@patch("manus_agent.tools.get_poc_week.urlopen")
 def test_get_poc_week_no_date_uses_today(mock_urlopen):
     mock_urlopen.return_value = _make_mock_response(SAMPLE_HTML)
     result = get_poc_week()
@@ -211,7 +211,7 @@ def test_get_poc_week_invalid_date():
     assert "error" in result
 
 
-@patch("manus_use.tools.get_poc_week.urlopen")
+@patch("manus_agent.tools.get_poc_week.urlopen")
 def test_get_poc_week_404_retries_and_fails(mock_urlopen):
     mock_urlopen.side_effect = HTTPError(url="https://example.com", code=404, msg="Not Found", hdrs=None, fp=None)
     result = get_poc_week("2026-04-27", max_retries=2)
@@ -219,7 +219,7 @@ def test_get_poc_week_404_retries_and_fails(mock_urlopen):
     assert "No PoC Week issue found" in result["error"]
 
 
-@patch("manus_use.tools.get_poc_week.urlopen")
+@patch("manus_agent.tools.get_poc_week.urlopen")
 def test_get_poc_week_404_then_success(mock_urlopen):
     """First call returns 404; second call (prior week) succeeds."""
     http_err = HTTPError(url="https://example.com", code=404, msg="Not Found", hdrs=None, fp=None)
@@ -229,7 +229,7 @@ def test_get_poc_week_404_then_success(mock_urlopen):
     assert result["total"] == 3
 
 
-@patch("manus_use.tools.get_poc_week.urlopen")
+@patch("manus_agent.tools.get_poc_week.urlopen")
 def test_get_poc_week_network_error(mock_urlopen):
     mock_urlopen.side_effect = URLError("Connection refused")
     result = get_poc_week("2026-04-27")
@@ -237,7 +237,7 @@ def test_get_poc_week_network_error(mock_urlopen):
     assert "Network error" in result["error"]
 
 
-@patch("manus_use.tools.get_poc_week.urlopen")
+@patch("manus_agent.tools.get_poc_week.urlopen")
 def test_get_poc_week_non_404_http_error(mock_urlopen):
     mock_urlopen.side_effect = HTTPError(
         url="https://example.com", code=503, msg="Service Unavailable", hdrs=None, fp=None
