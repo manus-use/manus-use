@@ -1053,6 +1053,7 @@ _SUBCOMMANDS = {
     "patch-diff",
     "compare",
     "exploit-complexity",
+    "temporal-priority",
     "poc-search",
 }
 
@@ -1343,7 +1344,78 @@ def _run_exploit_complexity(argv: list[str]) -> int:
 
 
 # ---------------------------------------------------------------------------
-# poc-search subcommand
+# temporal-priority subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_temporal_priority_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="manus-use temporal-priority",
+        description=(
+            "Compute a time-aware composite urgency score (0-100) for a CVE.\n"
+            "Combines CVSS severity, EPSS exploitation probability (with spike-recency\n"
+            "decay), CISA KEV membership, patch availability, and CVE age.\n"
+            "Score bands: CRITICAL 80-100 | HIGH 60-79 | MEDIUM 40-59 | LOW 0-39."
+        ),
+    )
+    parser.add_argument("cve_id", metavar="CVE-ID", help="CVE identifier (e.g. CVE-2021-44228)")
+    parser.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return parser
+
+
+def _run_temporal_priority(argv: list[str]) -> int:
+    parser = _build_temporal_priority_parser()
+    args = parser.parse_args(argv)
+
+    cve_id: str = args.cve_id.strip()
+    import re as _re
+
+    if not _re.match(r"CVE-\d{4}-\d+", cve_id, _re.IGNORECASE):
+        parser.error(f"Invalid CVE ID: {cve_id!r}. Expected format: CVE-YYYY-NNNNN")
+
+    try:
+        from manus_use.tools.score_temporal_priority import (
+            _compute_score,
+            _fetch_epss,
+            _fetch_kev,
+            _fetch_nvd,
+            _render_text,
+        )
+    except ImportError as exc:  # pragma: no cover
+        print(f"Error: failed to import score_temporal_priority: {exc}", file=__import__("sys").stderr)
+        return 1
+
+    import concurrent.futures as _cf
+
+    with _cf.ThreadPoolExecutor(max_workers=3) as executor:
+        f_nvd = executor.submit(_fetch_nvd, cve_id)
+        f_epss = executor.submit(_fetch_epss, cve_id)
+        f_kev = executor.submit(_fetch_kev, cve_id)
+        nvd = f_nvd.result()
+        epss = f_epss.result()
+        kev = f_kev.result()
+
+    if nvd.get("error"):
+        print(f"Error: NVD lookup failed for {cve_id}: {nvd['error']}", file=__import__("sys").stderr)
+        return 1
+
+    scored = _compute_score(nvd, epss, kev)
+
+    if args.output == "json":
+        import json as _json
+
+        print(_json.dumps(scored, indent=2))
+        return 0
+
+    print(_render_text(scored))
+    return 0
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -1761,6 +1833,10 @@ def main() -> None:
     if first_positional == "exploit-complexity":
         idx = argv.index("exploit-complexity")
         sys.exit(_run_exploit_complexity(argv[idx + 1 :]))
+
+    if first_positional == "temporal-priority":
+        idx = argv.index("temporal-priority")
+        sys.exit(_run_temporal_priority(argv[idx + 1 :]))
 
     if first_positional == "poc-search":
         idx = argv.index("poc-search")

@@ -111,6 +111,14 @@ Your process is optimized to build a comprehensive picture from authoritative, f
   - Whether the score was derived from PoC code analysis or NVD CVSS vector only.
   This score contextualises raw CVSS severity: a CVSS 9.8 with complexity_score=1.5 is far more urgent than the same CVSS with complexity_score=4.5.
 
+**Step 6c: Temporal Priority Scoring**
+- Call `score_temporal_priority` with the CVE ID. Include in the report:
+  - The `urgency_score` (0–100) and label (CRITICAL / HIGH / MEDIUM / LOW).
+  - The top-scoring component(s) driving the urgency (e.g. KEV membership, recent EPSS spike).
+  - `days_since_spike` if a spike was detected — a spike in the last 7 days is a strong "act now" signal.
+  This score synthesises CVSS, EPSS trajectory, KEV status, patch availability, and CVE age into a single
+  time-aware urgency number, answering "how urgently must I act *today*?".
+
 **Step 7: Analyze Weakness**
 - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -208,6 +216,7 @@ class VulnerabilityIntelligenceAgent:
             from manus_use.tools.get_trickest_pocs import get_trickest_pocs
             from manus_use.tools.get_vulncheck_data import get_vulncheck_data
             from manus_use.tools.score_exploit_complexity import score_exploit_complexity
+            from manus_use.tools.score_temporal_priority import score_temporal_priority
             from manus_use.tools.search_poc_sources import search_poc_sources
         except ImportError as exc:  # pragma: no cover - depends on env
             raise ImportError(
@@ -261,6 +270,7 @@ class VulnerabilityIntelligenceAgent:
             get_epss_trend,
             get_patch_diff,
             score_exploit_complexity,
+            score_temporal_priority,
             get_vulncheck_data,
             search_poc_sources,
         ]

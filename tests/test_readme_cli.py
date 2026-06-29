@@ -446,3 +446,156 @@ class TestModeFlag:
 
         args = cli._build_run_parser().parse_args(["task"])
         assert args.mode == "auto"
+
+
+# ---------------------------------------------------------------------------
+# temporal-priority subcommand
+# ---------------------------------------------------------------------------
+
+
+class TestTemporalPrioritySubcommand:
+    def test_parser_has_cve_id_positional(self):
+        """temporal-priority parser requires a CVE-ID positional argument."""
+        from manus_use import cli  # noqa: PLC0415
+
+        parser = cli._build_temporal_priority_parser()
+        args = parser.parse_args(["CVE-2021-44228"])
+        assert args.cve_id == "CVE-2021-44228"
+
+    def test_parser_output_default_is_text(self):
+        from manus_use import cli  # noqa: PLC0415
+
+        args = cli._build_temporal_priority_parser().parse_args(["CVE-2021-44228"])
+        assert args.output == "text"
+
+    def test_parser_output_json_accepted(self):
+        from manus_use import cli  # noqa: PLC0415
+
+        args = cli._build_temporal_priority_parser().parse_args(["CVE-2021-44228", "--output", "json"])
+        assert args.output == "json"
+
+    def test_routing_in_main(self):
+        """main() should route 'temporal-priority' to _run_temporal_priority."""
+        import sys
+        from unittest.mock import patch
+
+        from manus_use import cli  # noqa: PLC0415
+
+        with patch.object(cli, "_run_temporal_priority", return_value=0) as mock_run:
+            with patch.object(sys, "argv", ["manus-use", "temporal-priority", "CVE-2021-44228"]):
+                with pytest.raises(SystemExit) as exc_info:
+                    cli.main()
+            assert exc_info.value.code == 0
+            mock_run.assert_called_once_with(["CVE-2021-44228"])
+
+    def test_temporal_priority_in_known_subcommands(self):
+        """temporal-priority must be listed in KNOWN_SUBCOMMANDS."""
+        from manus_use import cli  # noqa: PLC0415
+
+        assert "temporal-priority" in cli._SUBCOMMANDS
+
+    def test_run_temporal_priority_invalid_cve(self, capsys):
+        """_run_temporal_priority should exit non-zero for bad CVE IDs."""
+        from manus_use import cli  # noqa: PLC0415
+
+        with pytest.raises(SystemExit) as exc_info:
+            cli._run_temporal_priority(["NOT-A-CVE"])
+        assert exc_info.value.code != 0
+
+    def test_run_temporal_priority_text_output(self, capsys):
+        """_run_temporal_priority text mode should print score to stdout."""
+        from datetime import date
+        from unittest.mock import patch
+
+        from manus_use import cli  # noqa: PLC0415
+
+        mock_nvd = {
+            "cve_id": "CVE-2021-44228",
+            "cvss_score": 9.8,
+            "cvss_severity": "CRITICAL",
+            "cvss_version": "3.1",
+            "attack_vector": "NETWORK",
+            "patch_signals": 2,
+            "published_date": "2021-12-10",
+            "description": "Log4Shell RCE",
+        }
+        mock_epss = {
+            "current_epss": 0.90,
+            "current_percentile": 0.97,
+            "spike_detected": True,
+            "spike_magnitude": 0.30,
+            "spike_date": "2021-12-11",
+            "days_since_spike": 5,
+        }
+        mock_kev = {"in_kev": True, "date_added": "2021-12-11", "due_date": "2022-01-03"}
+
+        with (
+            patch("manus_use.tools.score_temporal_priority._fetch_nvd", return_value=mock_nvd),
+            patch("manus_use.tools.score_temporal_priority._fetch_epss", return_value=mock_epss),
+            patch("manus_use.tools.score_temporal_priority._fetch_kev", return_value=mock_kev),
+            patch("manus_use.tools.score_temporal_priority._today", return_value=date(2026, 6, 29)),
+        ):
+            exit_code = cli._run_temporal_priority(["CVE-2021-44228"])
+
+        assert exit_code == 0
+        captured = capsys.readouterr()
+        assert "CVE-2021-44228" in captured.out
+        assert "Urgency Score" in captured.out
+
+    def test_run_temporal_priority_json_output(self, capsys):
+        """_run_temporal_priority --output json should produce valid JSON."""
+        import json
+        from datetime import date
+        from unittest.mock import patch
+
+        from manus_use import cli  # noqa: PLC0415
+
+        mock_nvd = {
+            "cve_id": "CVE-2021-44228",
+            "cvss_score": 9.8,
+            "cvss_severity": "CRITICAL",
+            "cvss_version": "3.1",
+            "attack_vector": "NETWORK",
+            "patch_signals": 2,
+            "published_date": "2021-12-10",
+            "description": "Log4Shell",
+        }
+        mock_epss = {
+            "current_epss": 0.90,
+            "current_percentile": 0.97,
+            "spike_detected": False,
+            "spike_magnitude": 0.0,
+            "spike_date": None,
+            "days_since_spike": None,
+        }
+        mock_kev = {"in_kev": False}
+
+        with (
+            patch("manus_use.tools.score_temporal_priority._fetch_nvd", return_value=mock_nvd),
+            patch("manus_use.tools.score_temporal_priority._fetch_epss", return_value=mock_epss),
+            patch("manus_use.tools.score_temporal_priority._fetch_kev", return_value=mock_kev),
+            patch("manus_use.tools.score_temporal_priority._today", return_value=date(2026, 6, 29)),
+        ):
+            exit_code = cli._run_temporal_priority(["CVE-2021-44228", "--output", "json"])
+
+        assert exit_code == 0
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["cve_id"] == "CVE-2021-44228"
+        assert "urgency_score" in data
+        assert "label" in data
+
+    def test_run_temporal_priority_nvd_error(self, capsys):
+        """_run_temporal_priority should return non-zero when NVD lookup fails."""
+        from unittest.mock import patch
+
+        from manus_use import cli  # noqa: PLC0415
+
+        with (
+            patch("manus_use.tools.score_temporal_priority._fetch_nvd", return_value={"error": "not found"}),
+            patch("manus_use.tools.score_temporal_priority._fetch_epss", return_value={"error": "not found"}),
+            patch("manus_use.tools.score_temporal_priority._fetch_kev", return_value={"in_kev": False}),
+        ):
+            exit_code = cli._run_temporal_priority(["CVE-9999-9999"])
+
+        assert exit_code != 0
