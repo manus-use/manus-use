@@ -63,6 +63,7 @@ Your process is optimized to build a comprehensive picture from authoritative, f
 - Call `get_otx_cve_details` to check for threat intelligence information from AlienVault OTX, such as associated pulses and IoCs.
 - Call `get_epss_trend` with the CVE ID (default 30 days of history). A `spike_detected=true` result (>0.10 jump in 7 days) indicates the vulnerability has recently been weaponised or discovered by attackers â flag this prominently in the report with the spike date and magnitude.
 
+- Call `classify_exploit_maturity` with the CVE ID. This synthesises CISA KEV, VulnCheck KEV, EPSS, and trickest/cve PoC data into a single **exploitation maturity verdict** (`EXPLOITED_IN_WILD` / `WEAPONIZED` / `POC_PUBLIC` / `POC_PRIVATE` / `THEORETICAL`). Include this verdict prominently near the top of your report — it is the single most useful signal for prioritisation.
 **Step 3: Gather Public Exploits and Advisories**
 - First, call `get_poc_week` (no arguments) to check if the CVE appears in recent PoC Week digests. A high mention_rank (low number) means the security community considers it high-priority this week â note this in your analysis.
 - Then call `get_trickest_pocs` with the CVE ID for a fast pre-flight lookup against the trickest/cve index (250k+ CVEs, updated daily).
@@ -210,6 +211,7 @@ class VulnerabilityIntelligenceAgent:
             from strands import Agent
             from strands_tools import current_time
 
+            from manus_agent.tools.classify_exploit_maturity import classify_exploit_maturity
             from manus_agent.tools.get_dependency_blast_radius import get_dependency_blast_radius
             from manus_agent.tools.get_epss_trend import get_epss_trend
             from manus_agent.tools.get_github_advisory import get_github_advisory
@@ -274,6 +276,7 @@ class VulnerabilityIntelligenceAgent:
             get_vulncheck_data,
             search_poc_sources,
             get_dependency_blast_radius,
+            classify_exploit_maturity,
         ]
         if use_browser is not None:
             tools.append(use_browser)

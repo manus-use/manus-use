@@ -1056,6 +1056,7 @@ _SUBCOMMANDS = {
     "poc-search",
     "changelog",
     "blast-radius",
+    "exploit-maturity",
 }
 
 
@@ -1974,6 +1975,141 @@ def _build_run_parser() -> argparse.ArgumentParser:
     return parser
 
 
+# ---------------------------------------------------------------------------
+# exploit-maturity subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_exploit_maturity_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-agent exploit-maturity",
+        description=(
+            "Classify the exploitation maturity of a CVE using multiple\n"
+            "intelligence sources (CISA KEV, VulnCheck KEV, EPSS, trickest/cve, NVD).\n\n"
+            "Verdict tiers (highest → lowest):\n"
+            "  EXPLOITED_IN_WILD  — confirmed active exploitation (KEV listed)\n"
+            "  WEAPONIZED         — weaponised exploit or EPSS ≥ 50%\n"
+            "  POC_PUBLIC         — public PoC exists\n"
+            "  POC_PRIVATE        — EPSS ≥ 20%, private capability likely\n"
+            "  THEORETICAL        — no exploitation evidence\n"
+        ),
+        add_help=True,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument(
+        "cve_id",
+        metavar="CVE_ID",
+        help="CVE identifier to classify (e.g., CVE-2021-44228)",
+    )
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return p
+
+
+def _run_exploit_maturity(argv: list[str]) -> int:
+    import json as _json
+
+    parser = _build_exploit_maturity_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        from manus_agent.tools.classify_exploit_maturity import (
+            TIER_EXPLOITED_IN_WILD,
+            TIER_POC_PRIVATE,
+            TIER_POC_PUBLIC,
+            TIER_THEORETICAL,
+            TIER_WEAPONIZED,
+            _check_cisa_kev,
+            _check_trickest,
+            _check_vulncheck_kev,
+            _classify,
+            _fetch_epss,
+            _fetch_nvd_meta,
+        )
+    except ImportError as exc:  # pragma: no cover
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    cve_id = args.cve_id.strip().upper()
+
+    import re
+
+    if not re.match(r"^CVE-\d{4}-\d+$", cve_id, re.IGNORECASE):
+        print(f"Error: '{cve_id}' is not a valid CVE ID. Expected: CVE-YYYY-NNNNN", file=sys.stderr)
+        return 1
+
+    cisa = _check_cisa_kev(cve_id)
+    vulncheck = _check_vulncheck_kev(cve_id)
+    epss = _fetch_epss(cve_id)
+    trickest = _check_trickest(cve_id)
+    nvd_meta = _fetch_nvd_meta(cve_id)
+
+    tier, evidence = _classify(cisa, vulncheck, epss, trickest)
+
+    if args.output == "json":
+        result = {
+            "cve_id": cve_id,
+            "maturity_tier": tier,
+            "evidence": evidence,
+            "sources": {
+                "cisa_kev": cisa,
+                "vulncheck_kev": vulncheck,
+                "epss": epss,
+                "trickest": trickest,
+                "nvd": nvd_meta,
+            },
+        }
+        print(_json.dumps(result, indent=2))
+        return 0
+
+    # Text output
+    tier_icon = {
+        TIER_EXPLOITED_IN_WILD: "🔴 CRITICAL",
+        TIER_WEAPONIZED: "🟠 HIGH",
+        TIER_POC_PUBLIC: "🟡 MEDIUM",
+        TIER_POC_PRIVATE: "🔵 LOW-MEDIUM",
+        TIER_THEORETICAL: "⚪ LOW",
+    }
+    icon = tier_icon.get(tier, tier)
+    print(f"Exploit Maturity Classification — {cve_id}")
+    print("=" * 52)
+    print(f"\nVerdict:  {tier}  {icon}")
+    print()
+    print("Evidence:")
+    for item in evidence:
+        print(f"  • {item}")
+    print()
+    print("CVE Metadata:")
+    if nvd_meta.get("published_date"):
+        print(f"  Published:    {nvd_meta['published_date']}")
+    if nvd_meta.get("cvss_score") is not None:
+        print(
+            f"  CVSS {nvd_meta.get('cvss_version', '')}:     {nvd_meta['cvss_score']} ({nvd_meta.get('cvss_severity', '')})"
+        )
+    if nvd_meta.get("cwes"):
+        print(f"  CWE:          {', '.join(nvd_meta['cwes'])}")
+    print()
+    print("Source coverage:")
+    print(f"  CISA KEV:       {'✓ checked' if 'in_cisa_kev' in cisa else '✗ unavailable'}")
+    if vulncheck.get("available") is False:
+        print("  VulnCheck KEV:  ✗ no API key (set VULNCHECK_API_KEY)")
+    else:
+        print(f"  VulnCheck KEV:  {'✓ checked' if vulncheck else '✗ unavailable'}")
+    epss_score = epss.get("epss_score")
+    print(f"  EPSS (FIRST):   {'✓ ' + str(round(epss_score, 4)) if epss_score is not None else '✗ unavailable'}")
+    print(
+        f"  trickest/cve:   {'✓ ' + str(trickest.get('poc_count', 0)) + ' PoC(s)' if trickest.get('trickest_available') else '✗ unavailable'}"
+    )
+    print(
+        f"  NVD CVSS:       {'✓ CVSS ' + str(nvd_meta.get('cvss_score', '')) if nvd_meta.get('cvss_score') else '✗ unavailable'}"
+    )
+    return 0
+
+
 def _build_init_parser() -> argparse.ArgumentParser:
     """Build the `init` subcommand parser."""
     parser = argparse.ArgumentParser(
@@ -2188,6 +2324,10 @@ def main() -> None:
     if first_positional == "blast-radius":
         idx = argv.index("blast-radius")
         sys.exit(_run_blast_radius(argv[idx + 1 :]))
+
+    if first_positional == "exploit-maturity":
+        idx = argv.index("exploit-maturity")
+        sys.exit(_run_exploit_maturity(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")
