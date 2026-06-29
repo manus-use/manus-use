@@ -1,35 +1,44 @@
-# ManusUse
+# manus-agent
 
 [![PyPI version](https://img.shields.io/pypi/v/manus-use.svg)](https://pypi.org/project/manus-use/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tests](https://github.com/manus-use/manus-agent/actions/workflows/test.yml/badge.svg)](https://github.com/manus-use/manus-agent/actions)
 
-A powerful, extensible framework for building AI agents with comprehensive tool support, multi-agent orchestration, and advanced web automation capabilities.
+A powerful, extensible framework for building AI agents with comprehensive tool support, multi-agent orchestration, and advanced vulnerability intelligence.
 
-## Overview
-
-ManusUse empowers developers to create sophisticated AI agents that can:
-
-- Execute code in secure Docker sandboxes
-- Automate web browsing and data extraction
-- Analyze data and generate visualizations
-- Coordinate multiple specialized agents for complex tasks
-- Integrate with various LLM providers seamlessly
-- Perform deep vulnerability intelligence analysis
-
-Built on [Strands SDK](https://github.com/strands-agents/sdk-python) and integrated with [browser-use](https://github.com/browser-use/browser-use), ManusUse provides a production-ready foundation for AI agent development.
+Built on [Strands SDK](https://github.com/strands-agents/sdk-python) and integrated with [browser-use](https://github.com/browser-use/browser-use).
 
 ## Table of Contents
 
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [CLI Reference](#cli-reference)
+  - [Run a task](#manus-use-task--run-a-task)
+  - [init / doctor / history](#manus-use-init--configure-credentials)
+  - [analyze](#manus-use-analyze-cve-id--vulnerability-intelligence)
+  - [remediate](#manus-use-remediate-cve-id--remediation-guidance)
+  - [discover](#manus-use-discover--cve-discovery)
+  - [epss-trend](#manus-use-epss-trend-cve-id--epss-score-history)
+  - [patch-diff](#manus-use-patch-diff-cve-id--patch-diff-summariser)
+  - [variants](#manus-use-variants-cve-id--variant-analysis)
+  - [compare](#manus-use-compare-cve-a-cve-b--side-by-side-comparison)
+  - [exploit-complexity](#manus-use-exploit-complexity-cve-id--exploit-complexity-scorer)
+  - [poc-search](#manus-use-poc-search-cve-id--multi-source-poc-aggregator)
+  - [blast-radius](#manus-use-blast-radius-spec--dependency-blast-radius)
+  - [silent-patches](#manus-use-silent-patches-ownerrepo--silent-patch-detector)
+  - [cve-timeline](#manus-use-cve-timeline-cve-id--cve-timeline)
+  - [version-range](#manus-use-version-range-cve-id--affected-version-ranges)
+  - [vendor-response](#manus-use-vendor-response-cve-id--vendor-response-tracker)
+  - [poc-freshness](#manus-use-poc-freshness-cve-id--poc-freshness-checker)
+  - [sbom-scan](#manus-use-sbom-scan-bomfile--sbom-scanner)
+  - [temporal-priority](#manus-use-temporal-priority-cve-id--temporal-priority-scorer)
+  - [cluster-variants](#manus-use-cluster-variants-cve-id--cve-variant-clustering)
+  - [changelog](#manus-use-changelog--manage-project-changelog)
 - [Configuration](#configuration)
 - [Python API](#python-api)
 - [Security & Vulnerability Intelligence](#security--vulnerability-intelligence)
 - [Development](#development)
-- [Changelog](#changelog)
 
 ---
 
@@ -51,29 +60,17 @@ pip install manus-use[browser,search,visualization]
 
 ## Quick Start
 
-### 1. Initialize your configuration
-
 ```bash
+# 1. Set up credentials
 manus-use init
-```
 
-The interactive wizard creates `~/.manus-use/config.toml` with your LLM provider credentials.
-
-### 2. Check your environment
-
-```bash
+# 2. Verify your environment
 manus-use doctor
-```
 
-Verifies installed packages, configuration, and API key accessibility.
-
-### 3. Run your first task
-
-```bash
-# Single-shot (non-interactive)
+# 3. Run a task
 manus-use "Write a Python script that fetches the current Bitcoin price"
 
-# Interactive REPL
+# Or start the interactive REPL
 manus-use
 ```
 
@@ -81,12 +78,10 @@ manus-use
 
 ## CLI Reference
 
-ManusUse ships a single `manus-use` entry point with several subcommands.
-
 ### `manus-use [task]` — Run a task
 
 ```bash
-# Single-shot task (prints result, then exits)
+# Single-shot (prints result, then exits)
 manus-use "Create a factorial function in Python"
 
 # Use a specific agent type
@@ -95,40 +90,37 @@ manus-use --agent browser "Find the top 5 trending GitHub repos today"
 # Force multi-agent orchestration
 manus-use --mode multi "Research quantum computing and create a presentation"
 
-# Save output to a file
-manus-use --output result.txt "Summarise the latest AI news"
-
-# JSON output for piping into other tools
+# JSON output for piping
 manus-use --format json "List the first 10 prime numbers" | jq .result
 
 # Stream output tokens in real time
 manus-use --stream "Write a short story about a robot"
 
-# Interactive REPL (omit the task argument)
+# Interactive REPL
 manus-use
 manus-use --mode multi
 ```
 
-**Options:**
-
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--mode {auto,single,multi}` | `auto` | Execution mode; `auto` detects task complexity |
-| `--agent {manus,browser,data,mcp}` | `manus` | Agent type for single-agent execution |
+| `--agent {manus,browser,data,mcp}` | `manus` | Agent type for single-agent mode |
 | `--show-plan` | off | Print the multi-agent plan before running |
 | `--output FILE` | — | Write result to FILE (single-shot only) |
-| `--format {text,json}` | `text` | Output format; `json` is scriptable |
-| `--stream` | off | Stream output tokens in real time (single-shot only) |
+| `--format {text,json}` | `text` | Output format |
+| `--stream` | off | Stream output tokens in real time |
 | `--no-history` | off | Skip recording this run in the history log |
-| `--config FILE` | — | Override default config file search path |
+| `--config FILE` | — | Override config file path |
 | `--version` | — | Print version and exit |
+
+---
 
 ### `manus-use init` — Configure credentials
 
 ```bash
-manus-use init                       # write to ~/.manus-use/config.toml
-manus-use init --output ./my.toml   # write to a custom location
-manus-use init --force               # overwrite without prompting
+manus-use init                        # write to ~/.manus-use/config.toml
+manus-use init --output ./my.toml    # write to a custom path
+manus-use init --force                # overwrite without prompting
 ```
 
 ### `manus-use doctor` — Diagnose your environment
@@ -138,25 +130,32 @@ manus-use doctor
 manus-use doctor --config ./custom.toml
 ```
 
-Checks Python packages, config file validity, and whether API keys are accessible.
+Checks Python packages, config file validity, and API key accessibility.
+
+### `manus-use history` — Browse past runs
+
+```bash
+manus-use history                        # last 20 runs
+manus-use history --limit 50            # last 50 runs
+manus-use history --grep "bitcoin"      # filter by task text
+manus-use history --format json | jq .  # all history as JSON
+manus-use history --clear               # delete all history
+```
+
+History is stored at `~/.manus-use/history.jsonl`.
+
+---
 
 ### `manus-use analyze <CVE-ID>` — Vulnerability intelligence
 
 ```bash
-# Deep CVE analysis (NVD · CISA KEV · OTX · PoC search · CWE · threat feeds)
 manus-use analyze CVE-2025-6554
-
-# With Docker-based exploit verification
 manus-use analyze CVE-2024-3094 --verify
-
-# Machine-readable output
 manus-use analyze CVE-2025-6554 --output json
-
-# Generate a Lark document report
 manus-use analyze CVE-2025-6554 --output lark
 ```
 
-**Options:**
+Runs an 8-step intelligence pipeline — see [Security & Vulnerability Intelligence](#security--vulnerability-intelligence) for full details.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -164,327 +163,334 @@ manus-use analyze CVE-2025-6554 --output lark
 | `--output {text,json,lark}` | `text` | Report format |
 | `--config FILE` | — | Override config |
 
+---
+
 ### `manus-use remediate <CVE-ID>` — Remediation guidance
 
 ```bash
-# Generate actionable remediation steps for a CVE
 manus-use remediate CVE-2024-3094
-
-# Machine-readable output
 manus-use remediate CVE-2024-3094 --output json
 ```
-
-**Options:**
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--output {text,json}` | `text` | Report format |
 | `--config FILE` | — | Override config |
 
-### `manus-use epss-trend <CVE-ID>` — EPSS score history
-
-```bash
-# Show 30-day EPSS score history and detect exploitation spikes
-manus-use epss-trend CVE-2024-3094
-
-# Show 90 days of history
-manus-use epss-trend CVE-2024-3094 --days 90
-
-# Machine-readable output
-manus-use epss-trend CVE-2024-3094 --output json | jq .analysis.spike_detected
-```
-
-Fetches daily EPSS (Exploit Prediction Scoring System) scores from the
-[FIRST.org API](https://www.first.org/epss/) and detects significant jumps.
-A spike of ≥ 0.10 in a 7-day window indicates the vulnerability has recently
-been weaponised or picked up by active threat actors.
-
-**Options:**
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--days N` | `30` | Days of EPSS history to retrieve (max 365) |
-| `--output {text,json}` | `text` | Output format; `json` includes the full time-series |
-
-### `manus-use patch-diff <CVE-ID>` — Patch diff summariser
-
-```bash
-# Fetch the fixing commit(s) for a CVE and summarise what changed
-manus-use patch-diff CVE-2024-3094
-
-# Machine-readable output
-manus-use patch-diff CVE-2024-3094 --output json | jq .commit_summaries
-```
-
-Finds the GitHub fixing commit(s) for a CVE (via the
-[GitHub Security Advisory database](https://github.com/advisories) and NVD
-reference links), fetches the raw unified diff, and produces a structured
-summary:
-- **Files and functions changed** — where in the codebase the fix landed
-- **Bug class** — detected from diff keywords (e.g. `auth_bypass`, `sql_injection`,
-  `buffer_overflow`, `use_after_free`, `input_validation`, …)
-- **Reproduction condition hints** — added guard/validation lines that reveal the
-  minimal condition required to trigger the vulnerability
-- **Commit URL** — direct link to the fixing commit on GitHub
-
-Useful for understanding *how* a vulnerability was introduced and fixed without
-having to read the raw diff yourself. Composable with `analyze` and `epss-trend`.
-
-**Options:**
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--output {text,json}` | `text` | Output format; `json` includes the full commit summary |
-
-### `manus-use variants <CVE-ID>` — Variant analysis
-
-```bash
-# Find similar bugs in related codebases
-manus-use variants CVE-2024-3094
-
-# Machine-readable output
-manus-use variants CVE-2024-3094 --output json
-```
-
-**Options:**
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--output {text,json}` | `text` | Report format |
-
-### `manus-use compare <CVE-A> <CVE-B>` — Side-by-side CVE comparison
-
-```bash
-# Compare two CVEs and get a prioritisation recommendation
-manus-use compare CVE-2024-3094 CVE-2021-44228
-
-# Machine-readable output
-manus-use compare CVE-2024-3094 CVE-2021-44228 --output json | jq .higher_priority
-```
-
-Fetches NVD, EPSS, and CISA KEV data for both CVEs in parallel and produces a
-structured side-by-side comparison across:
-
-- **CVSS score and severity** (v3.1 preferred, falls back to v3.0 then v2)
-- **EPSS exploitation probability** (current score and percentile)
-- **CISA KEV membership** (confirmed active exploitation)
-- **CWE weakness class**
-- **Attack vector, privileges required, user interaction** (exploitability factors)
-- **Affected vendor / product**
-
-Each CVE is assigned a composite priority score using a weighted rubric (KEV
-membership: +10, Critical CVSS: +8, high EPSS: +8, network attack vector: +3,
-etc.) and the output includes a plain-English recommendation with confidence
-level: *strong*, *moderate*, or *weak*.
-
-Useful for triage: quickly answer "should I patch A or B first?" without manually
-cross-referencing three data sources.
-
-**Options:**
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--output {text,json}` | `text` | Output format; `json` includes the full comparison |
-
-### `manus-use exploit-complexity <CVE-ID>` — Exploit complexity scorer
-
-```bash
-# Score how hard it is for an attacker to exploit a CVE (1=trivial, 5=very hard)
-manus-use exploit-complexity CVE-2024-3094
-
-# Machine-readable output
-manus-use exploit-complexity CVE-2024-3094 --output json | jq .complexity_score
-```
-
-Analyses the CVE's NVD CVSS vector and, when available, the PoC source code from
-the [Trickest CVE index](https://github.com/trickest/cve) to score the practical
-effort required to exploit the vulnerability across five dimensions:
-
-| Dimension | What it measures |
-|-----------|------------------|
-| Lines of code | How much exploit code an attacker needs to write / adapt |
-| Authentication required | Credentials, tokens, or privilege level needed |
-| Network hops | How many services the exploit must reach |
-| OS/platform dependencies | Platform-specific syscalls, kernel structs, gadgets |
-| Exploit chain length | Number of discrete attack stages |
-
-Each dimension is scored 1–5 (1 = easy for the attacker). The weighted overall
-`complexity_score` (1–5) is accompanied by a human-readable label
-(*trivial / low / moderate / high / very_high*) and an `attacker_friendly`
-boolean (True when score ≤ 2.5).
-
-Use this alongside `epss-trend` and `compare` to answer: *"this CVE is CVSS 9.8
-— but is it actually easy to exploit right now?"*
-
-**Options:**
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--output {text,json}` | `text` | Output format; `json` includes per-dimension scores and metadata |
+---
 
 ### `manus-use discover` — CVE discovery
 
 ```bash
-# Discover recent high-EPSS CVEs and submit them for tracking
 manus-use discover
-
-# Narrow the date window and raise the EPSS threshold
 manus-use discover --since 2025-06-01 --min-epss 0.7
-
-# Preview without submitting
 manus-use discover --dry-run
-
-# JSON output
 manus-use discover --output json
 ```
-
-**Options:**
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--since YYYY-MM-DD` | 4 weeks ago | Start date for the discovery window |
-| `--min-epss SCORE` | `0.5` | Minimum EPSS score threshold (0.0–1.0) |
+| `--min-epss SCORE` | `0.5` | Minimum EPSS score (0.0–1.0) |
 | `--output {text,json}` | `text` | Report format |
 | `--dry-run` | off | Discover CVEs but do not submit them |
 | `--config FILE` | — | Override config |
 
+---
+
+### `manus-use epss-trend <CVE-ID>` — EPSS score history
+
+```bash
+manus-use epss-trend CVE-2024-3094
+manus-use epss-trend CVE-2024-3094 --days 90
+manus-use epss-trend CVE-2024-3094 --output json | jq .analysis.spike_detected
+```
+
+Fetches daily EPSS scores from the [FIRST.org API](https://www.first.org/epss/) and detects exploitation spikes (≥ 0.10 jump in a 7-day window).
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--days N` | `30` | Days of history (max 365) |
+| `--output {text,json}` | `text` | Output format |
+
+---
+
+### `manus-use patch-diff <CVE-ID>` — Patch diff summariser
+
+```bash
+manus-use patch-diff CVE-2024-3094
+manus-use patch-diff CVE-2024-3094 --output json | jq .commit_summaries
+```
+
+Finds the fixing commit(s) via GHSA + NVD, fetches the raw unified diff, and produces a structured summary: files/functions changed, bug class (14 categories), reproduction condition hints, and commit URL.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Output format |
+
+---
+
+### `manus-use variants <CVE-ID>` — Variant analysis
+
+```bash
+manus-use variants CVE-2024-3094
+manus-use variants CVE-2024-3094 --output json
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Report format |
+
+---
+
+### `manus-use compare <CVE-A> <CVE-B>` — Side-by-side comparison
+
+```bash
+manus-use compare CVE-2024-3094 CVE-2021-44228
+manus-use compare CVE-2024-3094 CVE-2021-44228 --output json | jq .higher_priority
+```
+
+Fetches NVD, EPSS, and CISA KEV data for both CVEs in parallel and produces a side-by-side comparison across CVSS, EPSS, KEV membership, CWE, and exploitability factors. Outputs a prioritisation recommendation with confidence level (*strong / moderate / weak*).
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Output format |
+
+---
+
+### `manus-use exploit-complexity <CVE-ID>` — Exploit complexity scorer
+
+```bash
+manus-use exploit-complexity CVE-2024-3094
+manus-use exploit-complexity CVE-2024-3094 --output json | jq .attacker_friendly
+```
+
+Scores practical attacker effort on a 1–5 scale across five dimensions:
+
+| Dimension | What it measures |
+|-----------|------------------|
+| Lines of code | How much exploit code must be written/adapted |
+| Authentication | Credentials or privilege level required |
+| Network hops | How many services the exploit must reach |
+| OS/platform deps | Platform-specific syscalls, structs, gadgets |
+| Exploit chain length | Number of discrete attack stages |
+
+Outputs a `complexity_score` (1–5), a label (*trivial / low / moderate / high / very_high*), and an `attacker_friendly` boolean (true when score ≤ 2.5).
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Output format |
+
+---
+
 ### `manus-use poc-search <CVE-ID>` — Multi-source PoC aggregator
 
 ```bash
-# Search all sources for PoC exploits for a CVE
 manus-use poc-search CVE-2024-3094
-
-# Filter to specific sources
 manus-use poc-search CVE-2024-3094 --sources trickest,exploitdb,github
-
-# Machine-readable output
 manus-use poc-search CVE-2024-3094 --output json | jq .exploited_in_wild
 ```
 
-Queries five public PoC sources **in parallel** and returns a unified,
-deduplicated result set sorted by exploited-in-wild status and publication date:
+Queries five PoC sources **in parallel**, deduplicates results, and sorts by exploited-in-wild status and publication date:
 
 | Source | What it provides |
-|---|---|
+|--------|-----------------|
 | `trickest` | [trickest/cve](https://github.com/trickest/cve) — 250k+ CVE PoC index |
 | `vulncheck_kev` | [VulnCheck KEV](https://vulncheck.com) — exploited-in-wild signal from 100+ intel sources (requires `VULNCHECK_API_KEY`) |
 | `exploitdb` | [Exploit-DB](https://www.exploit-db.com) CSV — cached 24 h |
 | `github` | GitHub repo search for repositories mentioning the CVE |
 | `nvd` | NVD references filtered for GitHub / Exploit-DB / PacketStorm URLs |
 
-When `VULNCHECK_API_KEY` is absent the `vulncheck_kev` source is skipped
-gracefully; all other sources are unaffected.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--sources LIST` | all | Comma-separated subset: `trickest,vulncheck_kev,exploitdb,github,nvd` |
+| `--output {text,json}` | `text` | Output format |
 
-**⚠️ EXPLOITED IN WILD banner** — printed at the top when VulnCheck KEV
-confirms the CVE is actively exploited in the wild.
+---
+
+### `manus-use blast-radius <SPEC>` — Dependency blast radius
+
+```bash
+manus-use blast-radius requests@2.28.0
+manus-use blast-radius pypi:urllib3@1.26.5
+manus-use blast-radius npm:lodash@4.17.20
+manus-use blast-radius CVE-2021-44228
+manus-use blast-radius CVE-2021-44228 --output json | jq .summary
+```
+
+Estimates how broadly a vulnerability propagates downstream. Resolves affected packages from NVD CPE + OSV.dev + GHSA, then enriches each with real download/dependent stats:
+
+| Metric | Source |
+|--------|--------|
+| npm dependent packages | npm registry search API |
+| npm weekly/monthly downloads | npm downloads API |
+| PyPI downloads | PyPI JSON API + pypistats.org |
+| Maven artifact metadata | Maven Central Solr search |
+
+Blast-radius labels per package:
+
+| Label | Threshold |
+|-------|-----------|
+| **CRITICAL** | ≥ 5 M weekly downloads or ≥ 50 K npm dependents |
+| **HIGH** | ≥ 500 K downloads or ≥ 5 K dependents |
+| **MEDIUM** | ≥ 50 K downloads or ≥ 500 dependents |
+| **LOW** | any measurable signal |
+| **UNKNOWN** | no data available |
 
 | Flag | Default | Description |
-|---|---|---|
+|------|---------|-------------|
+| `--max-packages N` | `10` | Max affected packages to enrich |
 | `--output {text,json}` | `text` | Output format |
-| `--sources LIST` | all | Comma-separated subset: `trickest,vulncheck_kev,exploitdb,github,nvd` |
+
+---
+
+### `manus-use silent-patches <owner/repo>` — Silent patch detector
+
+```bash
+manus-use silent-patches torvalds/linux
+manus-use silent-patches torvalds/linux --since 2025-01-01
+manus-use silent-patches torvalds/linux --output json | jq .[].classification
+```
+
+Scans a repository's commit history for security fixes that were never assigned a CVE. Uses two-stage heuristic scoring: commit message keywords then diff keywords. Each candidate commit is labelled with one of 14 bug classes (e.g. `auth_bypass`, `buffer_overflow`, `use_after_free`).
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--since YYYY-MM-DD` | 90 days ago | Start date for commit scan |
+| `--until YYYY-MM-DD` | today | End date |
+| `--max-commits N` | `500` | Hard limit on commits fetched |
+| `--fast` | off | Skip diff scoring (message keywords only) |
+| `--output {text,json}` | `text` | Output format |
+
+---
+
+### `manus-use cve-timeline <CVE-ID>` — CVE timeline
+
+```bash
+manus-use cve-timeline CVE-2021-44228
+manus-use cve-timeline CVE-2021-44228 --output json
+```
+
+Reconstructs the full event timeline for a CVE: NVD publish date → EPSS history → CISA KEV add date → patch release date. Useful for understanding how quickly a vulnerability was weaponised and fixed.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Output format |
+
+---
+
+### `manus-use version-range <CVE-ID>` — Affected version ranges
+
+```bash
+manus-use version-range CVE-2021-44228
+manus-use version-range CVE-2021-44228 --ecosystem pypi
+manus-use version-range CVE-2021-44228 --output json | jq .first_patched_version
+```
+
+Walks NVD CPE configurations and cross-references PyPI / npm / Maven to produce structured vulnerable semver ranges, a list of affected releases, and the first patched release.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--ecosystem {auto,pypi,npm,maven}` | `auto` | Force a specific ecosystem |
+| `--output {text,json}` | `text` | Output format |
+
+---
+
+### `manus-use vendor-response <CVE-ID>` — Vendor response tracker
+
+```bash
+manus-use vendor-response CVE-2024-3094
+manus-use vendor-response CVE-2024-3094 --output json | jq .classification
+```
+
+Queries four sources (NVD reference URL patterns, GHSA published state + patched_versions, CISA KEV required-action + due-date, repo-level GitHub security advisories) and outputs a 6-state patch-status classification:
+
+`patch_available` · `patch_backported` · `wont_fix` · `investigating` · `no_patch` · `unknown`
+
+Confidence is rated `high / moderate / low`. A VulnCheck KEV hit upgrades confidence when `VULNCHECK_API_KEY` is set.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Output format |
+
+---
+
+### `manus-use poc-freshness <CVE-ID>` — PoC freshness checker
+
+```bash
+manus-use poc-freshness CVE-2024-3094
+manus-use poc-freshness CVE-2024-3094 --output json | jq .freshness_score
+```
+
+Measures how recently PoC activity occurred: last commit recency in known PoC repos, recently-starred repositories, new Exploit-DB entries. A high freshness score means attacker interest is ongoing.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Output format |
+
+---
+
+### `manus-use sbom-scan <bom-file>` — SBOM scanner
+
+```bash
+manus-use sbom-scan bom.json
+manus-use sbom-scan sbom.spdx.json --output json | jq .critical_count
+```
+
+Parses CycloneDX or SPDX SBOMs, queries OSV.dev in batch for all components, enriches each finding with EPSS and CISA KEV status, and ranks results by KEV membership then EPSS score.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Output format |
+
+---
+
+### `manus-use temporal-priority <CVE-ID>` — Temporal priority scorer
+
+```bash
+manus-use temporal-priority CVE-2024-3094
+manus-use temporal-priority CVE-2024-3094 --output json | jq .score
+```
+
+Produces a 0–100 urgency score combining CVSS base score, current EPSS, EPSS spike recency, CISA KEV membership, patch availability, and CVE age. Designed to answer: *"given everything I know today, how urgent is this?"*
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Output format |
+
+---
+
+### `manus-use cluster-variants <CVE-ID>` — CVE variant clustering
+
+```bash
+manus-use cluster-variants CVE-2021-44228
+manus-use cluster-variants CVE-2021-44228 --output json | jq .clusters
+```
+
+Groups CVEs related to the input across three cluster dimensions: same component/vendor, same CWE weakness class, and same researcher/disclosure domain. Useful for finding the full attack surface when one CVE is confirmed exploited.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Output format |
 
 ---
 
 ### `manus-use changelog` — Manage project changelog
 
 ```bash
-# Show the full CHANGELOG.md
-manus-use changelog view
-
-# Add an [Unreleased] entry from conventional commits since last tag
-manus-use changelog update
-
-# Cut a release (promotes [Unreleased] → [1.2.0] and tags git)
-manus-use changelog release 1.2.0
-
-# Preview without writing
-manus-use changelog release 1.2.0 --dry-run
+manus-use changelog                       # show full CHANGELOG.md
+manus-use changelog --version 0.1.0      # show section for a specific version
+manus-use changelog --generate           # preview next release notes from commits
+manus-use changelog --generate --output json
 ```
 
-Uses [Conventional Commits](https://www.conventionalcommits.org/) — commit
-messages prefixed `feat:`, `fix:`, `docs:`, etc. are grouped automatically
-into `Added`, `Fixed`, and `Changed` sections.
-
----
-
-### 🔜 Coming soon
-
-These tools are implemented as Strands tools and wired into the VI agent;
-CLI subcommands are tracked in open PRs and will merge shortly.
-
-| Subcommand | PR | Description |
-|---|---|---|
-| `manus-use silent-patches <owner/repo>` | [#51](https://github.com/manus-use/manus-agent/pull/51) | Detect security commits with no CVE reference — two-stage heuristic scoring on commit messages + diff keywords |
-| `manus-use cve-timeline <CVE-ID>` | [#53](https://github.com/manus-use/manus-agent/pull/53) | Full timeline view: publish date → EPSS movement → KEV add date → patch date |
-| `manus-use version-range <CVE-ID>` | [#54](https://github.com/manus-use/manus-agent/pull/54) | NVD CPE → PyPI/npm/Maven cross-reference; structured vulnerable semver ranges + first patched release |
-| `manus-use vendor-response <CVE-ID>` | [#58](https://github.com/manus-use/manus-agent/pull/58) | 6-state patch-status classifier: `patch_available` / `patch_backported` / `wont_fix` / `investigating` / `no_patch` / `unknown` |
-| `manus-use poc-freshness <CVE-ID>` | [#60](https://github.com/manus-use/manus-agent/pull/60) | PoC freshness check — last-commit recency, recently-starred repos, new exploit-db entries |
-| `manus-use blast-radius <CVE-or-pkg>` | [#63](https://github.com/manus-use/manus-agent/pull/63) | Downstream exposure estimator — resolves affected packages (NVD CPE + OSV + GHSA) and enriches each with npm/PyPI/Maven download counts |
-| `manus-use sbom-scan <bom.json>` | [#64](https://github.com/manus-use/manus-agent/pull/64) | CycloneDX/SPDX SBOM scanner — OSV.dev batch query, EPSS enrichment, CISA KEV flagging; ranks by KEV then EPSS |
-| `manus-use temporal-priority <CVE-ID>` | [#65](https://github.com/manus-use/manus-agent/pull/65) | Time-aware urgency scorer (0–100) combining CVSS, EPSS, EPSS spike recency, KEV, patch availability, and CVE age |
-| `manus-use cluster-variants <CVE-ID>` | [#67](https://github.com/manus-use/manus-agent/pull/67) | CVE variant cluster analysis — groups related CVEs by same component, same CWE, and same researcher/disclosure domain |
-
-
-### `manus-use blast-radius <SPEC>` — Dependency blast radius
-
-```bash
-# Estimate exposure for a specific package version
-manus-use blast-radius requests@2.28.0
-
-# Qualify the ecosystem explicitly
-manus-use blast-radius pypi:urllib3@1.26.5
-manus-use blast-radius npm:lodash@4.17.20
-manus-use blast-radius maven:log4j-core@2.14.1
-
-# Start from a CVE — auto-discovers all affected packages
-manus-use blast-radius CVE-2021-44228
-
-# Machine-readable output
-manus-use blast-radius CVE-2021-44228 --output json | jq .summary
-manus-use blast-radius CVE-2021-44228 --output json | jq '.packages[0].blast_radius'
-```
-
-For a given package or CVE, this command estimates how broadly a vulnerability
-can propagate by measuring downstream exposure:
-
-| Metric | Source |
-|---|---|
-| npm dependent packages | npm search API (no key required) |
-| npm weekly / monthly downloads | npm downloads API |
-| PyPI package metadata + downloads | PyPI JSON API + pypistats.org |
-| Maven artifact metadata | Maven Central Solr search |
-| Affected packages / version ranges | NVD + OSV.dev + GitHub Advisory DB |
-
-Blast-radius labels:
-
-| Label | Weekly downloads or npm dependents |
-|---|---|
-| **CRITICAL** | ≥ 5 M downloads or ≥ 50 K dependents |
-| **HIGH** | ≥ 500 K downloads or ≥ 5 K dependents |
-| **MEDIUM** | ≥ 50 K downloads or ≥ 500 dependents |
-| **LOW** | any measurable signal |
-| **UNKNOWN** | no data available |
-
-Composable with `epss-trend`, `exploit-complexity`, and `analyze` to answer:
-*"CVSS 9.8 + EPSS spike + CRITICAL blast radius = patch immediately."*
+Parses [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, etc.) and groups them into `Added`, `Fixed`, and `Changed` sections.
 
 | Flag | Default | Description |
-|---|---|---|
-| `--max-packages N` | 10 | Max affected packages to enrich |
+|------|---------|-------------|
+| `--version X.Y.Z` | — | Filter output to a specific release section |
+| `--generate` | off | Preview next release notes from commits since last tag |
 | `--output {text,json}` | `text` | Output format |
-
-
-### `manus-use history` — Browse past runs
-
-```bash
-manus-use history                        # last 20 runs
-manus-use history --limit 50             # last 50 runs
-manus-use history --grep "bitcoin"       # filter by task text
-manus-use history --format json | jq .   # all history as JSON
-manus-use history --clear                # delete all history
-```
-
-History is stored at `~/.manus-use/history.jsonl`.
 
 ---
 
@@ -509,9 +515,9 @@ enabled = ["file_ops", "code_execute", "web_search"]
 context_manager = "agentic"
 ```
 
-See [config/config.example.toml](config/config.example.toml) for all available options.
+See [config/config.example.toml](config/config.example.toml) for all options.
 
-### Provider-specific examples
+### Provider examples
 
 **AWS Bedrock:**
 ```toml
@@ -526,7 +532,7 @@ model = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 [llm]
 provider = "openai"
 model = "gpt-4o"
-api_key = "sk-..."    # or set OPENAI_API_KEY env var
+api_key = "***"    # or OPENAI_API_KEY env var
 ```
 
 **Anthropic:**
@@ -534,7 +540,7 @@ api_key = "sk-..."    # or set OPENAI_API_KEY env var
 [llm]
 provider = "anthropic"
 model = "claude-3-5-sonnet-20241022"
-api_key = "sk-ant-..."    # or set ANTHROPIC_API_KEY env var
+api_key = "***"    # or ANTHROPIC_API_KEY env var
 ```
 
 **Ollama (local):**
@@ -549,248 +555,141 @@ base_url = "http://localhost:11434"
 
 ## Python API
 
-### Basic usage
-
 ```python
+# General-purpose agent
 from manus_use import ManusAgent
-
 agent = ManusAgent()
-
 result = agent("Write a Python script that fetches weather data and saves it to CSV")
-print(result)
-```
 
-### Browser automation
-
-```python
+# Browser automation
 from manus_use.agents import BrowserUseAgent
-
 agent = BrowserUseAgent()
 result = agent("Go to GitHub and find the top 5 trending Python repositories today")
-print(result)
-```
 
-### Data analysis
-
-```python
+# Data analysis
 from manus_use.agents import DataAnalysisAgent
-
 agent = DataAnalysisAgent()
 result = agent("Load sales.csv, compute monthly revenue, and plot a bar chart")
-print(result)
-```
 
-### Multi-agent orchestration
-
-```python
+# Multi-agent orchestration
 from manus_use.multi_agents import WorkflowAgent
-
 workflow = WorkflowAgent()
 result = workflow.handle_request("""
     1. Search the web for recent AI research papers
-    2. Analyse the trends and create visualizations
-    3. Generate a comprehensive report with insights
+    2. Analyse the trends and create visualisations
+    3. Generate a comprehensive report
 """)
-print(result)
-```
 
-### Vulnerability intelligence
-
-```python
+# Vulnerability intelligence
 from manus_use.agents import VulnerabilityIntelligenceAgent
 from manus_use.config import Config
-
-config = Config.from_file()
-agent = VulnerabilityIntelligenceAgent(config=config)
-
-result = agent.handle_request("Analyse CVE-2025-6554 and create a comprehensive report")
-print(result)
-```
-
-### Remediation guidance
-
-```python
-from manus_use.agents import RemediationAgent
-from manus_use.config import Config
-
-config = Config.from_file()
-agent = RemediationAgent(config=config)
-
-result = agent.handle_request("Generate remediation steps for CVE-2024-3094")
-print(result)
-```
-
-### Variant analysis
-
-```python
-from manus_use.agents import VariantAnalysisAgent
-from manus_use.config import Config
-
-config = Config.from_file()
-agent = VariantAnalysisAgent(config=config)
-
-result = agent.handle_request("Find variants of CVE-2024-3094 in related codebases")
-print(result)
-```
-
-### Custom configuration
-
-```python
-from manus_use import ManusAgent
-from manus_use.config import Config
-
-config = Config.from_file("path/to/config.toml")
-agent = ManusAgent(config=config)
-
-result = agent("Create a factorial function")
-print(result)
+agent = VulnerabilityIntelligenceAgent(config=Config.from_file())
+result = agent.handle_request("Analyse CVE-2025-6554")
 ```
 
 ---
 
 ## Security & Vulnerability Intelligence
 
-ManusUse includes a multi-source vulnerability intelligence pipeline accessible via the CLI or Python API.
-
-### How it works
+### Pipeline
 
 The `manus-use analyze` command runs an 8-step pipeline:
 
-1. **NVD + GitHub Advisory** — official CVE metadata, CVSS, CWE
-2. **CISA KEV** — known-exploited-vulnerabilities catalogue; **VulnCheck KEV** when `VULNCHECK_API_KEY` is set (100+ intel sources, ransomware association flag)
+1. **NVD + GHSA** — official CVE metadata, CVSS, CWE
+2. **CISA KEV** — known-exploited-vulnerabilities catalogue; **VulnCheck KEV** when `VULNCHECK_API_KEY` is set (100+ intel sources, ransomware flag)
 3. **AlienVault OTX** — threat intelligence pulses and IoCs
-4. **PoC discovery** — PoC Week trending digest, Trickest/CVE index, Exploit-DB, PacketStorm, GitHub
+4. **PoC discovery** — Trickest/CVE index, Exploit-DB, PacketStorm, GitHub, VulnCheck KEV (with API key)
 5. **URL verification** — every candidate URL is fetched and validated
-6. **Static analysis** — code-level analysis of confirmed PoCs (network calls, payload patterns); patch diff summariser; exploit complexity scoring; version range resolution
+6. **Deep analysis** — patch diff summary · exploit complexity score · version range resolution · vendor response status · PoC freshness
 7. **CWE correlation** — weakness classification and remediation hints
-8. **Report generation** — structured text, JSON, or Lark document output
+8. **Report generation** — structured text, JSON, or Lark document
 
-### Examples
+### Quick reference
 
 ```bash
-# Analyse a CVE and print a structured text report
+# Full intelligence report
 manus-use analyze CVE-2024-3094
 
-# Get JSON output and extract the CVSS score
-manus-use analyze CVE-2024-3094 --output json | jq .cvss_score
-
-# Verify exploitability in a Docker sandbox, then write a Lark report
-manus-use analyze CVE-2025-6554 --verify --output lark
-
-# Check 30-day EPSS trend and detect exploitation spikes
+# How exploitable is it right now?
+manus-use exploit-complexity CVE-2024-3094
 manus-use epss-trend CVE-2024-3094
 
-# Check 90-day EPSS history in JSON
-manus-use epss-trend CVE-2025-6554 --days 90 --output json
-
-# Summarise the fixing commit (files changed, bug class, reproduction hints)
+# What changed in the fix?
 manus-use patch-diff CVE-2024-3094
-manus-use patch-diff CVE-2024-3094 --output json | jq .commit_summaries
 
-# Generate remediation steps
-manus-use remediate CVE-2024-3094
+# Am I affected?
+manus-use version-range CVE-2024-3094
+manus-use sbom-scan bom.json
 
-# Compare two CVEs side-by-side for triage prioritisation
+# Triage two CVEs
 manus-use compare CVE-2024-3094 CVE-2021-44228
-manus-use compare CVE-2024-3094 CVE-2021-44228 --output json | jq .higher_priority
+manus-use temporal-priority CVE-2024-3094
 
-# Score how hard it is for an attacker to exploit a CVE (1=trivial, 5=very hard)
-manus-use exploit-complexity CVE-2024-3094
-manus-use exploit-complexity CVE-2024-3094 --output json | jq .attacker_friendly
-
-# Find PoC exploits across five public sources in parallel
-manus-use poc-search CVE-2024-3094
-manus-use poc-search CVE-2024-3094 --output json | jq .exploited_in_wild
-
-# Estimate how many downstream packages are exposed to a CVE
+# Find related exposure
 manus-use blast-radius CVE-2021-44228
-manus-use blast-radius requests@2.28.0
-manus-use blast-radius CVE-2021-44228 --output json | jq .summary
-
-# Discover new high-EPSS CVEs from the last 2 weeks
-manus-use discover --since 2025-06-12 --min-epss 0.6
-
-# Manage the project changelog
-manus-use changelog view
-manus-use changelog release 1.2.0
+manus-use cluster-variants CVE-2021-44228
+manus-use silent-patches apache/log4j
 ```
 
 ### VulnCheck enrichment (optional)
 
-Set `VULNCHECK_API_KEY` to unlock two additional data sources inside the VI pipeline:
+Set `VULNCHECK_API_KEY` to unlock two additional intel sources:
 
 | Index | What it adds |
-|---|---|
-| `vulncheck-kev` | Exploitation status aggregated from 100+ intel sources (FBI Flash, CERT advisories, etc.); prints 🚨 **ACTIVELY EXPLOITED** banner when confirmed |
-| `nist-nvd2` | Enriched CPE matching with additional CVSS metadata and version range data |
+|-------|--------------|
+| `vulncheck-kev` | Exploitation status from 100+ sources (FBI Flash, CERT advisories, …); prints 🚨 **ACTIVELY EXPLOITED** banner when confirmed; ⚠️ **RANSOMWARE ASSOCIATED** when applicable |
+| `nist-nvd2` | Enriched CPE matching with additional CVSS metadata and version ranges |
 
-All other functionality works without the key.
-
-> **Important:** These tools are designed for defensive security purposes only. Use them for legitimate security research, vulnerability management, and defence.
+> **Note:** These tools are for defensive security purposes only.
 
 ---
 
 ## Key Features
 
-### 🤖 Agent types
+### Agent types
 
 | Agent | Class | Best for |
 |-------|-------|----------|
 | General | `ManusAgent` | File ops, code execution, reasoning |
-| Browser automation | `BrowserUseAgent` | JS-heavy sites, form filling, scraping |
-| Lightweight browser | `BrowserAgent` | Static pages, simple navigation |
+| Browser (full JS) | `BrowserUseAgent` | JS-heavy sites, form filling, scraping |
+| Browser (lightweight) | `BrowserAgent` | Static pages, simple navigation |
 | Data analysis | `DataAnalysisAgent` | CSV/JSON processing, charts |
 | MCP | `MCPAgent` | Model Context Protocol tool servers |
 | Multi-agent | `WorkflowAgent` | Complex tasks needing multiple specialists |
 | Vulnerability intel | `VulnerabilityIntelligenceAgent` | CVE analysis, threat intelligence |
-| Remediation | `RemediationAgent` | Actionable fix guidance for CVEs |
+| Remediation | `RemediationAgent` | Actionable fix guidance |
 | Variant analysis | `VariantAnalysisAgent` | Finding similar bugs in related codebases |
 | CVE discovery | `VulnerabilityDiscoveryAgent` | High-EPSS CVE triage and tracking |
 
-### 🛠️ Built-in tools
+### LLM providers
 
-- File operations (read, write, edit, delete)
-- Code execution in Docker sandboxes
-- Web search (DuckDuckGo, configurable)
-- Browser automation (click, type, extract, screenshot)
-- Data visualization (charts, plots, reports)
-- Security tools (NVD, CISA KEV, OTX, Exploit-DB, Trickest, PoC Week, VulnCheck KEV)
-- Vulnerability intelligence: EPSS trend, patch diff, exploit complexity, PoC aggregation, CVE comparison
-- HTTP requests with content extraction
-- Python REPL with persistent state
-
-### 🔌 LLM providers
-
-- **AWS Bedrock** (Claude, Titan, …)
-- **OpenAI** (GPT-4o, GPT-4-turbo, …)
-- **Anthropic** (Claude 3.5 Sonnet, Opus, …)
-- **Ollama** (Llama, Mistral, … running locally)
+- **AWS Bedrock** — Claude, Titan, …
+- **OpenAI** — GPT-4o, GPT-4-turbo, …
+- **Anthropic** — Claude 3.5 Sonnet, Opus, …
+- **Ollama** — Llama, Mistral, … (local)
 
 ---
 
 ## Development
 
-### Set up a development environment
-
 ```bash
 git clone https://github.com/manus-use/manus-agent.git
-cd manus-use
+cd manus-agent
 pip install -e ".[dev,browser,search,visualization]"
 ```
 
 ### Run tests
 
 ```bash
-# All non-integration tests
 pytest tests/ -v
-
-# With coverage
 pytest tests/ --cov=manus_use --cov-report=html
 
-# Or via hatch
+# Via hatch
 hatch run test
 hatch run test-cov
 ```
+
+900+ tests, all HTTP calls mocked.
 
 ### Lint and format
 
@@ -798,7 +697,7 @@ hatch run test-cov
 ruff check src/ tests/
 ruff format src/ tests/
 
-# Or via hatch
+# Via hatch
 hatch run lint
 hatch run format
 ```
@@ -806,51 +705,38 @@ hatch run format
 ### Project layout
 
 ```
-manus-use/
+manus-agent/
 ├── src/manus_use/
 │   ├── agents/          # Agent implementations
-│   │   ├── base.py      # BaseManusAgent (all agents inherit from this)
-│   │   ├── manus.py     # ManusAgent (general purpose)
-│   │   ├── browser.py   # BrowserAgent (lightweight)
-│   │   ├── browser_use_agent.py  # BrowserUseAgent (full JS automation)
-│   │   ├── data_analysis.py      # DataAnalysisAgent
-│   │   ├── mcp.py       # MCPAgent
-│   │   ├── vi_agent.py  # VulnerabilityIntelligenceAgent
-│   │   ├── remediation_agent.py  # RemediationAgent
-│   │   ├── variant_agent.py      # VariantAnalysisAgent
-│   │   └── vulnerability_discovery_agent.py  # VulnerabilityDiscoveryAgent
-│   ├── multi_agents/    # Multi-agent orchestration
+│   │   ├── base.py
+│   │   ├── manus.py
+│   │   ├── browser.py / browser_use_agent.py
+│   │   ├── data_analysis.py
+│   │   ├── mcp.py
+│   │   ├── vi_agent.py          # VulnerabilityIntelligenceAgent
+│   │   ├── remediation_agent.py
+│   │   ├── variant_agent.py
+│   │   └── vulnerability_discovery_agent.py
+│   ├── multi_agents/
 │   │   └── workflow_agent.py
-│   ├── tools/           # Individual tool implementations
+│   ├── tools/           # Strands tool implementations (one file per tool)
 │   ├── cli.py           # manus-use CLI entry point
-│   ├── config.py        # Config model (TOML-backed)
+│   ├── config.py
 │   └── __init__.py
-├── tests/               # pytest test suite (375+ tests)
+├── tests/               # pytest test suite (900+ tests, all mocked)
 ├── config/
 │   └── config.example.toml
-├── examples/            # Runnable usage examples
+├── examples/
+├── CHANGELOG.md
 └── pyproject.toml
 ```
 
-### Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
----
-
-## Examples
-
-Explore the [examples/](examples/) directory for runnable scripts:
-
-- [`basic_usage.py`](examples/basic_usage.py) — simple ManusAgent task
-- [`browser_use_demo.py`](examples/browser_use_demo.py) — browser automation
-- [`multi_agent_flow.py`](examples/multi_agent_flow.py) — multi-agent orchestration
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ---
 
 ## Support
 
-- 📖 [Documentation](https://github.com/manus-use/manus-agent/wiki)
 - 🐛 [Issue Tracker](https://github.com/manus-use/manus-agent/issues)
 - 💬 [Discussions](https://github.com/manus-use/manus-agent/discussions)
 
@@ -858,16 +744,15 @@ Explore the [examples/](examples/) directory for runnable scripts:
 
 ## License
 
-This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE) for details.
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for a full release history.
+See [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
 ## Acknowledgments
 
-- Built with [Strands SDK](https://github.com/strands-agents/sdk-python) — a powerful Python SDK for building AI agents
-- Browser automation powered by [browser-use](https://github.com/browser-use/browser-use) — framework for AI-driven web automation
-- Inspired by Anthropic's computer use demonstrations
+- Built with [Strands SDK](https://github.com/strands-agents/sdk-python)
+- Browser automation powered by [browser-use](https://github.com/browser-use/browser-use)
