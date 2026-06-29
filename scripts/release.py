@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Release helper for manus-use.
+"""Release helper for manus-agent.
 
 Usage
 -----
@@ -429,7 +429,7 @@ def cmd_bump(args: argparse.Namespace) -> int:  # noqa: C901
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="python scripts/release.py",
-        description="manus-use release helper -- bump version, update CHANGELOG, tag.",
+        description="manus-agent release helper -- bump version, update CHANGELOG, tag.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
