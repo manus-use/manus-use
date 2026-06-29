@@ -1054,6 +1054,7 @@ _SUBCOMMANDS = {
     "compare",
     "exploit-complexity",
     "poc-search",
+    "changelog",
 }
 
 
@@ -1450,6 +1451,241 @@ def _run_poc_search(argv: list[str]) -> int:  # noqa: C901
     return 0
 
 
+# ---------------------------------------------------------------------------
+# changelog subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_changelog_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-use changelog",
+        description=(
+            "View CHANGELOG.md or generate release notes from recent git commits.\n"
+            "Without --generate, prints the CHANGELOG.md content (or the section\n"
+            "matching --version).  With --generate, parses conventional commits\n"
+            "since the last v* tag and previews the next release section."
+        ),
+        add_help=True,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  manus-use changelog                       # show full CHANGELOG.md\n"
+            "  manus-use changelog --version 0.1.0       # show section for v0.1.0\n"
+            "  manus-use changelog --generate            # preview next release notes\n"
+            "  manus-use changelog --generate --output json\n"
+        ),
+    )
+    p.add_argument(
+        "--version",
+        dest="filter_version",
+        metavar="X.Y.Z",
+        default=None,
+        help="Filter output to the section for this version (e.g. 0.1.0)",
+    )
+    p.add_argument(
+        "--generate",
+        action="store_true",
+        help="Generate release notes from recent conventional commits instead of reading CHANGELOG.md",
+    )
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return p
+
+
+def _run_changelog(argv: list[str]) -> int:  # noqa: C901
+    import json as _json
+    import re as _re
+    from pathlib import Path as _Path
+
+    parser = _build_changelog_parser()
+    args = parser.parse_args(argv)
+
+    root = _Path(__file__).resolve().parents[2]
+    changelog_path = root / "CHANGELOG.md"
+
+    # --generate: parse conventional commits and preview next release section
+    if args.generate:
+        return _run_changelog_generate(args, root)
+
+    # Default: read and display CHANGELOG.md
+    if not changelog_path.exists():
+        print(
+            "CHANGELOG.md not found. Run 'python scripts/release.py patch --dry-run' to generate one.",
+            file=sys.stderr,
+        )
+        return 1
+
+    content = changelog_path.read_text(encoding="utf-8")
+
+    if args.filter_version:
+        ver = args.filter_version.strip().lstrip("v")
+        # Extract the block for this version
+        pattern = _re.compile(
+            rf"(## \[{_re.escape(ver)}\].*?)(?=^## \[|\Z)",
+            _re.DOTALL | _re.MULTILINE,
+        )
+        m = pattern.search(content)
+        if not m:
+            print(f"Version {ver} not found in CHANGELOG.md.", file=sys.stderr)
+            return 1
+        section = m.group(1).strip()
+        if args.output == "json":
+            print(_json.dumps({"version": ver, "section": section}, indent=2))
+        else:
+            print(section)
+        return 0
+
+    if args.output == "json":
+        print(_json.dumps({"changelog": content}, indent=2))
+    else:
+        print(content)
+    return 0
+
+
+def _run_changelog_generate(args: argparse.Namespace, root: "_Path") -> int:  # type: ignore[name-defined]  # noqa: F821
+    """Generate release notes from recent conventional commits."""
+    import json as _json
+    import re as _re
+    import subprocess as _subprocess
+
+    def _git(*cmd: str) -> str:
+        result = _subprocess.run(
+            ["git", *cmd],
+            capture_output=True,
+            text=True,
+            cwd=root,
+        )
+        return result.stdout.strip()
+
+    # Find last v* tag
+    last_tag = _git("describe", "--tags", "--match", "v*", "--abbrev=0") or None
+    range_spec = f"{last_tag}..HEAD" if last_tag else "HEAD"
+
+    raw = _git("log", range_spec, "--format=%H\x1f%s\x1f%b\x1e")
+    cc_pattern = _re.compile(r"^(?P<type>[a-z]+)(?:\((?P<scope>[^)]+)\))?(?P<breaking>!)?: (?P<desc>.+)$")
+    breaking_footer = _re.compile(r"^BREAKING[- ]CHANGE:", _re.MULTILINE | _re.IGNORECASE)
+    type_section = {
+        "feat": "Added",
+        "fix": "Fixed",
+        "docs": "Documentation",
+        "test": "Testing",
+        "refactor": "Changed",
+        "perf": "Performance",
+        "chore": "Maintenance",
+        "ci": "CI/CD",
+    }
+    section_order = [
+        "Added",
+        "Changed",
+        "Fixed",
+        "Performance",
+        "Documentation",
+        "CI/CD",
+        "Testing",
+        "Maintenance",
+        "Other",
+    ]
+
+    commits = []
+    for block in raw.split("\x1e"):
+        block = block.strip()
+        if not block:
+            continue
+        parts = block.split("\x1f", 2)
+        sha = parts[0].strip()
+        subject = parts[1].strip() if len(parts) > 1 else ""
+        body = parts[2].strip() if len(parts) > 2 else ""
+        m = cc_pattern.match(subject)
+        if not m:
+            continue
+        breaking = bool(m.group("breaking")) or bool(breaking_footer.search(body))
+        commits.append(
+            {
+                "sha": sha[:8],
+                "type": m.group("type"),
+                "scope": m.group("scope") or "",
+                "breaking": breaking,
+                "description": m.group("desc"),
+                "section": type_section.get(m.group("type"), "Other"),
+            }
+        )
+
+    if not commits:
+        msg = f"No conventional commits found since {last_tag or 'beginning'}"
+        if args.output == "json":
+            print(_json.dumps({"error": msg, "commits": []}), indent=2)
+        else:
+            print(msg, file=sys.stderr)
+        return 0
+
+    # Read current version from pyproject.toml
+    pyproject = root / "pyproject.toml"
+    current_ver = (0, 1, 0)
+    if pyproject.exists():
+        ver_match = _re.search(
+            r'^version\s*=\s*"(\d+)\.(\d+)\.(\d+)"',
+            pyproject.read_text(encoding="utf-8"),
+            _re.MULTILINE,
+        )
+        if ver_match:
+            current_ver = (int(ver_match.group(1)), int(ver_match.group(2)), int(ver_match.group(3)))
+
+    # Infer bump
+    if any(c["breaking"] for c in commits):
+        bump = "major"
+        maj, mn, pt = current_ver[0] + 1, 0, 0
+    elif any(c["type"] == "feat" for c in commits):
+        bump = "minor"
+        maj, mn, pt = current_ver[0], current_ver[1] + 1, 0
+    else:
+        bump = "patch"
+        maj, mn, pt = current_ver[0], current_ver[1], current_ver[2] + 1
+
+    next_ver = f"{maj}.{mn}.{pt}"
+
+    if args.output == "json":
+        print(
+            _json.dumps(
+                {
+                    "current_version": "{}.{}.{}".format(*current_ver),
+                    "next_version": next_ver,
+                    "inferred_bump": bump,
+                    "since_tag": last_tag,
+                    "commit_count": len(commits),
+                    "commits": commits,
+                },
+                indent=2,
+            )
+        )
+        return 0
+
+    # text output
+    import datetime as _dt
+
+    today = _dt.datetime.now(tz=_dt.timezone.utc).strftime("%Y-%m-%d")
+    print(f"## [{next_ver}] -- {today}")
+    print()
+    sections: dict[str, list[str]] = {}
+    for c in commits:
+        scope_part = f"**{c['scope']}**: " if c["scope"] else ""
+        breaking_tag = " (BREAKING CHANGE)" if c["breaking"] else ""
+        line = f"- {scope_part}{c['description']}{breaking_tag} ({c['sha']})"
+        sections.setdefault(c["section"], []).append(line)
+    for heading in section_order:
+        if heading in sections:
+            print(f"### {heading}")
+            for line in sections[heading]:
+                print(line)
+            print()
+    print()
+    print(f"Inferred bump: {bump} -> {next_ver}  (since: {last_tag or 'beginning'})", file=sys.stderr)
+    return 0
+
+
 def _build_run_parser() -> argparse.ArgumentParser:
     """Build the top-level run/interactive parser."""
     parser = argparse.ArgumentParser(
@@ -1492,6 +1728,12 @@ def _build_run_parser() -> argparse.ArgumentParser:
             "  # CVE remediation guidance\n"
             "  manus-use remediate CVE-2024-3094\n"
             "  manus-use remediate CVE-2024-3094 --output json\n"
+            "\n"
+            "  # Changelog and release notes\n"
+            "  manus-use changelog                           # show full CHANGELOG.md\n"
+            "  manus-use changelog --version 0.1.0          # show section for v0.1.0\n"
+            "  manus-use changelog --generate               # preview next release notes\n"
+            "  manus-use changelog --generate --output json\n"
         ),
     )
     parser.add_argument(
@@ -1765,6 +2007,10 @@ def main() -> None:
     if first_positional == "poc-search":
         idx = argv.index("poc-search")
         sys.exit(_run_poc_search(argv[idx + 1 :]))
+
+    if first_positional == "changelog":
+        idx = argv.index("changelog")
+        sys.exit(_run_changelog(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")
