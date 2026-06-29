@@ -28,12 +28,8 @@ __all__ = ["check_poc_freshness"]
 
 _CVE_YEAR_RE = re.compile(r"CVE-(\d{4})-\d+", re.IGNORECASE)
 _TRICKEST_RAW = "https://raw.githubusercontent.com/trickest/cve/main/{year}/{cve_id}.md"
-_GITHUB_REPO_RE = re.compile(
-    r"https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git|/|$)"
-)
-_GITHUB_COMMIT_RE = re.compile(
-    r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/commit/[0-9a-f]+"
-)
+_GITHUB_REPO_RE = re.compile(r"https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git|/|$)")
+_GITHUB_COMMIT_RE = re.compile(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/commit/[0-9a-f]+")
 _URL_RE = re.compile(r"https?://\S+")
 
 _STATUS_ICON: dict[str, str] = {
@@ -52,6 +48,7 @@ def _github_token() -> str | None:
 
 def _fetch_json(url: str) -> dict[str, Any] | list[Any] | None:
     import json
+
     headers: dict[str, str] = {"User-Agent": "manus-use/poc-freshness"}
     token = _github_token()
     if token and "api.github.com" in url:
@@ -124,6 +121,7 @@ def _fetch_nvd_poc_urls(cve_id: str) -> list[str]:
 def _get_commit_count(owner: str, repo: str) -> int | None:
     """Approximate commit count via GitHub API Link-header pagination."""
     import json as _json
+
     url = f"https://api.github.com/repos/{owner}/{repo}/commits?per_page=1"
     headers: dict[str, str] = {"User-Agent": "manus-use/poc-freshness"}
     token = _github_token()
@@ -144,9 +142,7 @@ def _get_commit_count(owner: str, repo: str) -> int | None:
     return None
 
 
-def _classify_github_repo(
-    owner: str, repo: str, active_days: int, now: datetime
-) -> dict[str, Any]:
+def _classify_github_repo(owner: str, repo: str, active_days: int, now: datetime) -> dict[str, Any]:
     """Return freshness record for a single GitHub repo."""
     api_url = f"https://api.github.com/repos/{owner}/{repo}"
     data = _fetch_json(api_url)
@@ -184,10 +180,7 @@ def _classify_github_repo(
             record["days_since_commit"] = days_ago
         except ValueError:
             pass
-    contribs_url = (
-        f"https://api.github.com/repos/{owner}/{repo}/contributors?per_page=100&anon=false"
-
-    )
+    contribs_url = f"https://api.github.com/repos/{owner}/{repo}/contributors?per_page=100&anon=false"
     contribs_data = _fetch_json(contribs_url)
     if isinstance(contribs_data, list):
         record["contributors"] = len(contribs_data)
@@ -286,27 +279,18 @@ def check_poc_freshness(cve_id: str, active_days: int = 90) -> str:
     for url in github_repos:
         m = _GITHUB_REPO_RE.match(url)
         if m:
-            gh_records.append(
-                _classify_github_repo(m.group(1), m.group(2), active_days, now)
-            )
+            gh_records.append(_classify_github_repo(m.group(1), m.group(2), active_days, now))
 
-    other_records: list[dict[str, Any]] = [
-        _probe_non_github_url(u) for u in other_urls[:10]
-    ]
+    other_records: list[dict[str, Any]] = [_probe_non_github_url(u) for u in other_urls[:10]]
 
-    status_counts: dict[str, int] = {
-        s: 0
-        for s in ("active", "stale", "archived", "deleted", "framework", "unknown")
-    }
+    status_counts: dict[str, int] = {s: 0 for s in ("active", "stale", "archived", "deleted", "framework", "unknown")}
     for r in gh_records:
         st: str = r.get("status", "unknown")
         status_counts[st] = status_counts.get(st, 0) + 1
 
     lines: list[str] = [
         f"## PoC Freshness Report: {cve_id}",
-        "Active threshold : {} days  (cut-off: {})".format(
-            active_days, cutoff.strftime("%Y-%m-%d")
-        ),
+        "Active threshold : {} days  (cut-off: {})".format(active_days, cutoff.strftime("%Y-%m-%d")),
         "Sources          : trickest/cve, NVD references",
         "Report generated : {}".format(now.strftime("%Y-%m-%d %H:%M UTC")),
         "",
@@ -323,19 +307,14 @@ def check_poc_freshness(cve_id: str, active_days: int = 90) -> str:
 
     active_repos = [r for r in gh_records if r["status"] in ("active", "framework")]
     if active_repos:
-        lines.append(
-            "WARNING: ACTIVE PoC ACTIVITY DETECTED"
-            " -- attacker community is still investing in this bug."
-        )
+        lines.append("WARNING: ACTIVE PoC ACTIVITY DETECTED -- attacker community is still investing in this bug.")
         lines.append("")
 
     if gh_records:
         lines.append("### GitHub PoC Repositories")
         for r in gh_records:
             icon = _STATUS_ICON.get(r["status"], "?")
-            lines.append(
-                "{} [{}]  {}".format(icon, r["status"].upper(), r["url"])
-            )
+            lines.append("{} [{}]  {}".format(icon, r["status"].upper(), r["url"]))
             lines.append("   {}".format(r["note"]))
             meta_parts: list[str] = []
             if r.get("last_commit_date"):

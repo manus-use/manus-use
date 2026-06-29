@@ -154,9 +154,7 @@ class TestFetchNvdPocUrls:
                 }
             ]
         }
-        with patch(
-            "manus_use.tools.check_poc_freshness._fetch_json", return_value=nvd_data
-        ):
+        with patch("manus_use.tools.check_poc_freshness._fetch_json", return_value=nvd_data):
             result = _fetch_nvd_poc_urls("CVE-2024-3094")
         assert "https://github.com/owner/vuln-repo" in result
         assert "https://example.com/advisory" not in result
@@ -167,18 +165,14 @@ class TestFetchNvdPocUrls:
                 {
                     "cve": {
                         "references": [
-                            {
-                                "url": "https://github.com/owner/repo/commit/abc123"
-                            },
+                            {"url": "https://github.com/owner/repo/commit/abc123"},
                             {"url": "https://github.com/owner/repo"},
                         ]
                     }
                 }
             ]
         }
-        with patch(
-            "manus_use.tools.check_poc_freshness._fetch_json", return_value=nvd_data
-        ):
+        with patch("manus_use.tools.check_poc_freshness._fetch_json", return_value=nvd_data):
             result = _fetch_nvd_poc_urls("CVE-2024-3094")
         assert all("/commit/" not in u for u in result)
         assert "https://github.com/owner/repo" in result
@@ -196,9 +190,7 @@ class TestFetchNvdPocUrls:
                 }
             ]
         }
-        with patch(
-            "manus_use.tools.check_poc_freshness._fetch_json", return_value=nvd_data
-        ):
+        with patch("manus_use.tools.check_poc_freshness._fetch_json", return_value=nvd_data):
             result = _fetch_nvd_poc_urls("CVE-2024-3094")
         assert result.count("https://github.com/owner/repo") == 1
 
@@ -235,9 +227,7 @@ class TestClassifyGithubRepo:
         assert record["status"] == "deleted"
 
     def test_archived_when_repo_archived(self):
-        record = self._mock_classify(
-            _make_repo_data(archived=True, pushed_at="2026-01-01T00:00:00Z")
-        )
+        record = self._mock_classify(_make_repo_data(archived=True, pushed_at="2026-01-01T00:00:00Z"))
         assert record["status"] == "archived"
         assert record["archived"] is True
 
@@ -296,9 +286,7 @@ class TestClassifyGithubRepo:
 
     def test_stars_forks_watchers_populated(self):
         recent = (NOW - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        record = self._mock_classify(
-            _make_repo_data(pushed_at=recent, stars=42, watchers=7, forks=3)
-        )
+        record = self._mock_classify(_make_repo_data(pushed_at=recent, stars=42, watchers=7, forks=3))
         assert record["stars"] == 42
         assert record["watchers"] == 7
         assert record["forks"] == 3
@@ -322,18 +310,14 @@ class TestClassifyGithubRepo:
 
 class TestProbeNonGithubUrl:
     def test_accessible_when_200(self):
-        with patch(
-            "manus_use.tools.check_poc_freshness._fetch_text", return_value=(200, "body")
-        ):
+        with patch("manus_use.tools.check_poc_freshness._fetch_text", return_value=(200, "body")):
             result = _probe_non_github_url("https://exploit-db.com/exploits/12345")
         assert result["status"] == "non_github"
         assert result["http_status"] == 200
         assert "accessible" in result["note"]
 
     def test_dead_when_404(self):
-        with patch(
-            "manus_use.tools.check_poc_freshness._fetch_text", return_value=(404, "")
-        ):
+        with patch("manus_use.tools.check_poc_freshness._fetch_text", return_value=(404, "")):
             result = _probe_non_github_url("https://exploit-db.com/exploits/99999")
         assert result["http_status"] == 404
         assert "404" in result["note"]
