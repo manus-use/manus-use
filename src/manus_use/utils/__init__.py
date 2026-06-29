@@ -1,1 +1,1 @@
-"""Utility modules for manus-use."""
+"""Utility modules for manus-agent."""

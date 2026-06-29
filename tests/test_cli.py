@@ -319,7 +319,7 @@ def test_append_history_creates_file(tmp_path):
     """_append_history creates the history file and writes a valid JSON record."""
     from manus_use import cli
 
-    hist_path = tmp_path / ".manus-use" / "history.jsonl"
+    hist_path = tmp_path / ".manus-agent" / "history.jsonl"
 
     with mock.patch.object(cli, "_HISTORY_PATH", hist_path):
         cli._append_history(
@@ -419,7 +419,7 @@ def test_history_flag_calls_append(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# manus-use history subcommand
+# manus-agent history subcommand
 # ---------------------------------------------------------------------------
 
 
@@ -440,7 +440,7 @@ def _invoke_history(argv):
 
 
 def test_history_subcommand_dispatches():
-    """manus-use history dispatches to _cmd_history."""
+    """manus-agent history dispatches to _cmd_history."""
     captured = _invoke_history([])
     assert captured["_cmd_history"].called
 

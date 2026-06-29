@@ -1,5 +1,5 @@
 """
-Tests for compare_cves tool and manus-use compare CLI subcommand.
+Tests for compare_cves tool and manus-agent compare CLI subcommand.
 
 All tests are fully mocked — no real HTTP calls are made.
 """

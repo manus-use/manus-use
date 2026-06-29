@@ -18,7 +18,7 @@ Thank you for your interest in contributing! This guide covers everything you ne
 
 ```bash
 git clone https://github.com/manus-use/manus-use.git
-cd manus-use
+cd manus-agent
 
 # Install the package in editable mode with all dev/test extras
 pip install -e ".[dev,browser,search,visualization]"
@@ -27,7 +27,7 @@ pip install -e ".[dev,browser,search,visualization]"
 If you are working inside a git **worktree** (e.g. for a parallel feature branch), make sure you install from the worktree directory, not the main clone:
 
 ```bash
-git -C /path/to/manus-use worktree add /tmp/my-feature -b feat/my-feature origin/main
+git -C /path/to/manus-agent worktree add /tmp/my-feature -b feat/my-feature origin/main
 cd /tmp/my-feature
 pip install -e ".[dev]"
 ```
@@ -101,7 +101,7 @@ manus-use/
 │   ├── multi_agents/    # WorkflowAgent + Orchestrator
 │   ├── tools/           # @tool-decorated functions used by agents
 │   ├── sandbox/         # Docker sandbox helpers
-│   ├── cli.py           # manus-use CLI entry point
+│   ├── cli.py           # manus-agent CLI entry point
 │   └── config.py        # Config model (Pydantic + TOML)
 ├── tests/               # pytest test suite
 ├── config/
@@ -127,7 +127,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 <type>(<scope>): <short description>
 
-feat(cli): add --dry-run flag to manus-use discover
+feat(cli): add --dry-run flag to manus-agent discover
 fix(config): respect aws_region from [agent] section
 docs(readme): add Ollama provider example
 test(vi_agent): cover goal-loop completeness check

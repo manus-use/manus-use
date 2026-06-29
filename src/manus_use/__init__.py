@@ -1,4 +1,4 @@
-"""manus-use: A powerful framework for building advanced AI agents."""
+"""manus-agent: A powerful framework for building advanced AI agents."""
 
 from manus_use.agents import (
     BrowserUseAgent,

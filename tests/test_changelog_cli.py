@@ -61,7 +61,7 @@ class TestChangelogSubcommandRouting:
         assert callable(cli._run_changelog)
 
     def test_changelog_help_exits_zero(self):
-        """manus-use changelog --help exits 0."""
+        """manus-agent changelog --help exits 0."""
         from manus_use import cli  # noqa: PLC0415
 
         with pytest.raises(SystemExit) as exc_info:
@@ -101,7 +101,7 @@ class TestChangelogSubcommandRouting:
         assert exc_info.value.code == 0
 
     def test_top_level_help_mentions_changelog(self, capsys):
-        """manus-use --help output mentions the changelog subcommand."""
+        """manus-agent --help output mentions the changelog subcommand."""
         from manus_use import cli  # noqa: PLC0415
 
         with pytest.raises(SystemExit):

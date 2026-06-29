@@ -205,7 +205,7 @@ def _run_analyze(
 # History helpers
 # ---------------------------------------------------------------------------
 
-_HISTORY_PATH = Path.home() / ".manus-use" / "history.jsonl"
+_HISTORY_PATH = Path.home() / ".manus-agent" / "history.jsonl"
 
 
 def _append_history(
@@ -219,7 +219,7 @@ def _append_history(
 ) -> None:
     """Append a single-shot run record to the history log.
 
-    The log lives at ``~/.manus-use/history.jsonl`` (one JSON object per line)
+    The log lives at ``~/.manus-agent/history.jsonl`` (one JSON object per line)
     so it can be streamed/grepped without loading the whole file.
 
     Each record has:
@@ -711,7 +711,7 @@ _PROVIDERS = {
     "ollama": ("Ollama (local)", "llama3.2", None, False),
 }
 
-_DEFAULT_CONFIG_PATH = Path.home() / ".manus-use" / "config.toml"
+_DEFAULT_CONFIG_PATH = Path.home() / ".manus-agent" / "config.toml"
 
 
 def _cmd_init(args: argparse.Namespace) -> int:  # noqa: C901
@@ -1877,7 +1877,7 @@ def _build_run_parser() -> argparse.ArgumentParser:
             "  manus-agent\n"
             "  manus-agent --mode multi\n\n"
             "  # Setup helpers\n"
-            "  manus-agent init           # create ~/.manus-use/config.toml interactively\n"
+            "  manus-agent init           # create ~/.manus-agent/config.toml interactively\n"
             "  manus-agent doctor         # check packages, config, and API keys\n"
             "  manus-agent history        # show recent runs (use --help for filters)\n"
             "\n"

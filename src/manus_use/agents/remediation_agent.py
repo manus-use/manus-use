@@ -25,7 +25,7 @@ __all__ = ["RemediationAgent", "DEFAULT_MODEL_ID"]
 # Sensible default used only when no model can be resolved from ``Config``.
 DEFAULT_MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 
-# Repository root (…/manus-use) — used to locate bundled skills.
+# Repository root (…/manus-agent) — used to locate bundled skills.
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 _SYSTEM_PROMPT = """
@@ -210,7 +210,7 @@ class RemediationAgent:
 def _main() -> None:
     """CLI entry-point kept for backwards compatibility.
 
-    Prefer ``manus-use remediate <CVE-ID>`` instead.
+    Prefer ``manus-agent remediate <CVE-ID>`` instead.
     """
     import sys
 

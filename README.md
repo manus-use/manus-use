@@ -14,27 +14,27 @@ Built on [Strands SDK](https://github.com/strands-agents/sdk-python) and integra
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [CLI Reference](#cli-reference)
-  - [Run a task](#manus-use-task--run-a-task)
-  - [init / doctor / history](#manus-use-init--configure-credentials)
-  - [analyze](#manus-use-analyze-cve-id--vulnerability-intelligence)
-  - [remediate](#manus-use-remediate-cve-id--remediation-guidance)
-  - [discover](#manus-use-discover--cve-discovery)
-  - [epss-trend](#manus-use-epss-trend-cve-id--epss-score-history)
-  - [patch-diff](#manus-use-patch-diff-cve-id--patch-diff-summariser)
-  - [variants](#manus-use-variants-cve-id--variant-analysis)
-  - [compare](#manus-use-compare-cve-a-cve-b--side-by-side-comparison)
-  - [exploit-complexity](#manus-use-exploit-complexity-cve-id--exploit-complexity-scorer)
-  - [poc-search](#manus-use-poc-search-cve-id--multi-source-poc-aggregator)
-  - [blast-radius](#manus-use-blast-radius-spec--dependency-blast-radius)
-  - [silent-patches](#manus-use-silent-patches-ownerrepo--silent-patch-detector)
-  - [cve-timeline](#manus-use-cve-timeline-cve-id--cve-timeline)
-  - [version-range](#manus-use-version-range-cve-id--affected-version-ranges)
-  - [vendor-response](#manus-use-vendor-response-cve-id--vendor-response-tracker)
-  - [poc-freshness](#manus-use-poc-freshness-cve-id--poc-freshness-checker)
-  - [sbom-scan](#manus-use-sbom-scan-bomfile--sbom-scanner)
-  - [temporal-priority](#manus-use-temporal-priority-cve-id--temporal-priority-scorer)
-  - [cluster-variants](#manus-use-cluster-variants-cve-id--cve-variant-clustering)
-  - [changelog](#manus-use-changelog--manage-project-changelog)
+  - [Run a task](#manus-agent-task--run-a-task)
+  - [init / doctor / history](#manus-agent-init--configure-credentials)
+  - [analyze](#manus-agent-analyze-cve-id--vulnerability-intelligence)
+  - [remediate](#manus-agent-remediate-cve-id--remediation-guidance)
+  - [discover](#manus-agent-discover--cve-discovery)
+  - [epss-trend](#manus-agent-epss-trend-cve-id--epss-score-history)
+  - [patch-diff](#manus-agent-patch-diff-cve-id--patch-diff-summariser)
+  - [variants](#manus-agent-variants-cve-id--variant-analysis)
+  - [compare](#manus-agent-compare-cve-a-cve-b--side-by-side-comparison)
+  - [exploit-complexity](#manus-agent-exploit-complexity-cve-id--exploit-complexity-scorer)
+  - [poc-search](#manus-agent-poc-search-cve-id--multi-source-poc-aggregator)
+  - [blast-radius](#manus-agent-blast-radius-spec--dependency-blast-radius)
+  - [silent-patches](#manus-agent-silent-patches-ownerrepo--silent-patch-detector)
+  - [cve-timeline](#manus-agent-cve-timeline-cve-id--cve-timeline)
+  - [version-range](#manus-agent-version-range-cve-id--affected-version-ranges)
+  - [vendor-response](#manus-agent-vendor-response-cve-id--vendor-response-tracker)
+  - [poc-freshness](#manus-agent-poc-freshness-cve-id--poc-freshness-checker)
+  - [sbom-scan](#manus-agent-sbom-scan-bomfile--sbom-scanner)
+  - [temporal-priority](#manus-agent-temporal-priority-cve-id--temporal-priority-scorer)
+  - [cluster-variants](#manus-agent-cluster-variants-cve-id--cve-variant-clustering)
+  - [changelog](#manus-agent-changelog--manage-project-changelog)
 - [Configuration](#configuration)
 - [Python API](#python-api)
 - [Security & Vulnerability Intelligence](#security--vulnerability-intelligence)
@@ -71,7 +71,7 @@ manus-agent doctor
 manus-agent "Write a Python script that fetches the current Bitcoin price"
 
 # Or start the interactive REPL
-manus-use
+manus-agent
 ```
 
 ---
@@ -97,7 +97,7 @@ manus-agent --format json "List the first 10 prime numbers" | jq .result
 manus-agent --stream "Write a short story about a robot"
 
 # Interactive REPL
-manus-use
+manus-agent
 manus-agent --mode multi
 ```
 
@@ -118,7 +118,7 @@ manus-agent --mode multi
 ### `manus-agent init` — Configure credentials
 
 ```bash
-manus-agent init                        # write to ~/.manus-use/config.toml
+manus-agent init                        # write to ~/.manus-agent/config.toml
 manus-agent init --output ./my.toml    # write to a custom path
 manus-agent init --force                # overwrite without prompting
 ```
@@ -142,7 +142,7 @@ manus-agent history --format json | jq .  # all history as JSON
 manus-agent history --clear               # delete all history
 ```
 
-History is stored at `~/.manus-use/history.jsonl`.
+History is stored at `~/.manus-agent/history.jsonl`.
 
 ---
 
@@ -496,7 +496,7 @@ Parses [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `f
 
 ## Configuration
 
-Create `~/.manus-use/config.toml` (or run `manus-agent init`):
+Create `~/.manus-agent/config.toml` (or run `manus-agent init`):
 
 ```toml
 [llm]

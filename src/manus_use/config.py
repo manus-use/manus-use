@@ -50,7 +50,7 @@ def _load_dotenv() -> None:
     search_paths = [
         Path(".env"),
         Path("config/.env"),
-        Path.home() / ".manus-use" / ".env",
+        Path.home() / ".manus-agent" / ".env",
     ]
     for p in search_paths:
         if p.exists():
@@ -305,7 +305,7 @@ class Config(BaseModel):
 
             .env              (current working directory)
             config/.env
-            ~/.manus-use/.env
+            ~/.manus-agent/.env
         """
         # Load .env into os.environ (does not overwrite vars already set in shell)
         _load_dotenv()
@@ -315,7 +315,7 @@ class Config(BaseModel):
             search_paths = [
                 Path("config.toml"),
                 Path("config/config.toml"),
-                Path.home() / ".manus-use" / "config.toml",
+                Path.home() / ".manus-agent" / "config.toml",
             ]
             for p in search_paths:
                 if p.exists():

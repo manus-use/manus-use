@@ -2,7 +2,7 @@
 
 These tests guard against ``from src.manus_use.<...>`` imports and module-level
 side-effects (network connections, filesystem mutations) that break the package
-when installed via ``pip install manus-use``.
+when installed via ``pip install manus-agent``.
 
 Background
 ----------

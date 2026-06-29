@@ -18,8 +18,8 @@ Data sources (all free, no API key required):
 The tool deliberately avoids paid/rate-limited APIs so it works without
 configuration.  When a source is unavailable the result degrades gracefully.
 
-CLI: ``manus-use blast-radius requests@2.28.0``
-     ``manus-use blast-radius CVE-2021-44228``
+CLI: ``manus-agent blast-radius requests@2.28.0``
+     ``manus-agent blast-radius CVE-2021-44228``
 """
 
 from __future__ import annotations
