@@ -16,8 +16,8 @@ from manus_use.tools.get_dependency_blast_radius import (
     _blast_score,
     _enrich_maven,
     _enrich_npm,
-    _enrich_pypi,
     _enrich_package,
+    _enrich_pypi,
     _fetch_ghsa_affected,
     _fetch_nvd_affected,
     _fetch_osv_affected,
@@ -25,7 +25,6 @@ from manus_use.tools.get_dependency_blast_radius import (
     _summarise_osv_ranges,
     get_dependency_blast_radius,
 )
-
 
 # ===========================================================================
 # _parse_input
@@ -363,9 +362,7 @@ class TestFetchOsvAffected:
     def test_returns_packages_from_osv(self):
         with patch("requests.post") as mock_post, patch("requests.get") as mock_get:
             mock_post.return_value.status_code = 200
-            mock_post.return_value.json.return_value = _make_osv_query_response(
-                ["GHSA-xxxx-yyyy-zzzz"]
-            )
+            mock_post.return_value.json.return_value = _make_osv_query_response(["GHSA-xxxx-yyyy-zzzz"])
             mock_get.return_value.status_code = 200
             mock_get.return_value.json.return_value = _make_osv_full_response()
             result = _fetch_osv_affected("CVE-2021-44228")
@@ -610,9 +607,7 @@ class TestEnrichMaven:
 
     def test_returns_artifact_metadata(self):
         mock_resp = MagicMock()
-        mock_resp.json.return_value = self._make_maven_response(
-            "org.apache.logging.log4j", "log4j-core", "2.20.0"
-        )
+        mock_resp.json.return_value = self._make_maven_response("org.apache.logging.log4j", "log4j-core", "2.20.0")
         with patch("requests.get", return_value=mock_resp):
             result = _enrich_maven("org.apache.logging.log4j:log4j-core")
         assert result["ecosystem"] == "Maven"
@@ -648,43 +643,33 @@ class TestEnrichMaven:
 
 class TestEnrichPackageDispatch:
     def test_npm_ecosystem(self):
-        with patch(
-            "manus_use.tools.get_dependency_blast_radius._enrich_npm"
-        ) as mock_npm:
+        with patch("manus_use.tools.get_dependency_blast_radius._enrich_npm") as mock_npm:
             mock_npm.return_value = {"ecosystem": "npm", "package_name": "axios"}
-            result = _enrich_package("axios", "npm")
+            _enrich_package("axios", "npm")
         mock_npm.assert_called_once_with("axios")
 
     def test_javascript_ecosystem_routes_to_npm(self):
-        with patch(
-            "manus_use.tools.get_dependency_blast_radius._enrich_npm"
-        ) as mock_npm:
+        with patch("manus_use.tools.get_dependency_blast_radius._enrich_npm") as mock_npm:
             mock_npm.return_value = {"ecosystem": "npm", "package_name": "react"}
-            result = _enrich_package("react", "javascript")
+            _enrich_package("react", "javascript")
         mock_npm.assert_called_once_with("react")
 
     def test_pypi_ecosystem(self):
-        with patch(
-            "manus_use.tools.get_dependency_blast_radius._enrich_pypi"
-        ) as mock_pypi:
+        with patch("manus_use.tools.get_dependency_blast_radius._enrich_pypi") as mock_pypi:
             mock_pypi.return_value = {"ecosystem": "PyPI", "package_name": "requests"}
-            result = _enrich_package("requests", "PyPI")
+            _enrich_package("requests", "PyPI")
         mock_pypi.assert_called_once_with("requests")
 
     def test_python_ecosystem_routes_to_pypi(self):
-        with patch(
-            "manus_use.tools.get_dependency_blast_radius._enrich_pypi"
-        ) as mock_pypi:
+        with patch("manus_use.tools.get_dependency_blast_radius._enrich_pypi") as mock_pypi:
             mock_pypi.return_value = {"ecosystem": "PyPI", "package_name": "flask"}
-            result = _enrich_package("flask", "python")
+            _enrich_package("flask", "python")
         mock_pypi.assert_called_once_with("flask")
 
     def test_maven_ecosystem(self):
-        with patch(
-            "manus_use.tools.get_dependency_blast_radius._enrich_maven"
-        ) as mock_maven:
+        with patch("manus_use.tools.get_dependency_blast_radius._enrich_maven") as mock_maven:
             mock_maven.return_value = {"ecosystem": "Maven", "package_name": "log4j-core"}
-            result = _enrich_package("log4j-core", "Maven")
+            _enrich_package("log4j-core", "Maven")
         mock_maven.assert_called_once_with("log4j-core")
 
     def test_unknown_ecosystem_returns_minimal_record(self):
@@ -808,7 +793,7 @@ class TestGetDependencyBlastRadius:
                 return_value=pypi_stats,
             ) as mock_enrich,
         ):
-            result = get_dependency_blast_radius("CVE-2023-32681")
+            _result = get_dependency_blast_radius("CVE-2023-32681")
         # _enrich_package should be called exactly once (deduplicated)
         mock_enrich.assert_called_once()
 
@@ -860,8 +845,7 @@ class TestGetDependencyBlastRadius:
     def test_max_packages_respected(self):
         # Create 15 packages
         many_pkgs = [
-            {"name": f"lib-{i}", "ecosystem": "npm", "version_range": "1.0", "source": "osv"}
-            for i in range(15)
+            {"name": f"lib-{i}", "ecosystem": "npm", "version_range": "1.0", "source": "osv"} for i in range(15)
         ]
         call_count = {"n": 0}
 
@@ -878,7 +862,7 @@ class TestGetDependencyBlastRadius:
                 side_effect=enrich_counter,
             ),
         ):
-            result = get_dependency_blast_radius("CVE-2021-00001", max_packages=5)
+            _result = get_dependency_blast_radius("CVE-2021-00001", max_packages=5)
         assert call_count["n"] == 5
 
     def test_ecosystem_label_in_output(self):

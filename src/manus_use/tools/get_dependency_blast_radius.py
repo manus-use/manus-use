@@ -166,12 +166,14 @@ def _fetch_nvd_affected(cve_id: str) -> list[dict[str, str]]:
                     else:
                         ver_range = version if version != "*" else "all versions"
 
-                    result.append({
-                        "name": product,
-                        "version_range": ver_range,
-                        "ecosystem": "unknown",
-                        "source": "nvd",
-                    })
+                    result.append(
+                        {
+                            "name": product,
+                            "version_range": ver_range,
+                            "ecosystem": "unknown",
+                            "source": "nvd",
+                        }
+                    )
 
     # Deduplicate by name
     seen: set[str] = set()
@@ -216,12 +218,14 @@ def _fetch_osv_affected(cve_id: str) -> list[dict[str, str]]:
             ranges = affected.get("ranges", [])
             ver_range = _summarise_osv_ranges(ranges, affected.get("versions", []))
 
-            result.append({
-                "name": name,
-                "ecosystem": ecosystem,
-                "version_range": ver_range,
-                "source": "osv",
-            })
+            result.append(
+                {
+                    "name": name,
+                    "ecosystem": ecosystem,
+                    "version_range": ver_range,
+                    "source": "osv",
+                }
+            )
 
     return result
 
@@ -280,12 +284,14 @@ def _fetch_ghsa_affected(cve_id: str) -> list[dict[str, str]]:
             patched = vuln.get("first_patched_version", {})
             patched_ver = patched.get("identifier", "") if isinstance(patched, dict) else ""
             ver_range = vulnerable_range or (f"<{patched_ver}" if patched_ver else "unspecified")
-            result.append({
-                "name": name,
-                "ecosystem": ecosystem,
-                "version_range": ver_range,
-                "source": "ghsa",
-            })
+            result.append(
+                {
+                    "name": name,
+                    "ecosystem": ecosystem,
+                    "version_range": ver_range,
+                    "source": "ghsa",
+                }
+            )
 
     return result
 
@@ -452,7 +458,7 @@ def get_dependency_blast_radius(  # noqa: C901
 
     if parsed["kind"] == "cve":
         cve_id = parsed["cve_id"]
-        sections.append(f"Dependency Blast Radius — {cve_id}\n{'='*50}")
+        sections.append(f"Dependency Blast Radius — {cve_id}\n{'=' * 50}")
 
         # Gather affected packages from multiple sources
         nvd_pkgs = _fetch_nvd_affected(cve_id)
@@ -485,13 +491,15 @@ def get_dependency_blast_radius(  # noqa: C901
         ecosystem = parsed["ecosystem"] or ""
         label = f"{ecosystem}:{name}" if ecosystem else name
         ver_label = f"@{version}" if version else " (all versions)"
-        sections.append(f"Dependency Blast Radius — {label}{ver_label}\n{'='*50}")
-        all_packages = [{
-            "name": name,
-            "ecosystem": ecosystem,
-            "version_range": version or "all",
-            "source": "direct",
-        }]
+        sections.append(f"Dependency Blast Radius — {label}{ver_label}\n{'=' * 50}")
+        all_packages = [
+            {
+                "name": name,
+                "ecosystem": ecosystem,
+                "version_range": version or "all",
+                "source": "direct",
+            }
+        ]
 
     # Enrich each package with stats
     enriched_results: list[dict[str, Any]] = []
@@ -563,14 +571,9 @@ def get_dependency_blast_radius(  # noqa: C901
         max_pkg = top.get("package_name", "")
         sections.append(f"\nSummary: highest blast radius is {max_blast} ({max_pkg})")
         total_weekly = sum(
-            r.get("weekly_downloads") or 0
-            for r in enriched_results
-            if r.get("weekly_downloads") is not None
+            r.get("weekly_downloads") or 0 for r in enriched_results if r.get("weekly_downloads") is not None
         )
-        total_dependents = sum(
-            r.get("dependent_packages_count") or 0
-            for r in enriched_results
-        )
+        total_dependents = sum(r.get("dependent_packages_count") or 0 for r in enriched_results)
         if total_weekly:
             sections.append(f"         Total weekly downloads across all packages: {total_weekly:,}")
         if total_dependents:

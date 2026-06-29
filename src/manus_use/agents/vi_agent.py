@@ -210,13 +210,13 @@ class VulnerabilityIntelligenceAgent:
             from strands import Agent
             from strands_tools import current_time
 
+            from manus_use.tools.get_dependency_blast_radius import get_dependency_blast_radius
             from manus_use.tools.get_epss_trend import get_epss_trend
             from manus_use.tools.get_github_advisory import get_github_advisory
             from manus_use.tools.get_patch_diff import get_patch_diff
             from manus_use.tools.get_poc_week import get_poc_week
             from manus_use.tools.get_trickest_pocs import get_trickest_pocs
             from manus_use.tools.get_vulncheck_data import get_vulncheck_data
-            from manus_use.tools.get_dependency_blast_radius import get_dependency_blast_radius
             from manus_use.tools.score_exploit_complexity import score_exploit_complexity
             from manus_use.tools.search_poc_sources import search_poc_sources
         except ImportError as exc:  # pragma: no cover - depends on env
