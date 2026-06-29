@@ -321,6 +321,46 @@ Use this alongside `epss-trend` and `compare` to answer: *"this CVE is CVSS 9.8
 |------|---------|-------------|
 | `--output {text,json}` | `text` | Output format; `json` includes per-dimension scores and metadata |
 
+### `manus-use temporal-priority <CVE-ID>` — Time-aware urgency score
+
+```bash
+# Score how urgently you need to act on a CVE right now (0-100)
+manus-use temporal-priority CVE-2021-44228
+
+# Machine-readable output
+manus-use temporal-priority CVE-2021-44228 --output json | jq '{score: .urgency_score, label: .label}'
+```
+
+Computes a composite 0–100 urgency score by combining six signals, each weighted
+to reflect real-world exploitation risk:
+
+| Component | Max pts | What it captures |
+|-----------|---------|------------------|
+| CVSS base score | 25 | Theoretical severity |
+| EPSS current score | 20 | ML-predicted exploitation probability |
+| EPSS spike recency | 15 | How recently the EPSS score surged (exponential decay — a spike last week outweighs a spike six months ago) |
+| CISA KEV membership | 20 | Actively exploited in the wild |
+| Patch unavailability | 10 | No patch signals in NVD references |
+| CVE age pressure | 10 | How long an unpatched window has been open |
+
+Score bands:
+
+| Score | Label | Suggested action |
+|-------|-------|------------------|
+| 80–100 | 🔴 CRITICAL | Act immediately — patch, isolate, or mitigate within hours |
+| 60–79 | 🟠 HIGH | Prioritise patching within 1–3 days |
+| 40–59 | 🟡 MEDIUM | Schedule for next maintenance window |
+| 0–39 | 🟢 LOW | Monitor; patch on standard cycle |
+
+Use alongside `exploit-complexity` (how hard to weaponise) and `compare`
+(which of two CVEs is more urgent) to build a full triage picture.
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output {text,json}` | `text` | Output format; `json` includes per-component breakdown and all raw signals |
+
 ### `manus-use discover` — CVE discovery
 
 ```bash
@@ -606,6 +646,10 @@ manus-use compare CVE-2024-3094 CVE-2021-44228 --output json | jq .higher_priori
 # Score how hard it is for an attacker to exploit a CVE (1=trivial, 5=very hard)
 manus-use exploit-complexity CVE-2024-3094
 manus-use exploit-complexity CVE-2024-3094 --output json | jq .attacker_friendly
+
+# Score time-aware urgency: CVSS + EPSS trajectory + KEV + patch status + age (0-100)
+manus-use temporal-priority CVE-2021-44228
+manus-use temporal-priority CVE-2021-44228 --output json | jq '{score: .urgency_score, label: .label}'
 
 # Discover new high-EPSS CVEs from the last 2 weeks
 manus-use discover --since 2025-06-12 --min-epss 0.6
