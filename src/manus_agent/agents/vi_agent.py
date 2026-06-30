@@ -120,6 +120,12 @@ Your process is optimized to build a comprehensive picture from authoritative, f
   Use this to answer: *"how many downstream projects are exposed to this vulnerability?"*
   A CRITICAL blast radius (>5M weekly downloads or >50K npm dependents) should be flagged prominently.
 
+**Step 6d: EPSS Watchlist**
+- After completing the blast-radius step, call `watch_epss` with `action="add"` and the CVE ID to add it
+  to the persistent EPSS watchlist. This lets the user track exploitation-probability changes over time
+  using `manus-agent watch check`. Only call this once per CVE; it is a no-op if the CVE is already
+  on the watchlist.
+
 **Step 7: Analyze Weakness**
 - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -219,6 +225,7 @@ class VulnerabilityIntelligenceAgent:
             from manus_agent.tools.get_vulncheck_data import get_vulncheck_data
             from manus_agent.tools.score_exploit_complexity import score_exploit_complexity
             from manus_agent.tools.search_poc_sources import search_poc_sources
+            from manus_agent.tools.watch_epss import watch_epss
         except ImportError as exc:  # pragma: no cover - depends on env
             raise ImportError(
                 "VulnerabilityIntelligenceAgent requires the optional 'strands' "
@@ -274,6 +281,7 @@ class VulnerabilityIntelligenceAgent:
             get_vulncheck_data,
             search_poc_sources,
             get_dependency_blast_radius,
+            watch_epss,
         ]
         if use_browser is not None:
             tools.append(use_browser)

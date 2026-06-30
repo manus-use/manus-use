@@ -1056,6 +1056,7 @@ _SUBCOMMANDS = {
     "poc-search",
     "changelog",
     "blast-radius",
+    "watch",
 }
 
 
@@ -1859,6 +1860,121 @@ def _run_blast_radius(argv: list[str]) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# watch subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_watch_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-agent watch",
+        description=(
+            "Manage a persistent EPSS watchlist stored in ~/.manus-agent/watchlist.jsonl.\n"
+            "Track CVEs and be alerted when their exploitation probability spikes."
+        ),
+        add_help=True,
+    )
+    sub = p.add_subparsers(dest="watch_action", metavar="{add,remove,list,check}")
+    sub.required = True
+
+    # add
+    p_add = sub.add_parser("add", help="Add a CVE to the watchlist")
+    p_add.add_argument("cve_id", metavar="CVE-ID", help="CVE to track, e.g. CVE-2024-3094")
+
+    # remove
+    p_rem = sub.add_parser("remove", help="Remove a CVE from the watchlist")
+    p_rem.add_argument("cve_id", metavar="CVE-ID", help="CVE to stop tracking")
+
+    # list
+    sub.add_parser("list", help="Show all watched CVEs with their last EPSS snapshot")
+
+    # check
+    p_chk = sub.add_parser("check", help="Fetch current EPSS for all watched CVEs and flag spikes")
+    p_chk.add_argument(
+        "--threshold",
+        type=float,
+        default=0.10,
+        metavar="DELTA",
+        help="Minimum EPSS delta to flag as a spike (default: 0.10)",
+    )
+    p_chk.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+
+    # shared optional flag
+    for sub_p in (p_add, p_rem):
+        sub_p.add_argument(
+            "--output",
+            choices=["text", "json"],
+            default="text",
+            help="Output format (default: text)",
+        )
+
+    return p
+
+
+def _run_watch(argv: list[str]) -> int:  # noqa: C901
+    parser = _build_watch_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        from manus_agent.tools.watch_epss import (
+            _action_add,
+            _action_check,
+            _action_list,
+            _action_remove,
+            _load_watchlist,
+            _resolve_path,
+        )
+    except ImportError as exc:  # pragma: no cover
+        print(f"[error] missing dependencies: {exc}", file=sys.stderr)
+        return 1
+
+    import os
+
+    path = _resolve_path(os.environ.get("MANUS_WATCHLIST_PATH"))
+    records = _load_watchlist(path)
+
+    action = args.watch_action
+    output_fmt = getattr(args, "output", "text")
+
+    try:
+        if action == "add":
+            records, message = _action_add(records, args.cve_id, path)
+        elif action == "remove":
+            records, message = _action_remove(records, args.cve_id, path)
+        elif action == "list":
+            message = _action_list(records)
+        else:  # check
+            threshold = getattr(args, "threshold", 0.10)
+            records, message = _action_check(records, path, threshold)
+    except Exception as exc:
+        print(f"[error] watch {action} failed: {exc}", file=sys.stderr)
+        return 1
+
+    if output_fmt == "json":
+        import json as _json_mod
+
+        print(
+            _json_mod.dumps(
+                {
+                    "action": action,
+                    "watchlist_path": str(path),
+                    "count": len(records),
+                    "records": records,
+                },
+                indent=2,
+            )
+        )
+    else:
+        print(message)
+
+    return 0
+
+
 def _build_run_parser() -> argparse.ArgumentParser:
     """Build the top-level run/interactive parser."""
     parser = argparse.ArgumentParser(
@@ -2188,6 +2304,10 @@ def main() -> None:
     if first_positional == "blast-radius":
         idx = argv.index("blast-radius")
         sys.exit(_run_blast_radius(argv[idx + 1 :]))
+
+    if first_positional == "watch":
+        idx = argv.index("watch")
+        sys.exit(_run_watch(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")
