@@ -120,6 +120,12 @@ Your process is optimized to build a comprehensive picture from authoritative, f
   Use this to answer: *"how many downstream projects are exposed to this vulnerability?"*
   A CRITICAL blast radius (>5M weekly downloads or >50K npm dependents) should be flagged prominently.
 
+**Step 6d: Reachability Score**
+- Call `score_reachability` with the CVE ID to obtain a 0–20 reachability score and level
+  (CRITICAL / HIGH / MEDIUM / LOW). Include the score, level, and top contributing factors in the
+  report. Reachability answers: *"how easily can an attacker trigger this in a typical deployment?"*
+  A CRITICAL or HIGH reachability score should increase the urgency of the remediation recommendation.
+
 **Step 7: Analyze Weakness**
 - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -218,6 +224,7 @@ class VulnerabilityIntelligenceAgent:
             from manus_agent.tools.get_trickest_pocs import get_trickest_pocs
             from manus_agent.tools.get_vulncheck_data import get_vulncheck_data
             from manus_agent.tools.score_exploit_complexity import score_exploit_complexity
+            from manus_agent.tools.score_reachability import score_reachability
             from manus_agent.tools.search_poc_sources import search_poc_sources
         except ImportError as exc:  # pragma: no cover - depends on env
             raise ImportError(
@@ -274,6 +281,7 @@ class VulnerabilityIntelligenceAgent:
             get_vulncheck_data,
             search_poc_sources,
             get_dependency_blast_radius,
+            score_reachability,
         ]
         if use_browser is not None:
             tools.append(use_browser)
