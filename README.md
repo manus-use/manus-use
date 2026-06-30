@@ -34,6 +34,7 @@ Built on [Strands SDK](https://github.com/strands-agents/sdk-python) and integra
   - [sbom-scan](#manus-agent-sbom-scan-bomfile--sbom-scanner)
   - [temporal-priority](#manus-agent-temporal-priority-cve-id--temporal-priority-scorer)
   - [cluster-variants](#manus-agent-cluster-variants-cve-id--cve-variant-clustering)
+  - [watch](#manus-agent-watch--epss-watchlist)
   - [changelog](#manus-agent-changelog--manage-project-changelog)
 - [Configuration](#configuration)
 - [Python API](#python-api)
@@ -475,6 +476,46 @@ Groups CVEs related to the input across three cluster dimensions: same component
 
 ---
 
+### `manus-agent watch` — EPSS watchlist
+
+Track CVEs over time and be alerted when their exploitation probability spikes.
+The watchlist is stored in `~/.manus-agent/watchlist.jsonl`.
+
+```bash
+# Add CVEs to the watchlist
+manus-agent watch add CVE-2024-3094
+manus-agent watch add CVE-2021-44228
+
+# List all watched CVEs with their last EPSS snapshot
+manus-agent watch list
+
+# Fetch current EPSS for all watched CVEs and flag any that spiked >= 0.10
+manus-agent watch check
+
+# Machine-readable output
+manus-agent watch check --output json | jq '.records[] | select(.last_epss > 0.5)'
+
+# Remove a CVE from the watchlist
+manus-agent watch remove CVE-2024-3094
+
+# Custom spike threshold
+manus-agent watch check --threshold 0.05
+```
+
+`manus-agent analyze` automatically adds the analysed CVE to the watchlist (Step 6d),
+so you can run `manus-agent watch check` daily to track any EPSS movement.
+
+| Subcommand | CVE-ID | Options | Description |
+|---|---|---|---|
+| `add` | required | `--output {text,json}` | Add a CVE to the watchlist |
+| `remove` | required | `--output {text,json}` | Remove a CVE from the watchlist |
+| `list` | — | — | Show all watched CVEs |
+| `check` | — | `--threshold DELTA`, `--output {text,json}` | Check for EPSS spikes |
+
+The `MANUS_WATCHLIST_PATH` environment variable overrides the default file location.
+
+---
+
 ### `manus-agent changelog` — Manage project changelog
 
 ```bash
@@ -629,6 +670,10 @@ manus-agent temporal-priority CVE-2024-3094
 manus-agent blast-radius CVE-2021-44228
 manus-agent cluster-variants CVE-2021-44228
 manus-agent silent-patches apache/log4j
+
+# Track EPSS changes over time
+manus-agent watch add CVE-2024-3094
+manus-agent watch check
 ```
 
 ### VulnCheck enrichment (optional)
