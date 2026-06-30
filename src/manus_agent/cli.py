@@ -1859,6 +1859,129 @@ def _run_blast_radius(argv: list[str]) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# reachability subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_reachability_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-agent reachability",
+        description=(
+            "Score how reachable a CVE's vulnerable code path is in a typical deployment.\n"
+            "\n"
+            "Combines six weighted signals into a 0–20 reachability score:\n"
+            "  Attack Vector (25%), Privileges Required (15%), User Interaction (10%),\n"
+            "  CWE reachability class (20%), PoC availability (20%), EPSS score (10%).\n"
+            "\n"
+            "Levels: CRITICAL ≥15 | HIGH ≥10 | MEDIUM ≥6 | LOW <6"
+        ),
+        add_help=True,
+    )
+    p.add_argument(
+        "cve_id",
+        metavar="CVE_ID",
+        help="CVE identifier (e.g. CVE-2024-3094)",
+    )
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    p.add_argument(
+        "--save",
+        metavar="FILE",
+        help="Write output to FILE instead of stdout",
+    )
+    return p
+
+
+def _run_reachability(argv: list[str]) -> int:  # noqa: C901
+    import json as _json
+
+    from rich.console import Console as _Console
+    from rich.panel import Panel as _Panel
+    from rich.progress import Progress as _Progress
+    from rich.progress import SpinnerColumn as _SpinnerColumn
+    from rich.progress import TextColumn as _TextColumn
+
+    _console = _Console()
+
+    parser = _build_reachability_parser()
+    args = parser.parse_args(argv)
+
+    cve_id = args.cve_id.strip().upper()
+    import re as _re
+
+    if not _re.match(r"CVE-\d{4}-\d+", cve_id):
+        _console.print(f"[red]Invalid CVE ID: {cve_id!r}[/red]")
+        return 1
+
+    try:
+        from manus_agent.tools.score_reachability import _render_text, _run_scoring
+    except ImportError as exc:
+        _console.print(f"[red]Failed to import score_reachability: {exc}[/red]")
+        return 1
+
+    if args.output == "json":
+        # Progress to stderr so stdout stays pipe-clean
+        _err = _Console(stderr=True)
+        with _Progress(
+            _SpinnerColumn(),
+            _TextColumn("[progress.description]{task.description}"),
+            console=_err,
+        ) as prog:
+            prog.add_task(f"Scoring reachability for {cve_id}…", total=None)
+            result = _run_scoring(cve_id)
+        if args.save:
+            import pathlib as _pl
+
+            _pl.Path(args.save).write_text(_json.dumps(result, indent=2))
+            _err.print(f"[green]Saved to {args.save}[/green]")
+        else:
+            print(_json.dumps(result, indent=2))
+        return 1 if "error" in result else 0
+
+    # text output
+    with _Progress(
+        _SpinnerColumn(),
+        _TextColumn("[progress.description]{task.description}"),
+        console=_console,
+    ) as prog:
+        prog.add_task(f"Scoring reachability for {cve_id}…", total=None)
+        result = _run_scoring(cve_id)
+
+    if "error" in result:
+        _console.print(f"[red]Error: {result['error']}[/red]")
+        return 1
+
+    report_text = _render_text(result)
+
+    level_colours = {
+        "CRITICAL": "bold red",
+        "HIGH": "bold yellow",
+        "MEDIUM": "yellow",
+        "LOW": "green",
+    }
+    level = result.get("reachability_level", "UNKNOWN")
+    colour = level_colours.get(level, "white")
+    panel = _Panel(
+        report_text,
+        title=f"[{colour}]Reachability — {cve_id}[/{colour}]",
+        border_style=colour,
+    )
+
+    if args.save:
+        import pathlib as _pl
+
+        _pl.Path(args.save).write_text(report_text)
+        _console.print(f"[green]Saved to {args.save}[/green]")
+    else:
+        _console.print(panel)
+    return 0
+
+
 def _build_run_parser() -> argparse.ArgumentParser:
     """Build the top-level run/interactive parser."""
     parser = argparse.ArgumentParser(
@@ -1901,6 +2024,10 @@ def _build_run_parser() -> argparse.ArgumentParser:
             "  # CVE remediation guidance\n"
             "  manus-agent remediate CVE-2024-3094\n"
             "  manus-agent remediate CVE-2024-3094 --output json\n"
+            "\n"
+            "  # Reachability scoring\n"
+            "  manus-agent reachability CVE-2024-3094\n"
+            "  manus-agent reachability CVE-2024-3094 --output json\n"
             "\n"
             "  # Changelog and release notes\n"
             "  manus-agent changelog                           # show full CHANGELOG.md\n"
@@ -2214,6 +2341,10 @@ def main() -> None:
                 config=config,
             )
         )
+
+    if first_positional == "reachability":
+        idx = argv.index("reachability")
+        sys.exit(_run_reachability(argv[idx + 1 :]))
 
     # Default: run / interactive
     run_parser = _build_run_parser()
