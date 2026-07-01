@@ -1056,6 +1056,7 @@ _SUBCOMMANDS = {
     "poc-search",
     "changelog",
     "blast-radius",
+    "watch-alert",
 }
 
 
@@ -1859,6 +1860,103 @@ def _run_blast_radius(argv: list[str]) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# watch-alert subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_watch_alert_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-agent watch-alert",
+        description=(
+            "Read the EPSS watchlist (~/.manus-agent/watchlist.jsonl), fetch current\n"
+            "EPSS scores and enrichment data (CVSS, KEV) for every tracked CVE, and\n"
+            "render an alert digest grouped into: 🚨 Spikes, ⚠️  Elevated, ✅ Stable.\n"
+            "Updated EPSS scores are persisted back to the watchlist."
+        ),
+        add_help=True,
+    )
+    p.add_argument(
+        "--threshold",
+        type=float,
+        default=0.10,
+        metavar="DELTA",
+        help="Minimum EPSS delta to flag as a spike (default: 0.10)",
+    )
+    p.add_argument(
+        "--floor",
+        type=float,
+        default=0.30,
+        metavar="EPSS",
+        help="EPSS score floor for the Elevated bucket (default: 0.30)",
+    )
+    p.add_argument(
+        "--output",
+        choices=["markdown", "text", "json"],
+        default="markdown",
+        help="Output format: markdown (default), text, or json",
+    )
+    p.add_argument(
+        "--watchlist",
+        metavar="PATH",
+        default=None,
+        help="Override the watchlist file path (default: ~/.manus-agent/watchlist.jsonl)",
+    )
+    return p
+
+
+def _run_watch_alert(argv: list[str]) -> int:
+    parser = _build_watch_alert_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        from manus_agent.tools.watch_alert import (
+            _build_alert,
+            _load_watchlist,
+            _render_markdown,
+            _render_text,
+            _resolve_path,
+        )
+    except ImportError as exc:  # pragma: no cover
+        print(f"[error] missing dependencies: {exc}", file=sys.stderr)
+        return 1
+
+    import os
+
+    path = _resolve_path(args.watchlist or os.environ.get("MANUS_WATCHLIST_PATH"))
+    records = _load_watchlist(path)
+
+    if not records:
+        print(
+            "Watchlist is empty. Use 'manus-agent watch add CVE-XXXX-YYYY' to start tracking CVEs.",
+            file=sys.stderr,
+        )
+        return 0
+
+    try:
+        _updated, payload = _build_alert(
+            records,
+            path,
+            spike_threshold=args.threshold,
+            epss_alert_floor=args.floor,
+        )
+    except Exception as exc:
+        print(f"[error] watch-alert failed: {exc}", file=sys.stderr)
+        return 1
+
+    fmt = args.output
+    if fmt == "json":
+        import json as _json_mod
+
+        print(_json_mod.dumps(payload, indent=2))
+    elif fmt == "text":
+        print(_render_text(payload), end="")
+    else:
+        print(_render_markdown(payload), end="")
+
+    return 0
+
+
 def _build_run_parser() -> argparse.ArgumentParser:
     """Build the top-level run/interactive parser."""
     parser = argparse.ArgumentParser(
@@ -2188,6 +2286,10 @@ def main() -> None:
     if first_positional == "blast-radius":
         idx = argv.index("blast-radius")
         sys.exit(_run_blast_radius(argv[idx + 1 :]))
+
+    if first_positional == "watch-alert":
+        idx = argv.index("watch-alert")
+        sys.exit(_run_watch_alert(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")
