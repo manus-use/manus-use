@@ -112,6 +112,16 @@ Your process is optimized to build a comprehensive picture from authoritative, f
   This score contextualises raw CVSS severity: a CVSS 9.8 with complexity_score=1.5 is far more urgent than the same CVSS with complexity_score=4.5.
 
 
+**Step 6b2: Attack Surface Exposure**
+- Call `score_attack_surface` with the CVE ID. Include in the report:
+  - The overall exposure score (1–5) and label (minimal / low / moderate / high / critical).
+  - The component archetype (e.g. web_server_or_api_gateway, cli_or_library).
+  - Per-dimension breakdown: deployment archetype, CVSS attack vector, internet prevalence, authentication scope, public-facing indicators.
+  - The one-paragraph rationale explaining the score.
+  Use this alongside `score_exploit_complexity` for a full attacker-perspective picture:
+  *complexity* measures how hard an exploit is to use; *exposure* measures how reachable the target is.
+  A CVE scoring **exposure=critical** and **complexity=trivial** should be treated as highest priority.
+
 **Step 6c: Dependency Blast Radius**
 - Call `get_dependency_blast_radius` with the CVE ID. Include in the report:
   - The blast-radius label (CRITICAL / HIGH / MEDIUM / LOW) for each affected package.
@@ -217,6 +227,7 @@ class VulnerabilityIntelligenceAgent:
             from manus_agent.tools.get_poc_week import get_poc_week
             from manus_agent.tools.get_trickest_pocs import get_trickest_pocs
             from manus_agent.tools.get_vulncheck_data import get_vulncheck_data
+            from manus_agent.tools.score_attack_surface import score_attack_surface
             from manus_agent.tools.score_exploit_complexity import score_exploit_complexity
             from manus_agent.tools.search_poc_sources import search_poc_sources
         except ImportError as exc:  # pragma: no cover - depends on env
@@ -271,6 +282,7 @@ class VulnerabilityIntelligenceAgent:
             get_epss_trend,
             get_patch_diff,
             score_exploit_complexity,
+            score_attack_surface,
             get_vulncheck_data,
             search_poc_sources,
             get_dependency_blast_radius,
