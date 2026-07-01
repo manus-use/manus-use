@@ -1056,6 +1056,7 @@ _SUBCOMMANDS = {
     "poc-search",
     "changelog",
     "blast-radius",
+    "attack-surface",
 }
 
 
@@ -1859,6 +1860,61 @@ def _run_blast_radius(argv: list[str]) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# attack-surface subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_attack_surface_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="manus-agent attack-surface",
+        description=(
+            "Estimate the attack surface exposure of a CVE on a 1-5 scale\n"
+            "(1=minimal, 5=critical/internet-facing).\n"
+            "Analyses deployment archetype, CVSS attack vector, internet prevalence,\n"
+            "authentication requirements, and public-facing indicators."
+        ),
+    )
+    parser.add_argument("cve_id", metavar="CVE-ID", help="CVE identifier (e.g. CVE-2021-44228)")
+    parser.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return parser
+
+
+def _run_attack_surface(argv: list[str]) -> int:
+    import json as _json
+    import re as _re
+
+    parser = _build_attack_surface_parser()
+    args = parser.parse_args(argv)
+
+    cve_id: str = args.cve_id.strip()
+    if not _re.match(r"CVE-\d{4}-\d+", cve_id, _re.IGNORECASE):
+        parser.error(f"Invalid CVE ID: {cve_id!r}. Expected format: CVE-YYYY-NNNNN")
+
+    try:
+        from manus_agent.tools.score_attack_surface import _render_text
+        from manus_agent.tools.score_attack_surface import _run_attack_surface as _run_scoring
+    except ImportError as exc:  # pragma: no cover
+        import sys as _sys
+
+        print(f"Error: failed to import score_attack_surface: {exc}", file=_sys.stderr)
+        return 1
+
+    result = _run_scoring(cve_id)
+
+    if args.output == "json":
+        print(_json.dumps(result, indent=2))
+        return 0
+
+    print(_render_text(result))
+    return 0
+
+
 def _build_run_parser() -> argparse.ArgumentParser:
     """Build the top-level run/interactive parser."""
     parser = argparse.ArgumentParser(
@@ -2188,6 +2244,10 @@ def main() -> None:
     if first_positional == "blast-radius":
         idx = argv.index("blast-radius")
         sys.exit(_run_blast_radius(argv[idx + 1 :]))
+
+    if first_positional == "attack-surface":
+        idx = argv.index("attack-surface")
+        sys.exit(_run_attack_surface(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")
