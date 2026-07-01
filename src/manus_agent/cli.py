@@ -1056,6 +1056,7 @@ _SUBCOMMANDS = {
     "poc-search",
     "changelog",
     "blast-radius",
+    "risk-score",
 }
 
 
@@ -2122,6 +2123,77 @@ def _cmd_history(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# risk-score subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_risk_score_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="manus-agent risk-score",
+        description=(
+            "Compute a composite 0–100 contextual risk score for a CVE.\n"
+            "Aggregates exploit complexity, EPSS momentum, dependency blast radius,\n"
+            "attack surface exposure, and patch availability into a single score."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("cve_id", metavar="CVE-ID", help="CVE identifier (e.g. CVE-2021-44228)")
+    parser.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    parser.add_argument(
+        "--weights",
+        default="",
+        metavar="JSON",
+        help=(
+            "Optional JSON object of per-dimension weight overrides, e.g. "
+            '\'{"exploit_complexity": 0.4, "epss_momentum": 0.3, '
+            '"blast_radius": 0.2, "attack_surface": 0.05, "patch_lag": 0.05}\'. '
+            "Values are normalised to sum to 1.0 automatically."
+        ),
+    )
+    return parser
+
+
+def _run_risk_score(argv: list[str]) -> int:
+    import re as _re
+
+    parser = _build_risk_score_parser()
+    args = parser.parse_args(argv)
+
+    cve_id: str = args.cve_id.strip()
+    if not _re.match(r"CVE-\d{4}-\d+", cve_id, _re.IGNORECASE):
+        parser.error(f"Invalid CVE ID: {cve_id!r}. Expected format: CVE-YYYY-NNNNN")
+
+    try:
+        from manus_agent.tools.score_context_score import _render_text, _run_context_score
+    except ImportError as exc:  # pragma: no cover
+        print(f"Error: failed to import score_context_score: {exc}", file=__import__("sys").stderr)
+        return 1
+
+    import json as _json
+
+    parsed_weights = None
+    if args.weights:
+        try:
+            parsed_weights = _json.loads(args.weights)
+        except _json.JSONDecodeError as exc:
+            parser.error(f"Invalid --weights JSON: {exc}")
+
+    result = _run_context_score(cve_id, parsed_weights)
+
+    if args.output == "json":
+        print(_json.dumps(result, indent=2))
+        return 0
+
+    print(_render_text(result))
+    return 0
+
+
 def main() -> None:
     """Main CLI entry point."""
     argv = sys.argv[1:]
@@ -2188,6 +2260,10 @@ def main() -> None:
     if first_positional == "blast-radius":
         idx = argv.index("blast-radius")
         sys.exit(_run_blast_radius(argv[idx + 1 :]))
+
+    if first_positional == "risk-score":
+        idx = argv.index("risk-score")
+        sys.exit(_run_risk_score(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")
