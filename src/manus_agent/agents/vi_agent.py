@@ -120,6 +120,15 @@ Your process is optimized to build a comprehensive picture from authoritative, f
   Use this to answer: *"how many downstream projects are exposed to this vulnerability?"*
   A CRITICAL blast radius (>5M weekly downloads or >50K npm dependents) should be flagged prominently.
 
+**Step 6d: Composite Contextual Risk Score**
+- Call `score_context_score` with the CVE ID. Include in the report:
+  - The overall `context_score` (0–100) and `risk_label` (CRITICAL / HIGH / MEDIUM / LOW / INFORMATIONAL).
+  - The `dominant_factor` that most drives the score and the `risk_summary` sentence.
+  - The per-dimension breakdown table (exploit complexity, EPSS momentum, blast radius, attack surface, patch lag).
+  - The `confidence` level (HIGH / MEDIUM / LOW) and which dimensions had live data.
+  This single number integrates all prior scoring steps into one actionable priority signal.
+  A score ≥80 (CRITICAL) should be treated as a highest-priority escalation regardless of raw CVSS.
+
 **Step 7: Analyze Weakness**
 - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -217,6 +226,7 @@ class VulnerabilityIntelligenceAgent:
             from manus_agent.tools.get_poc_week import get_poc_week
             from manus_agent.tools.get_trickest_pocs import get_trickest_pocs
             from manus_agent.tools.get_vulncheck_data import get_vulncheck_data
+            from manus_agent.tools.score_context_score import score_context_score
             from manus_agent.tools.score_exploit_complexity import score_exploit_complexity
             from manus_agent.tools.search_poc_sources import search_poc_sources
         except ImportError as exc:  # pragma: no cover - depends on env
@@ -274,6 +284,7 @@ class VulnerabilityIntelligenceAgent:
             get_vulncheck_data,
             search_poc_sources,
             get_dependency_blast_radius,
+            score_context_score,
         ]
         if use_browser is not None:
             tools.append(use_browser)
