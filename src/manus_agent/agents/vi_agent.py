@@ -120,6 +120,15 @@ Your process is optimized to build a comprehensive picture from authoritative, f
   Use this to answer: *"how many downstream projects are exposed to this vulnerability?"*
   A CRITICAL blast radius (>5M weekly downloads or >50K npm dependents) should be flagged prominently.
 
+**Step 6d: Patch Status**
+- Call `get_patch_status` with the CVE ID. Include in the report:
+  - The `overall_status` (fully_patched / partially_patched / unpatched / unknown) as a headline.
+  - Which distributions have released fixes (Ubuntu release codenames, Debian suites, Red Hat products).
+  - The fastest patcher: which vendor/distro shipped a fix first, and how many days after NVD publication.
+  - Any notable gaps: distros still showing "vulnerable" status.
+  Use this to answer: *"has a patch been released for this CVE and where can I get it?"*
+  An "unpatched" overall_status for a CVSS ≥7.0 CVE should be flagged prominently.
+
 **Step 7: Analyze Weakness**
 - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -214,6 +223,7 @@ class VulnerabilityIntelligenceAgent:
             from manus_agent.tools.get_epss_trend import get_epss_trend
             from manus_agent.tools.get_github_advisory import get_github_advisory
             from manus_agent.tools.get_patch_diff import get_patch_diff
+            from manus_agent.tools.get_patch_status import get_patch_status
             from manus_agent.tools.get_poc_week import get_poc_week
             from manus_agent.tools.get_trickest_pocs import get_trickest_pocs
             from manus_agent.tools.get_vulncheck_data import get_vulncheck_data
@@ -274,6 +284,7 @@ class VulnerabilityIntelligenceAgent:
             get_vulncheck_data,
             search_poc_sources,
             get_dependency_blast_radius,
+            get_patch_status,
         ]
         if use_browser is not None:
             tools.append(use_browser)
