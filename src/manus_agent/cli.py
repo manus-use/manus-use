@@ -1056,6 +1056,7 @@ _SUBCOMMANDS = {
     "poc-search",
     "changelog",
     "blast-radius",
+    "patch-status",
 }
 
 
@@ -1859,6 +1860,148 @@ def _run_blast_radius(argv: list[str]) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# patch-status subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_patch_status_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-agent patch-status",
+        description=(
+            "Query Linux distribution and open-source ecosystem security advisories\n"
+            "to report patch availability for a CVE across Ubuntu, Debian, Red Hat,\n"
+            "and OSV.dev. Shows fixed versions, advisory IDs, and time-to-patch."
+        ),
+        add_help=True,
+    )
+    p.add_argument(
+        "cve_id",
+        metavar="CVE_ID",
+        help="CVE identifier to check (e.g. CVE-2024-3094)",
+    )
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return p
+
+
+_STATUS_EMOJI: dict[str, str] = {
+    "fixed": "\u2705",  # ✅
+    "vulnerable": "\u274c",  # ❌
+    "not_affected": "\u26aa",  # ⚪
+    "unknown": "\u2753",  # ❓
+}
+
+_OVERALL_LABEL: dict[str, str] = {
+    "fully_patched": "FULLY PATCHED",
+    "partially_patched": "PARTIALLY PATCHED",
+    "unpatched": "UNPATCHED",
+    "unknown": "UNKNOWN",
+}
+
+
+def _run_patch_status(argv: list[str]) -> int:
+    import json as _json
+
+    parser = _build_patch_status_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        from manus_agent.tools.get_patch_status import get_patch_status
+    except ImportError as exc:  # pragma: no cover
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    cve_id = args.cve_id.strip().upper()
+
+    if args.output == "text":
+        print(f"Checking patch status for {cve_id}\u2026", file=sys.stderr)
+
+    result = get_patch_status(cve_id=cve_id)
+
+    if "error" in result:
+        print(f"Error: {result['error']}", file=sys.stderr)
+        return 1
+
+    if args.output == "json":
+        print(_json.dumps(result, indent=2))
+        return 0
+
+    # ------------------------------------------------------------------
+    # Text output
+    # ------------------------------------------------------------------
+    summary = result.get("summary") or {}
+    vendors = result.get("vendors") or []
+    nvd_pub = result.get("nvd_published", "unknown")
+
+    overall = summary.get("overall_status", "unknown")
+    overall_label = _OVERALL_LABEL.get(overall, overall.upper())
+
+    print()
+    print(f"Patch Status \u2014 {cve_id}")
+    print("=" * 60)
+    print(f"NVD Published  : {nvd_pub}")
+    print(f"Overall status : {overall_label}")
+    print(
+        f"Vendors checked: {summary.get('vendors_checked', 0)}  "
+        f"({summary.get('vendors_fixed', 0)} fixed, "
+        f"{summary.get('vendors_vulnerable', 0)} vulnerable)"
+    )
+    if summary.get("fastest_patch_vendor"):
+        print(f"Fastest patcher: {summary['fastest_patch_vendor']} (+{summary['fastest_patch_days']} days)")
+    if summary.get("all_advisory_ids"):
+        adv = ", ".join(summary["all_advisory_ids"][:8])
+        if len(summary["all_advisory_ids"]) > 8:
+            adv += f" \u2026 (+{len(summary['all_advisory_ids']) - 8} more)"
+        print(f"Advisories     : {adv}")
+    print()
+
+    # Group by vendor prefix for cleaner display
+    by_prefix: dict[str, list[dict]] = {}
+    for v in vendors:
+        prefix = v["vendor"].split("/")[0]
+        by_prefix.setdefault(prefix, []).append(v)
+
+    for prefix in ("ubuntu", "debian", "redhat", "osv"):
+        group = by_prefix.get(prefix, [])
+        if not group:
+            continue
+
+        # Only show fixed/vulnerable entries; skip pure "not_affected" noise
+        notable = [v for v in group if v["status"] not in ("not_affected",)]
+        if not notable:
+            continue
+
+        print(f"  {prefix.upper()}")
+        for v in notable[:10]:
+            icon = _STATUS_EMOJI.get(v["status"], "\u2753")
+            vendor_name = v["vendor"]
+            fixed_ver = v.get("fixed_version")
+            adv_ids = v.get("advisory_ids") or []
+            days = v.get("days_to_patch")
+            pkgs = ", ".join((v.get("affected_packages") or [])[:3])
+
+            line = f"    {icon} {vendor_name}"
+            if fixed_ver:
+                line += f"  \u2192 {fixed_ver}"
+            if adv_ids:
+                line += f"  [{', '.join(adv_ids[:2])}]"
+            if days is not None:
+                line += f"  (+{days}d)"
+            if pkgs:
+                line += f"  pkg: {pkgs}"
+            print(line)
+        if len(notable) > 10:
+            print(f"    \u2026 and {len(notable) - 10} more {prefix} entries")
+        print()
+
+    return 0
+
+
 def _build_run_parser() -> argparse.ArgumentParser:
     """Build the top-level run/interactive parser."""
     parser = argparse.ArgumentParser(
@@ -2188,6 +2331,10 @@ def main() -> None:
     if first_positional == "blast-radius":
         idx = argv.index("blast-radius")
         sys.exit(_run_blast_radius(argv[idx + 1 :]))
+
+    if first_positional == "patch-status":
+        idx = argv.index("patch-status")
+        sys.exit(_run_patch_status(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")
