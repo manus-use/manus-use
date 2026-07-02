@@ -1056,6 +1056,7 @@ _SUBCOMMANDS = {
     "poc-search",
     "changelog",
     "blast-radius",
+    "cve-timeline",
 }
 
 
@@ -1859,6 +1860,128 @@ def _run_blast_radius(argv: list[str]) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# cve-timeline subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_cve_timeline_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-agent cve-timeline",
+        description=(
+            "Reconstruct the full event timeline for a CVE.\n"
+            "Aggregates: NVD publish date -> EPSS first-seen -> EPSS peak date\n"
+            "-> CISA KEV add date (if exploited) -> OSV.dev patch release date.\n"
+            "Shows time-to-patch and time-to-kev deltas to judge exploitation velocity."
+        ),
+        add_help=True,
+    )
+    p.add_argument("cve_id", metavar="CVE-ID", help="CVE identifier, e.g. CVE-2021-44228")
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return p
+
+
+def _run_cve_timeline(argv: list[str]) -> int:
+    parser = _build_cve_timeline_parser()
+    args = parser.parse_args(argv)
+    cve_id = args.cve_id.strip()
+    if not cve_id:
+        parser.error("CVE-ID is required")
+
+    try:
+        from manus_agent.tools.get_cve_timeline import _build_timeline
+    except ImportError as exc:  # pragma: no cover
+        print(f"[error] missing dependencies: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        data = _build_timeline(cve_id)
+    except Exception as exc:
+        print(f"[error] timeline reconstruction failed: {exc}", file=sys.stderr)
+        return 1
+
+    if args.output == "json":
+        import json
+
+        print(json.dumps(data, indent=2))
+        return 0
+
+    # ---- text output ----
+    tl = data.get("timeline", {})
+    deltas = data.get("deltas", {})
+    kev = data.get("kev_details")
+
+    cvss = data.get("cvss_score")
+    sev = data.get("cvss_severity", "")
+    cvss_str = f"CVSS {cvss} ({sev})" if cvss else "CVSS n/a"
+
+    print(f"CVE Timeline: {data['cve_id']}  [{cvss_str}]")
+    if data.get("description"):
+        desc = data["description"]
+        print(f"  {desc[:120]}{'...' if len(desc) > 120 else ''}")
+    print()
+
+    label_w = 24
+
+    def _row(label: str, value: str | None, note: str = "") -> None:
+        val_str = value if value is not None else "(not available)"
+        note_str = f"  {note}" if note else ""
+        print(f"  {label:<{label_w}} {val_str}{note_str}")
+
+    print("Timeline:")
+    _row("NVD published", tl.get("nvd_published"))
+    _row("NVD last modified", tl.get("nvd_last_modified"))
+    _row("EPSS first seen", tl.get("epss_first_seen"))
+    epss_peak = tl.get("epss_peak_date")
+    epss_peak_score = tl.get("epss_peak_score")
+    _row(
+        "EPSS peak",
+        epss_peak,
+        f"(score {epss_peak_score:.4f})" if epss_peak_score is not None else "",
+    )
+    epss_cur = tl.get("epss_current_score")
+    _row("EPSS current score", f"{epss_cur:.4f}" if epss_cur is not None else None)
+    kev_added = tl.get("kev_added")
+    kev_due = tl.get("kev_due_date")
+    _row(
+        "CISA KEV added",
+        kev_added if kev_added else None,
+        f"(due: {kev_due})" if kev_due else "",
+    )
+    if kev:
+        _row(
+            "  KEV vendor/product",
+            f"{kev.get('vendor', '')} / {kev.get('product', '')}",
+        )
+        action = kev.get("required_action", "")
+        if action:
+            _row("  Required action", action[:80] + ("..." if len(action) > 80 else ""))
+    _row("Patch released (OSV)", tl.get("patch_released"))
+    print()
+
+    print("Deltas (from NVD publish date):")
+    d2k = deltas.get("days_nvd_to_kev")
+    d2p = deltas.get("days_nvd_to_patch")
+    d2ep = deltas.get("days_nvd_to_epss_peak")
+    _row("Days to KEV listing", str(d2k) if d2k is not None else None)
+    _row("Days to patch", str(d2p) if d2p is not None else None)
+    _row("Days to EPSS peak", str(d2ep) if d2ep is not None else None)
+
+    if d2k is not None and d2p is not None:
+        gap = d2p - d2k
+        if gap > 0:
+            print(f"\n  ⚠  Patch lagged KEV listing by {gap} days -- window of exposure.")
+        elif gap < 0:
+            print(f"\n  ✓  Patch preceded KEV listing by {-gap} days.")
+
+    return 0
+
+
 def _build_run_parser() -> argparse.ArgumentParser:
     """Build the top-level run/interactive parser."""
     parser = argparse.ArgumentParser(
@@ -2188,6 +2311,10 @@ def main() -> None:
     if first_positional == "blast-radius":
         idx = argv.index("blast-radius")
         sys.exit(_run_blast_radius(argv[idx + 1 :]))
+
+    if first_positional == "cve-timeline":
+        idx = argv.index("cve-timeline")
+        sys.exit(_run_cve_timeline(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")

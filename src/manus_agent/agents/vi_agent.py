@@ -120,6 +120,13 @@ Your process is optimized to build a comprehensive picture from authoritative, f
   Use this to answer: *"how many downstream projects are exposed to this vulnerability?"*
   A CRITICAL blast radius (>5M weekly downloads or >50K npm dependents) should be flagged prominently.
 
+**Step 6d: CVE Timeline**
+- Call `get_cve_timeline` with the CVE ID to reconstruct the exploitation timeline:
+  - NVD publish date, EPSS first-seen, EPSS peak score and date, CISA KEV add date, OSV patch date.
+  - Report `days_nvd_to_kev` (weaponisation speed) and `days_nvd_to_patch` (vendor responsiveness).
+  - If patch lagged KEV listing, flag the exposure window prominently.
+  Use this to answer: *"how fast was this vulnerability weaponised, and how quickly was it patched?"*
+
 **Step 7: Analyze Weakness**
 - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -210,6 +217,7 @@ class VulnerabilityIntelligenceAgent:
             from strands import Agent
             from strands_tools import current_time
 
+            from manus_agent.tools.get_cve_timeline import get_cve_timeline
             from manus_agent.tools.get_dependency_blast_radius import get_dependency_blast_radius
             from manus_agent.tools.get_epss_trend import get_epss_trend
             from manus_agent.tools.get_github_advisory import get_github_advisory
@@ -274,6 +282,7 @@ class VulnerabilityIntelligenceAgent:
             get_vulncheck_data,
             search_poc_sources,
             get_dependency_blast_radius,
+            get_cve_timeline,
         ]
         if use_browser is not None:
             tools.append(use_browser)
