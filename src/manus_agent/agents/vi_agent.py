@@ -120,6 +120,14 @@ Your process is optimized to build a comprehensive picture from authoritative, f
   Use this to answer: *"how many downstream projects are exposed to this vulnerability?"*
   A CRITICAL blast radius (>5M weekly downloads or >50K npm dependents) should be flagged prominently.
 
+**Step 6d: Patch Status**
+- Call `get_patch_status` with the CVE ID. Include in the report:
+  - Whether a patch is available for each affected package.
+  - The first patched version and its release date.
+  - The patch lag in days and its label (FAST ≤7 d, NORMAL 8–30 d, SLOW >30 d, MISSING).
+  Use this to answer: *"how quickly did the ecosystem respond?"*
+  A SLOW or MISSING patch lag (>30 days or no patch) should be flagged prominently as it extends the exposure window.
+
 **Step 7: Analyze Weakness**
 - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -214,6 +222,7 @@ class VulnerabilityIntelligenceAgent:
             from manus_agent.tools.get_epss_trend import get_epss_trend
             from manus_agent.tools.get_github_advisory import get_github_advisory
             from manus_agent.tools.get_patch_diff import get_patch_diff
+            from manus_agent.tools.get_patch_status import get_patch_status
             from manus_agent.tools.get_poc_week import get_poc_week
             from manus_agent.tools.get_trickest_pocs import get_trickest_pocs
             from manus_agent.tools.get_vulncheck_data import get_vulncheck_data
@@ -274,6 +283,7 @@ class VulnerabilityIntelligenceAgent:
             get_vulncheck_data,
             search_poc_sources,
             get_dependency_blast_radius,
+            get_patch_status,
         ]
         if use_browser is not None:
             tools.append(use_browser)
