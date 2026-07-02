@@ -1056,6 +1056,7 @@ _SUBCOMMANDS = {
     "poc-search",
     "changelog",
     "blast-radius",
+    "silent-patches",
 }
 
 
@@ -1859,6 +1860,149 @@ def _run_blast_radius(argv: list[str]) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# silent-patches subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_silent_patches_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-agent silent-patches",
+        description=(
+            "Scan a GitHub repository's commit history for security fixes that were\n"
+            "never assigned a CVE ('silent patches'). Uses a two-stage heuristic:\n"
+            "commit message keyword scoring followed by diff keyword scoring."
+        ),
+    )
+    p.add_argument(
+        "repo",
+        metavar="OWNER/REPO",
+        help="GitHub repository slug, e.g. 'torvalds/linux'",
+    )
+    p.add_argument(
+        "--since",
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="Start date for commit scan (default: 90 days ago)",
+    )
+    p.add_argument(
+        "--until",
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="End date for commit scan (default: today)",
+    )
+    p.add_argument(
+        "--max-commits",
+        type=int,
+        default=500,
+        metavar="N",
+        help="Hard limit on commits fetched (default: 500)",
+    )
+    p.add_argument(
+        "--fast",
+        action="store_true",
+        default=False,
+        help="Skip Stage 2 diff scoring (message keywords only, faster but noisier)",
+    )
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return p
+
+
+def _run_silent_patches(argv: list[str]) -> int:  # noqa: C901
+    parser = _build_silent_patches_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        from manus_agent.tools.detect_silent_patches import detect_silent_patches
+    except ImportError as exc:
+        print(f"Error: failed to import detect_silent_patches: {exc}", file=sys.stderr)
+        return 1
+
+    with Progress(SpinnerColumn(), TextColumn("{task.description}"), console=console, transient=True) as prog:
+        prog.add_task(
+            f"Scanning [bold]{args.repo}[/bold] for silent patches…",
+            total=None,
+        )
+        result = detect_silent_patches(
+            repo=args.repo,
+            since=args.since,
+            until=args.until,
+            max_commits=args.max_commits,
+            fast=args.fast,
+        )
+
+    if "error" in result:
+        print(f"Error: {result['error']}", file=sys.stderr)
+        return 1
+
+    candidates = result.get("candidates", [])
+
+    if args.output == "json":
+        print(json.dumps(candidates, indent=2))
+        return 0
+
+    # ---- text output -------------------------------------------------------
+    bug_emoji: dict[str, str] = {
+        "auth_bypass": "🔓",
+        "buffer_overflow": "💥",
+        "use_after_free": "♻️",
+        "integer_overflow": "🔢",
+        "injection": "💉",
+        "path_traversal": "🗂️",
+        "information_disclosure": "🕵️",
+        "denial_of_service": "🚫",
+        "race_condition": "🏁",
+        "memory_leak": "💧",
+        "null_deref": "❌",
+        "crypto_weakness": "🔑",
+        "privilege_escalation": "⬆️",
+        "format_string": "📝",
+        "unknown": "❓",
+    }
+
+    print()
+    console.print(Panel(result.get("summary", ""), title="Silent Patch Detector", style="bold blue"))
+
+    if not candidates:
+        console.print("[green]No silent patch candidates found in this range.[/green]")
+        return 0
+
+    table = Table(
+        show_header=True,
+        header_style="bold magenta",
+        title=f"Silent Patch Candidates — {args.repo}",
+    )
+    table.add_column("SHA", style="cyan", width=12)
+    table.add_column("Date", style="yellow", width=12)
+    table.add_column("Class", style="red", width=22)
+    table.add_column("Score", style="green", width=7)
+    table.add_column("Subject", style="white")
+
+    for c in candidates:
+        date_str = c.get("date", "")[:10]
+        cls = c.get("classification", "unknown")
+        emoji = bug_emoji.get(cls, "❓")
+        table.add_row(
+            c.get("sha", ""),
+            date_str,
+            f"{emoji} {cls}",
+            str(c.get("combined_score", 0)),
+            c.get("subject", "")[:70],
+        )
+
+    console.print(table)
+    print()
+    print("Use --output json to get machine-readable results with commit URLs.")
+    if args.fast:
+        print("[fast mode] Re-run without --fast for higher-confidence results (Stage 2 diff scoring).")
+    return 0
+
+
 def _build_run_parser() -> argparse.ArgumentParser:
     """Build the top-level run/interactive parser."""
     parser = argparse.ArgumentParser(
@@ -2188,6 +2332,10 @@ def main() -> None:
     if first_positional == "blast-radius":
         idx = argv.index("blast-radius")
         sys.exit(_run_blast_radius(argv[idx + 1 :]))
+
+    if first_positional == "silent-patches":
+        idx = argv.index("silent-patches")
+        sys.exit(_run_silent_patches(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")

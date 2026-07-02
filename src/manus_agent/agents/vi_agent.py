@@ -120,6 +120,14 @@ Your process is optimized to build a comprehensive picture from authoritative, f
   Use this to answer: *"how many downstream projects are exposed to this vulnerability?"*
   A CRITICAL blast radius (>5M weekly downloads or >50K npm dependents) should be flagged prominently.
 
+**Step 6d: Silent Patch Check**
+- Call `detect_silent_patches` with the ``owner/repo`` of the affected project (if determinable from NVD CPE or advisory data), using a ``--since`` date 30 days before the CVE publish date.
+  Look for commits in the affected repo that fix the same vulnerability without a CVE reference in their message.
+  Include in the report:
+  - Any silent-patch candidates found (SHA, date, classification, combined score).
+  - If a commit predate the CVE publish date, note it: the fix was shipped before public disclosure.
+  - If no candidates are found, state that no silent patches were detected in the scan window.
+
 **Step 7: Analyze Weakness**
 - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -210,6 +218,7 @@ class VulnerabilityIntelligenceAgent:
             from strands import Agent
             from strands_tools import current_time
 
+            from manus_agent.tools.detect_silent_patches import detect_silent_patches
             from manus_agent.tools.get_dependency_blast_radius import get_dependency_blast_radius
             from manus_agent.tools.get_epss_trend import get_epss_trend
             from manus_agent.tools.get_github_advisory import get_github_advisory
@@ -274,6 +283,7 @@ class VulnerabilityIntelligenceAgent:
             get_vulncheck_data,
             search_poc_sources,
             get_dependency_blast_radius,
+            detect_silent_patches,
         ]
         if use_browser is not None:
             tools.append(use_browser)
