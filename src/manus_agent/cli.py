@@ -1056,6 +1056,7 @@ _SUBCOMMANDS = {
     "poc-search",
     "changelog",
     "blast-radius",
+    "risk-score",
 }
 
 
@@ -1859,6 +1860,101 @@ def _run_blast_radius(argv: list[str]) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# risk-score subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_risk_score_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-agent risk-score",
+        description=(
+            "Produce a composite contextual risk score (0–100) for a CVE.\n"
+            "Combines six weighted dimensions: EPSS probability, CVSS v3 base score,\n"
+            "exploit complexity (attacker-friendliness), EPSS spike detection (last 30d),\n"
+            "blast radius (CPE count), and CISA KEV listing (+15 hard bonus).\n"
+            "Outputs a risk tier (CRITICAL/HIGH/MEDIUM/LOW) and a dominant-factor field."
+        ),
+        add_help=True,
+    )
+    p.add_argument(
+        "cve_id",
+        metavar="CVE_ID",
+        help="CVE identifier to score (e.g. CVE-2021-44228)",
+    )
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    p.add_argument(
+        "--weights",
+        metavar="JSON",
+        default=None,
+        help=(
+            "Override dimension weights as a JSON object, e.g. "
+            '\'{"kev_listed":0.30,"epss":0.20}\'. Values are auto-normalised.'
+        ),
+    )
+    return p
+
+
+def _run_risk_score(argv: list[str]) -> int:
+    import json as _json
+
+    parser = _build_risk_score_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        from manus_agent.tools.score_context_score import _render_text, _run_context_score
+    except ImportError as exc:  # pragma: no cover
+        print(f"Error: failed to import score_context_score: {exc}", file=sys.stderr)
+        return 1
+
+    weights: dict | None = None
+    if args.weights:
+        try:
+            weights = _json.loads(args.weights)
+            if not isinstance(weights, dict):
+                raise ValueError("--weights must be a JSON object")
+        except (ValueError, _json.JSONDecodeError) as exc:
+            print(f"Error: invalid --weights: {exc}", file=sys.stderr)
+            return 1
+
+    cve_id = args.cve_id.strip().upper()
+    import re as _re
+
+    if not _re.match(r"CVE-\d{4}-\d+", cve_id):
+        print(f"Error: {cve_id!r} is not a valid CVE identifier (expected CVE-YYYY-NNNNN)", file=sys.stderr)
+        return 1
+
+    try:
+        from manus_agent.tools import score_context_score as _mod
+
+        if weights:
+            # Merge and normalise weights before scoring
+            merged = dict(_mod._WEIGHTS)
+            for k, v in weights.items():
+                if k in merged and isinstance(v, (int, float)) and v >= 0:
+                    merged[k] = float(v)
+            total = sum(merged.values())
+            if total > 0:
+                _mod._WEIGHTS = {k: v / total for k, v in merged.items()}
+
+        result = _run_context_score(cve_id)
+    except Exception as exc:  # pragma: no cover
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    if args.output == "json":
+        print(_json.dumps(result, indent=2))
+    else:
+        print(_render_text(result))
+
+    return 0
+
+
 def _build_run_parser() -> argparse.ArgumentParser:
     """Build the top-level run/interactive parser."""
     parser = argparse.ArgumentParser(
@@ -1901,6 +1997,11 @@ def _build_run_parser() -> argparse.ArgumentParser:
             "  # CVE remediation guidance\n"
             "  manus-agent remediate CVE-2024-3094\n"
             "  manus-agent remediate CVE-2024-3094 --output json\n"
+            "\n"
+            "  # Contextual risk score (composite 6-dimension scorer)\n"
+            "  manus-agent risk-score CVE-2021-44228\n"
+            "  manus-agent risk-score CVE-2024-3094 --output json\n"
+            "  manus-agent risk-score CVE-2024-3094 --weights '{\"kev_listed\":0.30}'\n"
             "\n"
             "  # Changelog and release notes\n"
             "  manus-agent changelog                           # show full CHANGELOG.md\n"
@@ -2188,6 +2289,10 @@ def main() -> None:
     if first_positional == "blast-radius":
         idx = argv.index("blast-radius")
         sys.exit(_run_blast_radius(argv[idx + 1 :]))
+
+    if first_positional == "risk-score":
+        idx = argv.index("risk-score")
+        sys.exit(_run_risk_score(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")
