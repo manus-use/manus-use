@@ -1056,6 +1056,7 @@ _SUBCOMMANDS = {
     "poc-search",
     "changelog",
     "blast-radius",
+    "patch-status",
 }
 
 
@@ -2122,6 +2123,99 @@ def _cmd_history(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# patch-status subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_patch_status_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-agent patch-status",
+        description=(
+            "Report patch availability and patch-lag for a CVE.\n"
+            "Shows the first patched version per affected package, the date it was\n"
+            "released to the package registry (PyPI / npm / Maven), the lag in days\n"
+            "between CVE disclosure and patch release, and a lag label:\n"
+            "  FAST  = patch released within 7 days\n"
+            "  NORMAL = patch released within 30 days\n"
+            "  SLOW   = patch took more than 30 days\n"
+            "  MISSING = no patch available"
+        ),
+        add_help=True,
+    )
+    p.add_argument(
+        "cve_id",
+        metavar="CVE_ID",
+        help="CVE identifier (e.g. CVE-2021-44228)",
+    )
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return p
+
+
+def _run_patch_status(argv: list[str]) -> int:
+    import json as _json
+
+    parser = _build_patch_status_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        from manus_agent.tools.get_patch_status import _run_patch_status as _core
+    except ImportError as exc:  # pragma: no cover
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    cve_id = args.cve_id.strip()
+
+    try:
+        result = _core(cve_id)
+    except Exception as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    if "error" in result:
+        print(result["error"], file=sys.stderr)
+        return 1
+
+    if args.output == "json":
+        print(_json.dumps(result, indent=2))
+        return 0
+
+    # Text output
+    packages = result.get("packages", [])
+    print(f"Patch Status — {result['cve_id']}")
+    print("=" * 50)
+    print(f"CVE Published : {result.get('cve_published', 'unknown')}")
+    print(f"Severity      : {result.get('severity', 'UNKNOWN')}")
+    print(f"Summary       : {result.get('summary', '')}")
+
+    if not packages:
+        return 0
+
+    print()
+    for pkg in packages:
+        lag_days = pkg.get("patch_lag_days")
+        lag_str = f"{lag_days} days" if lag_days is not None else "N/A"
+        label = pkg.get("patch_lag_label", "MISSING")
+        lag_display = f"{lag_str}  [{label}]"
+        print(f"  Package   : {pkg['name']} ({pkg.get('ecosystem', 'unknown')})")
+        print(f"  Patched   : {pkg.get('patched_version', 'unknown')}")
+        print(f"  Released  : {pkg.get('patch_release_date', 'unknown')}")
+        print(f"  Lag       : {lag_display}")
+        if pkg.get("advisory_id"):
+            print(f"  Advisory  : {pkg['advisory_id']}")
+        print()
+
+    # Determine exit code: non-zero if any MISSING
+    if any(p.get("patch_lag_label") == "MISSING" for p in packages):
+        return 2  # advisory exit: unpatched packages present
+    return 0
+
+
 def main() -> None:
     """Main CLI entry point."""
     argv = sys.argv[1:]
@@ -2188,6 +2282,10 @@ def main() -> None:
     if first_positional == "blast-radius":
         idx = argv.index("blast-radius")
         sys.exit(_run_blast_radius(argv[idx + 1 :]))
+
+    if first_positional == "patch-status":
+        idx = argv.index("patch-status")
+        sys.exit(_run_patch_status(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")
