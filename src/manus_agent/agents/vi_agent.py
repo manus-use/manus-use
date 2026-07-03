@@ -120,6 +120,15 @@ Your process is optimized to build a comprehensive picture from authoritative, f
   Use this to answer: *"how many downstream projects are exposed to this vulnerability?"*
   A CRITICAL blast radius (>5M weekly downloads or >50K npm dependents) should be flagged prominently.
 
+**Step 6d: Affected Version Ranges**
+- Call `get_version_range` with the CVE ID. Include in the report:
+  - The `first_patched_version` — the minimum version users must upgrade to in order to be safe.
+  - The `ecosystem` and `package_name` so defenders know which dependency to update.
+  - The `vulnerable_ranges` as a compact constraint string (e.g. `>=2.0-beta9, <2.15.0`).
+  - Any known `affected_versions` (sample list of specific impacted releases).
+  Use this to give defenders a concrete, machine-readable upgrade target.  If `first_patched_version`
+  is None, warn that no patched version has been identified and advise checking the vendor advisory.
+
 **Step 7: Analyze Weakness**
 - From the NVD data, find the CWE ID and use the `get_cwe_details` tool to understand the software weakness.
 
@@ -216,6 +225,7 @@ class VulnerabilityIntelligenceAgent:
             from manus_agent.tools.get_patch_diff import get_patch_diff
             from manus_agent.tools.get_poc_week import get_poc_week
             from manus_agent.tools.get_trickest_pocs import get_trickest_pocs
+            from manus_agent.tools.get_version_range import get_version_range
             from manus_agent.tools.get_vulncheck_data import get_vulncheck_data
             from manus_agent.tools.score_exploit_complexity import score_exploit_complexity
             from manus_agent.tools.search_poc_sources import search_poc_sources
@@ -274,6 +284,7 @@ class VulnerabilityIntelligenceAgent:
             get_vulncheck_data,
             search_poc_sources,
             get_dependency_blast_radius,
+            get_version_range,
         ]
         if use_browser is not None:
             tools.append(use_browser)

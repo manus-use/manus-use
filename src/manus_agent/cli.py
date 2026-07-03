@@ -1056,6 +1056,7 @@ _SUBCOMMANDS = {
     "poc-search",
     "changelog",
     "blast-radius",
+    "version-range",
 }
 
 
@@ -1859,6 +1860,112 @@ def _run_blast_radius(argv: list[str]) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# version-range subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_version_range_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-agent version-range",
+        description=(
+            "Return structured vulnerable version ranges, the first patched version, "
+            "and a list of affected releases for a CVE. "
+            "Cross-references OSV.dev, NVD CPE configurations, and the GitHub Advisory Database."
+        ),
+        add_help=True,
+    )
+    p.add_argument("cve_id", metavar="CVE-ID", help="CVE identifier, e.g. CVE-2021-44228")
+    p.add_argument(
+        "--ecosystem",
+        choices=["auto", "pypi", "npm", "maven", "go"],
+        default="auto",
+        help="Force a specific ecosystem (default: auto)",
+    )
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return p
+
+
+def _run_version_range(argv: list[str]) -> int:
+    """Dispatch the ``version-range`` subcommand."""
+    parser = _build_version_range_parser()
+    args = parser.parse_args(argv)
+    cve_id = args.cve_id.strip()
+    if not cve_id:
+        print("[error] CVE-ID is required", file=sys.stderr)
+        return 1
+
+    try:
+        from manus_agent.tools.get_version_range import get_version_range
+    except ImportError as exc:  # pragma: no cover
+        print(f"[error] missing dependencies: {exc}", file=sys.stderr)
+        return 1
+
+    result = get_version_range(cve_id=cve_id, ecosystem=args.ecosystem)
+
+    if "error" in result:
+        print(f"[error] {result['error']}", file=sys.stderr)
+        return 1
+
+    if args.output == "json":
+        import json as _json
+
+        print(_json.dumps(result, indent=2))
+        return 0
+
+    # ------------------------------------------------------------------
+    # Text output
+    # ------------------------------------------------------------------
+    cve_upper = result.get("cve_id", cve_id.upper())
+    ecosystem = result.get("ecosystem", "unknown")
+    pkg = result.get("package_name", "")
+    first_patched = result.get("first_patched_version")
+    ranges = result.get("vulnerable_ranges", [])
+    affected = result.get("affected_versions", [])
+    sources = result.get("all_sources", [])
+    errors = result.get("errors", [])
+
+    print(f"\nVersion Range Report — {cve_upper}")
+    print("=" * 50)
+    print(f"  Package   : {pkg or '(unknown)'}")
+    print(f"  Ecosystem : {ecosystem}")
+    print(f"  First patched version : {first_patched or '(not determined)'}")
+    print(f"  Data sources          : {', '.join(sources) if sources else 'none'}")
+
+    if ranges:
+        print("\n  Vulnerable ranges:")
+        for i, r in enumerate(ranges, 1):
+            intro = r.get("introduced") or "(any)"
+            fixed = r.get("fixed") or "(no fix)"
+            rtype = r.get("range_type", "")
+            src = r.get("source", "")
+            print(f"    [{i}] >={intro} and <{fixed}  [{rtype}] (source: {src})")
+    else:
+        print("\n  No version range data found.")
+
+    if affected:
+        sample = affected[:10]
+        suffix = f" (+{len(affected) - 10} more)" if len(affected) > 10 else ""
+        print(f"\n  Known affected versions: {', '.join(sample)}{suffix}")
+
+    if first_patched:
+        print(f"\n  ✓ Upgrade to: {first_patched} or later")
+    else:
+        print("\n  ⚠ No patched version identified — check vendor advisory")
+
+    if errors:
+        print("\n  Warnings:")
+        for e in errors:
+            print(f"    - {e}")
+
+    return 0
+
+
 def _build_run_parser() -> argparse.ArgumentParser:
     """Build the top-level run/interactive parser."""
     parser = argparse.ArgumentParser(
@@ -2189,7 +2296,10 @@ def main() -> None:
         idx = argv.index("blast-radius")
         sys.exit(_run_blast_radius(argv[idx + 1 :]))
 
-    if first_positional == "discover":
+    if first_positional == "version-range":
+        idx = argv.index("version-range")
+        sys.exit(_run_version_range(argv[idx + 1 :]))
+
         idx = argv.index("discover")
         discover_args = _build_discover_parser().parse_args(argv[idx + 1 :])
         config = Config.from_file(discover_args.config)
