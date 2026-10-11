@@ -1055,6 +1055,7 @@ _SUBCOMMANDS = {
     "compare",
     "exploit-complexity",
     "poc-search",
+    "poc-freshness",
     "changelog",
     "blast-radius",
 }
@@ -1524,6 +1525,122 @@ def _run_poc_search(argv: list[str]) -> int:  # noqa: C901
         date = (r.get("published") or "")[:col_date]
         url = (r.get("url") or "")[:col_url]
         print(f"{src:<{col_src}}  {eaw_flag:<{col_eaw}}  {title:<{col_title}}  {date:<{col_date}}  {url}")
+
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# poc-freshness subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_poc_freshness_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-agent poc-freshness",
+        description=(
+            "Measure PoC freshness for a CVE — how recently exploit activity occurred.\n"
+            "Queries GitHub PoC repos, Exploit-DB, NVD references, and EPSS trends\n"
+            "to compute a 0-100 freshness score. A high score means attacker interest\n"
+            "is ongoing."
+        ),
+        add_help=True,
+    )
+    p.add_argument("cve_id", metavar="CVE-ID", help="CVE identifier, e.g. CVE-2024-3094")
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return p
+
+
+def _run_poc_freshness(argv: list[str]) -> int:
+    import json as _json
+    import re as _re
+
+    parser = _build_poc_freshness_parser()
+    args = parser.parse_args(argv)
+    cve_id: str = args.cve_id.strip()
+
+    if not _re.match(r"CVE-\d{4}-\d+", cve_id, _re.IGNORECASE):
+        parser.error(f"Invalid CVE ID: {cve_id!r}. Expected format: CVE-YYYY-NNNNN")
+
+    try:
+        from manus_agent.tools.get_poc_freshness import assess_poc_freshness
+    except ImportError as exc:  # pragma: no cover
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    result = assess_poc_freshness(cve_id)
+
+    if args.output == "json":
+        print(_json.dumps(result, indent=2))
+        return 0
+
+    # ---- text output ----
+    score = result.get("freshness_score", 0)
+    classification = result.get("classification", "none")
+    description = result.get("description", "")
+    breakdown = result.get("breakdown", {})
+    most_recent = result.get("most_recent_activity_days_ago")
+    recent_sources = result.get("recent_sources", {})
+    signals = result.get("signals", {})
+
+    # Header with classification badge
+    badge = {
+        "critical": "\U0001f534",  # red circle
+        "high": "\U0001f7e0",  # orange circle
+        "moderate": "\U0001f7e1",  # yellow circle
+        "low": "\U0001f7e2",  # green circle
+        "none": "\u26aa",  # white circle
+    }.get(classification, "")
+
+    print(f"PoC Freshness: {cve_id.upper()}")
+    print(f"  Score          : {score}/100 {badge} {classification.upper()}")
+    print(f"  Assessment     : {description}")
+    if most_recent is not None:
+        print(f"  Last activity  : {most_recent} days ago")
+    else:
+        print("  Last activity  : no activity detected")
+    print()
+
+    # Breakdown
+    print("Score Breakdown:")
+    print(f"  Recency         : {breakdown.get('recency_points', 0)}/40")
+    print(f"  Source breadth  : {breakdown.get('breadth_points', 0)}/20")
+    print(f"  Star velocity   : {breakdown.get('star_velocity_points', 0)}/20")
+    print(f"  EPSS momentum   : {breakdown.get('epss_momentum_points', 0)}/20")
+    print()
+
+    # Active sources
+    active = [s for s, v in recent_sources.items() if v]
+    inactive = [s for s, v in recent_sources.items() if not v]
+    if active:
+        print(f"  Active signals  : {', '.join(active)}")
+    if inactive:
+        print(f"  Quiet signals   : {', '.join(inactive)}")
+    print()
+
+    # GitHub details
+    gh = signals.get("github", {})
+    if gh.get("status") == "ok" and gh.get("repo_count", 0) > 0:
+        print(f"GitHub PoC Repos ({gh['repo_count']} found):")
+        for repo in gh.get("repos", [])[:5]:
+            stars = repo.get("stars", 0)
+            pushed = repo.get("pushed_at", "?")[:10]
+            print(f"  \u2b50 {stars:>4}  {pushed}  {repo.get('name', '')}")
+            if repo.get("description"):
+                print(f"         {repo['description'][:80]}")
+        print()
+
+    # EPSS
+    epss = signals.get("epss", {})
+    if epss.get("status") == "ok" and epss.get("current_score") is not None:
+        momentum = epss.get("momentum", 0)
+        arrow = "\u2191" if momentum > 0 else ("\u2193" if momentum < 0 else "\u2192")
+        print(f"EPSS: {epss['current_score']:.4f} {arrow} ({momentum:+.4f} over 30d)")
+        print()
 
     return 0
 
@@ -2260,6 +2377,10 @@ def main() -> None:
     if first_positional == "poc-search":
         idx = argv.index("poc-search")
         sys.exit(_run_poc_search(argv[idx + 1 :]))
+
+    if first_positional == "poc-freshness":
+        idx = argv.index("poc-freshness")
+        sys.exit(_run_poc_freshness(argv[idx + 1 :]))
 
     if first_positional == "changelog":
         idx = argv.index("changelog")
