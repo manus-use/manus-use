@@ -1057,6 +1057,7 @@ _SUBCOMMANDS = {
     "poc-search",
     "changelog",
     "blast-radius",
+    "sbom-scan",
 }
 
 
@@ -1935,6 +1936,116 @@ def _run_blast_radius(argv: list[str]) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# sbom-scan subcommand
+# ---------------------------------------------------------------------------
+
+
+def _build_sbom_scan_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="manus-agent sbom-scan",
+        description=(
+            "Scan a CycloneDX or SPDX SBOM for known vulnerabilities.\n"
+            "Queries OSV.dev in batch for all components, enriches each\n"
+            "finding with EPSS score and CISA KEV status, and ranks results\n"
+            "by KEV membership first then EPSS score descending."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  manus-agent sbom-scan bom.json\n"
+            "  manus-agent sbom-scan sbom.spdx.json --output json | jq .critical_count\n"
+        ),
+        add_help=True,
+    )
+    p.add_argument(
+        "bom_file",
+        metavar="BOM-FILE",
+        help="Path to the SBOM file (CycloneDX JSON or SPDX JSON)",
+    )
+    p.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output format (default: text)",
+    )
+    return p
+
+
+def _run_sbom_scan(argv: list[str]) -> int:  # noqa: C901
+    import json as _json
+
+    parser = _build_sbom_scan_parser()
+    args = parser.parse_args(argv)
+    bom_file = args.bom_file.strip()
+
+    if not bom_file:
+        parser.error("BOM-FILE is required")
+
+    try:
+        from manus_agent.tools.sbom_scan import scan_sbom
+    except ImportError as exc:
+        print(f"[error] missing dependencies: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        payload = scan_sbom(bom_file)
+    except FileNotFoundError as exc:
+        print(f"[error] {exc}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"[error] {exc}", file=sys.stderr)
+        return 1
+    except Exception as exc:
+        print(f"[error] unexpected error: {exc}", file=sys.stderr)
+        return 1
+
+    if args.output == "json":
+        print(_json.dumps(payload, indent=2))
+        return 0
+
+    # --- text output ---
+    print()
+    print("SBOM Vulnerability Scan")
+    print("=" * 60)
+    print(payload.get("summary", "No summary available."))
+    print()
+
+    findings = payload.get("findings", [])
+    if not findings:
+        return 0
+
+    for i, f in enumerate(findings, 1):
+        vid = f.get("vuln_id", "?")
+        cve = f.get("cve_id") or "(no CVE)"
+        sev = f.get("severity", "unknown").upper()
+        epss = f.get("epss_score", 0.0)
+        kev = "[KEV] " if f.get("in_kev") else ""
+        summary = f.get("summary", "")
+        cvss = f.get("cvss_score")
+        cvss_str = f"CVSS {cvss:.1f}" if cvss is not None else "CVSS n/a"
+
+        print(f"[{i}] {kev}{vid}")
+        if cve != vid:
+            print(f"    CVE:       {cve}")
+        print(f"    Severity:  {sev} ({cvss_str})")
+        print(f"    EPSS:      {epss:.4f}")
+        if summary:
+            print(f"    Summary:   {summary[:120]}")
+        affected = f.get("affected_components", [])
+        if affected:
+            print(f"    Affects:   {', '.join(affected[:5])}")
+            if len(affected) > 5:
+                print(f"               ... and {len(affected) - 5} more")
+        print()
+
+    # Footer summary
+    kev_count = sum(1 for f in findings if f.get("in_kev"))
+    if kev_count:
+        print(f"⚠ {kev_count} vulnerabilit{'y' if kev_count == 1 else 'ies'} in CISA KEV (actively exploited)")
+    return 0
+
+
 def _build_run_parser() -> argparse.ArgumentParser:
     """Build the top-level run/interactive parser."""
     parser = argparse.ArgumentParser(
@@ -1983,6 +2094,10 @@ def _build_run_parser() -> argparse.ArgumentParser:
             "  manus-agent changelog --version 0.1.0          # show section for v0.1.0\n"
             "  manus-agent changelog --generate               # preview next release notes\n"
             "  manus-agent changelog --generate --output json\n"
+            "\n"
+            "  # SBOM vulnerability scanning\n"
+            "  manus-agent sbom-scan bom.json\n"
+            "  manus-agent sbom-scan sbom.spdx.json --output json | jq .critical_count\n"
         ),
     )
     parser.add_argument(
@@ -2268,6 +2383,10 @@ def main() -> None:
     if first_positional == "blast-radius":
         idx = argv.index("blast-radius")
         sys.exit(_run_blast_radius(argv[idx + 1 :]))
+
+    if first_positional == "sbom-scan":
+        idx = argv.index("sbom-scan")
+        sys.exit(_run_sbom_scan(argv[idx + 1 :]))
 
     if first_positional == "discover":
         idx = argv.index("discover")
